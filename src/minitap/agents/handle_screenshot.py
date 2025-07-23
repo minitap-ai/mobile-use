@@ -3,6 +3,7 @@ from langchain_mcp_adapters.tools import ImageContent
 from minitap.constants import EXPIRED_TOOL_MESSAGE
 from minitap.graph.state import State
 from minitap.utils.media import compress_base64_jpeg
+from minitap.utils.conversation import message_is_screenshot
 
 
 def handle_screenshot(state: State):
@@ -20,7 +21,7 @@ def handle_screenshot(state: State):
         content=[
             {
                 "type": "text",
-                "text": "Screenshot taken",
+                "text": "Now that you've taken a screenshot, if you observed a goal (or sub-goal) relevant information, you must immediately persist it using add_to_memory before continuing",
             },
         ],
     )
@@ -32,18 +33,13 @@ def handle_screenshot(state: State):
             },
         ]
     )
+   
     expired_screenshot_messages: list[HumanMessage] = []
 
     for message in messages[:-1]:
-        if isinstance(message, HumanMessage):
-            first_content = message.content[0]
-            if (
-                isinstance(first_content, dict)
-                and first_content.get("type") == "image_url"
-                and first_content.get("image_url") != EXPIRED_TOOL_MESSAGE
-            ):
-                message.content = EXPIRED_TOOL_MESSAGE
-                expired_screenshot_messages.append(message)
+        if isinstance(message, HumanMessage) and message_is_screenshot(message):
+            message.content = EXPIRED_TOOL_MESSAGE
+            expired_screenshot_messages.append(message)
 
     last_message_id: str = last_message.id  # type: ignore
     return {
