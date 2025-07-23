@@ -41,7 +41,7 @@ or latest screenshot that it is truly the case.**
 
 - When the hierarchy is not enough to make a decision, use the `take_screenshot` tool to do better decisions.
 - Try to avoid calling screenshot tool as much as possible, since it is a very expensive operation. Use it when the hierarchy does not allow you to make a good decision.
-  - When you call the screenshot tool, cross-check the hierarchy with the screenshot to make sure you have the best understanding of the screen.
+- Screenshot visual information is not stored in memory. If you observe goal-relevant information, use `add_to_memory` to persist it immediately.
 
 * Subgoal Sanity & Adaptability
 
