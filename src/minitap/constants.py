@@ -7,7 +7,7 @@ FORBIDDEN_MAESTRO_TOOLS = {
     "cheat_sheet",
 }
 FAST_NON_UI_TOOLS = {
-    "update_memory",
+    "add_to_memory",
     "list_packages",
     "start_subgoal",
     "end_subgoal",
