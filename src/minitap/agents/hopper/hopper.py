@@ -3,7 +3,7 @@ from typing import Sequence
 
 from jinja2 import Template
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
-from minitap.services.llm import get_openai_llm
+from minitap.services.llm import get_google_llm
 from pydantic import BaseModel, Field
 
 
@@ -28,7 +28,7 @@ async def hopper(initial_goal: str, messages: Sequence[BaseMessage], data: str) 
         HumanMessage(content=data),
     ]
 
-    llm = get_openai_llm()
+    llm = get_google_llm()
     structured_llm = llm.with_structured_output(HopperOutput)
     response: HopperOutput = await structured_llm.ainvoke(messages)  # type: ignore
     return HopperOutput(

@@ -18,7 +18,7 @@ def get_google_llm(
 
 
 def get_openai_llm(
-    model_name: str = "o3",  # gpt-4o-mini-2024-07-18
+    model_name: str = "gpt-4o",  # gpt-4o-mini-2024-07-18
     temperature: float = 1,
 ) -> ChatOpenAI:
     client = ChatOpenAI(

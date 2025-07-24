@@ -1,6 +1,7 @@
 import asyncio
 import sys
 import time
+import uuid
 from pathlib import Path
 from typing import Any, Optional
 
@@ -20,6 +21,7 @@ from minitap.utils.media import (
 )
 from minitap.utils.time import convert_timestamp_to_str
 
+print("🔥 Minitap loaded")
 app = typer.Typer(add_completion=False, pretty_exceptions_enable=False)
 
 
@@ -32,7 +34,7 @@ def print_ai_response_to_stderr(graph_result: dict[str, Any]):
 
 async def run_automation(
     goal: str,
-    test_name: Optional[str] = None,
+    test_name: Optional[str] = uuid.uuid4().hex[:5].upper(),
     traces_output_path_str: str = "traces",
 ):
     start_time = time.time()
@@ -105,7 +107,7 @@ async def run_automation(
 
 @app.command()
 def main(
-    goal: Annotated[str, typer.Argument(help="The main goal for the agent to achieve.")],
+    goal: Annotated[str, typer.Argument(help="The main goal for the AGENT to achieve.")],
     test_name: Annotated[
         Optional[str],
         typer.Option(
