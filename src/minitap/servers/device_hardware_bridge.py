@@ -37,7 +37,7 @@ class DeviceHardwareBridge:
                 creation_flags = subprocess.CREATE_NO_WINDOW
 
             self.process = subprocess.Popen(
-                ["maestro", "studio"],
+                ["maestro", "studio", "--no-window"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
