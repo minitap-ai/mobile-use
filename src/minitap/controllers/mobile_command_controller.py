@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 
 class ScreenDataResponse(BaseModel):
     base64: str
-    elements: list
+    elements: list[dict]
     width: int
     height: int
     platform: str
