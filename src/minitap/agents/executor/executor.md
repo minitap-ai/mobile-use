@@ -15,6 +15,7 @@ and the previous tool calls, you must:
    - This is a natural-language sentence (or two) **explaining why** this tool is being invoked.
    - Keep it short but informative.
    - This is essential for debugging, traceability, and adaptation by other agents.
+
 5. For **the tool you invoke**, always provide the `executor_metadata` argument:
 
    - If you know you won't be able to achieve all Cortex decisions using the tool call you've chosen, set `retrigger` to `true` - otherwise set it to `false`
