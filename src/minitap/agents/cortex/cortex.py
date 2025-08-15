@@ -17,7 +17,6 @@ from minitap.config import LLM
 from minitap.context import get_device_context
 from minitap.graph.state import State
 from minitap.services.llm import get_llm, with_fallback
-from minitap.utils.conversations import get_screenshot_message_for_llm
 from minitap.utils.decorators import wrap_with_callbacks
 from minitap.utils.logger import get_logger
 
@@ -58,10 +57,6 @@ async def cortex_node(state: State):
     for thought in state.agents_thoughts:
         messages.append(AIMessage(content=thought))
 
-    if state.latest_screenshot_base64:
-        messages.append(get_screenshot_message_for_llm(state.latest_screenshot_base64))
-        logger.info("Added screenshot to context")
-
     if state.latest_ui_hierarchy:
         ui_hierarchy_dict: list[dict] = state.latest_ui_hierarchy
         ui_hierarchy_str = json.dumps(ui_hierarchy_dict, indent=2, ensure_ascii=False)
@@ -80,7 +75,6 @@ async def cortex_node(state: State):
     return {
         "agents_thoughts": [response.agent_thought],
         "structured_decisions": response.decisions if not is_subgoal_completed else None,
-        "latest_screenshot_base64": None,
         "latest_ui_hierarchy": None,
         "focused_app_info": None,
         "device_date": None,

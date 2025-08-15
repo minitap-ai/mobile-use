@@ -35,7 +35,6 @@ class State(AgentStatePydantic):
     subgoal_plan: Annotated[list[Subgoal], "The current plan, made of subgoals"]
 
     # contextor related keys
-    latest_screenshot_base64: Annotated[Optional[str], "Latest screenshot of the device", take_last]
     latest_ui_hierarchy: Annotated[Optional[list], "Latest UI hierarchy of the device", take_last]
     focused_app_info: Annotated[Optional[str], "Focused app info", take_last]
     device_date: Annotated[Optional[str], "Date of the device", take_last]
