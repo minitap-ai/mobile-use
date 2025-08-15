@@ -85,7 +85,7 @@ def record_events(output_path: str | None, events: Union[list[str], BaseModel, A
 ### LLM Configuration
 
 LLMProvider = Literal["openai", "google", "openrouter", "xai"]
-AgentNode = Literal["planner", "orchestrator", "cortex", "executor"]
+AgentNode = Literal["planner", "orchestrator", "contextor", "cortex", "executor"]
 
 ROOT_DIR = Path(__file__).parent.parent.parent
 DEFAULT_LLM_CONFIG_FILENAME = "llm-config.defaults.jsonc"
@@ -103,6 +103,7 @@ class LLM(BaseModel):
 class LLMConfig(BaseModel):
     planner: LLM
     orchestrator: LLM
+    contextor: LLM
     cortex: LLM
     executor: LLM
 
@@ -128,10 +129,11 @@ def get_default_llm_config() -> LLMConfig:
     except Exception as e:
         logger.error(f"Failed to load default llm config: {e}. Falling back to hardcoded config")
         return LLMConfig(
-            planner=LLM(provider="openai", model="gpt-4.1"),
-            orchestrator=LLM(provider="openai", model="gpt-4.1"),
-            cortex=LLM(provider="openai", model="o3"),
-            executor=LLM(provider="openai", model="gpt-4.1"),
+            planner=LLM(provider="openai", model="gpt-5-mini"),
+            orchestrator=LLM(provider="openai", model="gpt-5-mini"),
+            contextor=LLM(provider="openai", model="gpt-5-mini"),
+            cortex=LLM(provider="openai", model="o4-mini"),
+            executor=LLM(provider="openai", model="gpt-5-nano"),
         )
 
 

@@ -9,33 +9,41 @@
       "provider": "openai",
       "model": "gpt-5-mini"
     },
+    "contextor": {
+      "provider": "openai",
+      "model": "gpt-5-mini"
+    },
     "cortex": {
       "provider": "openai",
-      "model": "gpt-5"
+      "model": "o4-mini"
     },
     "executor": {
       "provider": "openai",
-      "model": "gpt-5"
+      "model": "gpt-5-nano"
     }
   },
   // This is the config we recommend.
   // To use it, copy it to llm.override.jsonc, following llm.override.template.jsonc.
   "recommended": {
     "planner": {
-      "provider": "google",
-      "model": "gemini-2.5-pro"
+      "provider": "openrouter",
+      "model": "meta-llama/llama-4-scout"
     },
     "orchestrator": {
-      "provider": "google",
-      "model": "gemini-2.5-pro"
+      "provider": "openrouter",
+      "model": "meta-llama/llama-4-scout"
+    },
+    "contextor": {
+      "provider": "openai",
+      "model": "gpt-5-mini"
     },
     "cortex": {
-      "provider": "openai",
-      "model": "gpt-5"
+      "provider": "google",
+      "model": "gemini-2.5-pro"
     },
     "executor": {
       "provider": "openai",
-      "model": "gpt-5"
+      "model": "gpt-5-nano"
     }
   }
 }
