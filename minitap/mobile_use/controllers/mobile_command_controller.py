@@ -356,6 +356,7 @@ if __name__ == "__main__":
         focused_app_info=None,
         device_date="",
         structured_decisions=None,
+        complete_subgoals_by_ids=[],
         executor_messages=[],
         cortex_last_thought="",
         agents_thoughts=[],

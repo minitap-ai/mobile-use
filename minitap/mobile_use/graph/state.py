@@ -36,6 +36,11 @@ class State(AgentStatePydantic):
         "Structured decisions made by the cortex, for the executor to follow",
         take_last,
     ]
+    complete_subgoals_by_ids: Annotated[
+        list[str],
+        "List of subgoal IDs to complete",
+        take_last,
+    ]
 
     # executor related keys
     executor_messages: Annotated[list[AnyMessage], "Sequential Executor messages", add_messages]

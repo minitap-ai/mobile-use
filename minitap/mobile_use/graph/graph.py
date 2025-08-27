@@ -51,7 +51,7 @@ def post_cortex_gate(
     state: State,
 ) -> Literal["continue", "end_subgoal"]:
     logger.info("Starting post_cortex_gate")
-    if not state.structured_decisions:
+    if len(state.complete_subgoals_by_ids) > 0:
         return "end_subgoal"
     return "continue"
 
