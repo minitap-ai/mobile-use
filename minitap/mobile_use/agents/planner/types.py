@@ -5,8 +5,13 @@ from pydantic import BaseModel
 from typing_extensions import Annotated
 
 
+class PlannerSubgoalOutput(BaseModel):
+    id: Annotated[Optional[str], "If not provided, it will be generated"] = None
+    description: str
+
+
 class PlannerOutput(BaseModel):
-    subgoals: list[str]
+    subgoals: list[PlannerSubgoalOutput]
 
 
 class SubgoalStatus(Enum):
@@ -17,6 +22,7 @@ class SubgoalStatus(Enum):
 
 
 class Subgoal(BaseModel):
+    id: Annotated[str, "Unique identifier of the subgoal"]
     description: Annotated[str, "Description of the subgoal"]
     completion_reason: Annotated[
         Optional[str], "Reason why the subgoal was completed (failure or success)"
@@ -35,7 +41,7 @@ class Subgoal(BaseModel):
             case SubgoalStatus.NOT_STARTED:
                 status_emoji = "(not started yet)"
 
-        output = f"- {self.description} : {status_emoji}."
+        output = f"- [ID:{self.id}]: {self.description} : {status_emoji}."
         if self.completion_reason:
             output += f" Completion reason: {self.completion_reason}"
         return output

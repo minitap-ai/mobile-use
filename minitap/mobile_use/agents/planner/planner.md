@@ -25,7 +25,7 @@ You work like an agile tech lead: defining the key milestones without locking in
 
 ### Output
 
-You must output a **list of strings**, each representing a clear subgoal.
+You must output a **list of subgoals (description + optional subgoal ID)**, each representing a clear subgoal.
 Each subgoal should be:
 
 - Focused on **realistic mobile interactions**
@@ -33,21 +33,23 @@ Each subgoal should be:
 - Sequential (later steps may depend on earlier ones)
 - Don't use loop-like formulation unless necessary (e.g. don't say "repeat this X times", instead reuse the same steps X times as subgoals)
 
+If you're replaning and need to keep a previous subgoal, you **must keep the same subgoal ID**.
+
 ### Examples
 
 #### **Initial Goal**: "Open WhatsApp and send 'I’m running late' to Alice"
 
 **Plan**:
 
-- Open the WhatsApp app
-- Locate or search for Alice
-- Open the conversation with Alice
-- Type the message "I’m running late"
-- Send the message
+- Open the WhatsApp app (ID: None -> will be generated as a UUID like bc3c362d-f498-4f1a-991e-4a2d1f8c1226)
+- Locate or search for Alice (ID: None)
+- Open the conversation with Alice (ID: None)
+- Type the message "I’m running late" (ID: None)
+- Send the message (ID: None)
 
 #### **Replanning Example**
 
-**Original Plan**: same as above
+**Original Plan**: same as above with IDs set
 **Agent Thoughts**:
 
 - Couldn’t find Alice in recent chats
@@ -56,9 +58,8 @@ Each subgoal should be:
 
 **New Plan**:
 
-- Unlock the phone if needed
-- Open WhatsApp
-- Tap the search bar
-- Search for "Alice"
-- Select the correct chat
-- Type and send "I’m running late"
+- Open WhatsApp (ID: bc3c362d-f498-4f1a-991e-4a2d1f8c1226)
+- Tap the search bar (ID: None)
+- Search for "Alice" (ID: None)
+- Select the correct chat (ID: None)
+- Type and send "I’m running late" (ID: None)
