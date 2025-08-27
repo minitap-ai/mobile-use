@@ -66,6 +66,5 @@ class ExecutorNode:
             update={
                 "cortex_last_thought": cortex_last_thought,
                 EXECUTOR_MESSAGES_KEY: [response],
-                "messages": [response],
             },
         )

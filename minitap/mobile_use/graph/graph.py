@@ -60,7 +60,7 @@ def post_executor_gate(
     state: State,
 ) -> Literal["invoke_tools", "skip"]:
     logger.info("Starting post_executor_gate")
-    messages = state.messages
+    messages = state.executor_messages
     if not messages:
         return "skip"
     last_message = messages[-1]
