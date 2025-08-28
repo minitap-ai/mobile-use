@@ -263,6 +263,7 @@ class Agent:
                 input=graph_input,
                 config={
                     "recursion_limit": task.request.max_steps,
+                    "callbacks": self._config.graph_config_callbacks,
                 },
                 stream_mode=["messages", "custom", "updates", "values"],
             ):
