@@ -41,6 +41,7 @@ Focus on the **current subgoal**.
 - When you need to open an app, use the `find_packages` low-level action to try and get its name.
 - If you refer to a UI element or coordinates, specify it clearly (e.g., `resource-id: com.whatsapp:id/search`, `text: "Alice"`, `x: 100, y: 200`).
 - **The structure is up to you**, but it must be valid **JSON stringified output**. You will accompany this output with a **natural-language summary** of your reasoning and approach in your agent thought.
+- **Never use a sequence of `tap` + `input_text` to type into a field. Always use a single `input_text` action** with the correct `resource_id` (this already ensures the element is focused and the cursor is moved to the end).
 - When you want to launch/stop an app, prefer using its package name.
 - **Only reference UI element IDs or visible texts that are explicitly present in the provided UI hierarchy or screenshot. Do not invent, infer, or guess any IDs or texts that are not directly observed**.
 - **For text clearing**: When you need to completely clear text from an input field, always use **LONG PRESS** first to select the text field, then erase. Do NOT use tap + erase as this only clears from cursor position.
