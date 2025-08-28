@@ -2,19 +2,20 @@
 Builder for AgentConfig objects using a fluent interface.
 """
 
-from typing import Dict, Optional, List
 import copy
+from typing import Dict, List, Optional
+
+from langchain_core.callbacks.base import Callbacks
 
 from minitap.mobile_use.config import get_default_llm_config
+from minitap.mobile_use.context import DevicePlatform
 from minitap.mobile_use.sdk.constants import (
     DEFAULT_HW_BRIDGE_BASE_URL,
     DEFAULT_PROFILE_NAME,
     DEFAULT_SCREEN_API_BASE_URL,
 )
-from minitap.mobile_use.sdk.types.agent import ApiBaseUrl, AgentConfig, ServerConfig
-from minitap.mobile_use.sdk.types.agent import AgentProfile
+from minitap.mobile_use.sdk.types.agent import AgentConfig, AgentProfile, ApiBaseUrl, ServerConfig
 from minitap.mobile_use.sdk.types.task import TaskRequestCommon
-from minitap.mobile_use.context import DevicePlatform
 
 
 class AgentConfigBuilder:
@@ -44,6 +45,7 @@ class AgentConfigBuilder:
         self._device_id: Optional[str] = None
         self._device_platform: Optional[DevicePlatform] = None
         self._servers: ServerConfig = get_default_servers()
+        self._graph_config_callbacks: Callbacks = None
 
     def add_profile(self, profile: AgentProfile) -> "AgentConfigBuilder":
         """
@@ -151,6 +153,16 @@ class AgentConfigBuilder:
         self._servers = copy.deepcopy(servers)
         return self
 
+    def with_graph_config_callbacks(self, callbacks: Callbacks) -> "AgentConfigBuilder":
+        """
+        Set the graph config callbacks.
+
+        Args:
+            callbacks: The graph config callbacks to use
+        """
+        self._graph_config_callbacks = callbacks
+        return self
+
     def build(self) -> AgentConfig:
         """
         Build the mobile-use AgentConfig object.
@@ -197,6 +209,7 @@ class AgentConfigBuilder:
             device_id=self._device_id,
             device_platform=self._device_platform,
             servers=self._servers,
+            graph_config_callbacks=self._graph_config_callbacks,
         )
 
 

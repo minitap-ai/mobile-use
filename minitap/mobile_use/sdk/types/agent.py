@@ -1,5 +1,7 @@
 from typing import Dict, Literal, Optional
 from urllib.parse import urlparse
+
+from langchain_core.callbacks.base import Callbacks
 from pydantic import BaseModel
 
 from minitap.mobile_use.context import DevicePlatform
@@ -71,3 +73,6 @@ class AgentConfig(BaseModel):
     device_id: Optional[str] = None
     device_platform: Optional[DevicePlatform] = None
     servers: ServerConfig
+    graph_config_callbacks: Callbacks = None
+
+    model_config = {"arbitrary_types_allowed": True}
