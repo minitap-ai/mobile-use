@@ -5,7 +5,7 @@ Here is the input for your analysis:
 **Subgoal plan**
 {{ subgoal_plan }}
 
-**Subgoals to examine**
+**Subgoals to examine (provided by the Cortex)**
 {{ subgoals_to_examine }}
 
 **Agent thoughts**

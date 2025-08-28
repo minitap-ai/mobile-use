@@ -82,14 +82,14 @@ class OrchestratorNode:
 
         state.subgoal_plan = complete_subgoals_by_ids(
             subgoals=state.subgoal_plan,
-            ids=response.subgoal_completion_report.completed_subgoal_ids,
+            ids=response.completed_subgoal_ids,
         )
         thoughts = [response.reason]
         if all_completed(state.subgoal_plan):
             logger.success("All the subgoals have been completed successfully.")
             return _get_state_update(ctx=self.ctx, state=state, thoughts=thoughts, update_plan=True)
 
-        if current_subgoal.id not in response.subgoal_completion_report.completed_subgoal_ids:
+        if current_subgoal.id not in response.completed_subgoal_ids:
             # The current subgoal is not yet complete.
             return _get_state_update(ctx=self.ctx, state=state, thoughts=thoughts, update_plan=True)
 

@@ -85,6 +85,9 @@ class CortexNode:
             and len(response.complete_subgoals_by_ids) > 0
             and len(response.decisions) == 0
         )
+        if not is_subgoal_completed:
+            response.complete_subgoals_by_ids = []
+
         return state.sanitize_update(
             ctx=self.ctx,
             update={

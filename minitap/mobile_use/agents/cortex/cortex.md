@@ -49,7 +49,10 @@ Focus on the **current PENDING subgoal and the next subgoals not yet started**.
 
 ### Output
 
-- **Structured Decisions**:
+- **complete_subgoals_by_ids** _(optional)_:
+  A list of subgoal IDs that should be marked as completed.
+
+- **Structured Decisions** _(optional)_:
   A **valid stringified JSON** describing what should be executed **right now** to advance through the subgoals as much as possible.
 
 - **Agent Thought** _(1-2 sentences)_:
@@ -57,6 +60,8 @@ Focus on the **current PENDING subgoal and the next subgoals not yet started**.
 
   This also helps other agents understand your decision and learn from future failures.
   You must also use this field to mention checkpoints when you perform actions without definite ending: for instance "Swiping up to reveal more recipes - last seen recipe was <ID or NAME>, stop when no more".
+
+**Important:** `complete_subgoals_by_ids` and the structured decisions are mutually exclusive: if you provide both, the structured decisions will be ignored. Therefore, you must always prioritize completing subgoals over providing structured decisions.
 
 ---
 
