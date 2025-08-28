@@ -1,6 +1,6 @@
 [project]
 name = "minitap-mobile-use"
-version = "2.0.0"
+version = "2.0.1"
 description = "AI-powered multi-agent system that automates real Android and iOS devices through low-level control using LangGraph."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -11,7 +11,7 @@ authors = [
     { name = "Nicolas Dehandschoewercker" },
 ]
 
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 
 dependencies = [
     "langgraph==0.5.0",
