@@ -19,17 +19,17 @@ You are provided with:
 
   - The user's **initial goal**
   - The **subgoal plan** with their statuses
-  - The **current subgoal** to act on (the one in `PENDING` in the plan)
+  - The **current subgoal** (the one in `PENDING` in the plan)
   - A list of **agent thoughts** (previous reasoning, observations about the environment)
   - **Executor agent feedback** on the latest UI decisions
 
 ### Your Mission:
 
-Focus on the **remaining PENDING subgoals**.
+Focus on the **current PENDING subgoal and the next subgoals not yet started**.
 
 1. **Analyze the UI** and environment to understand what action is required.
 
-2.1. If the **subgoal is completed**, set the `complete_subgoal` field to `True`. To justify your conclusion, you will fill in the `agent_thought` field based on:
+2.1. If some of the subgoals must be **completed** based on your observations, add them to `complete_subgoals_by_ids`. To justify your conclusion, you will fill in the `agent_thought` field based on:
 
 - The current UI state
 - Past agent thoughts
@@ -38,6 +38,7 @@ Focus on the **remaining PENDING subgoals**.
 2.2. Otherwise, output a **stringified structured set of instructions** that an **Executor agent** can perform on a real mobile device:
 
 - These must be **concrete low-level actions**: back, tap, swipe, launch app, find packages, close app, input text, paste, erase text, copy, etc.
+- Your goal is to achieve subgoals **fast** - so you must put as much actions as possible in your instructions to complete all achievable subgoals (based on your observations) in one go. 
 - When you need to open an app, use the `find_packages` low-level action to try and get its name.
 - If you refer to a UI element or coordinates, specify it clearly (e.g., `resource-id: com.whatsapp:id/search`, `text: "Alice"`, `x: 100, y: 200`).
 - **The structure is up to you**, but it must be valid **JSON stringified output**. You will accompany this output with a **natural-language summary** of your reasoning and approach in your agent thought.
@@ -49,16 +50,13 @@ Focus on the **remaining PENDING subgoals**.
 ### Output
 
 - **Structured Decisions**:
-  A **valid stringified JSON** describing what should be executed **right now** to advance the current subgoal **IF THE SUBGOAL IS NOT COMPLETED**.
+  A **valid stringified JSON** describing what should be executed **right now** to advance through the subgoals as much as possible.
 
 - **Agent Thought** _(1-2 sentences)_:
   If there is any information you need to remember for later steps, you must include it here, because only the agent thoughts will be used to produce the final structured output.
 
   This also helps other agents understand your decision and learn from future failures.
   You must also use this field to mention checkpoints when you perform actions without definite ending: for instance "Swiping up to reveal more recipes - last seen recipe was <ID or NAME>, stop when no more".
-
-- **Subgoal Completion** _(boolean)_:
-  Set to true if the current subgoal has been successfully completed - you **cannot set it to true and provide structured decisions at the same time**. You must base your decision ONLY on what you have as input (device state, agent thoughts, executor feedback, etc) - NEVER based on the decisions you have produced.
 
 ---
 

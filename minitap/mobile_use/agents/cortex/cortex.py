@@ -80,9 +80,11 @@ class CortexNode:
             fallback_call=lambda: llm_fallback.ainvoke(messages),
         )  # type: ignore
 
-        is_subgoal_completed = response.complete_subgoals_by_ids is not None and len(
-            response.complete_subgoals_by_ids
-        ) > 0
+        is_subgoal_completed = (
+            response.complete_subgoals_by_ids is not None
+            and len(response.complete_subgoals_by_ids) > 0
+            and len(response.decisions) == 0
+        )
         return state.sanitize_update(
             ctx=self.ctx,
             update={
