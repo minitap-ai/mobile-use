@@ -51,6 +51,17 @@ Call the `tap_on_element` tool with:
 - Just use the right tool based on what the `structured_decisions` requires.
 - The tools are provided dynamically via LangGraph's tool binding mechanism.
 
+#### 📝 Text Input Best Practice
+
+When using the `input_text` tool:
+
+- **Always provide the `resource_id` of the element** you want to type into.
+- The tool will automatically:
+
+  1. **Focus the element first**
+  2. **Move the cursor to the end** of the existing text
+  3. **Then type the new text**
+
 #### 🔄 Text Clearing Best Practice
 
 When you need to completely clear text from an input field, **DO NOT** simply use `erase_text` alone, as it only erases from the cursor position, backward. Instead:
