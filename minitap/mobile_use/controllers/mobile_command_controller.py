@@ -346,7 +346,6 @@ if __name__ == "__main__":
     )
     screen_data = get_screen_data(ctx.screen_api_client)
     from minitap.mobile_use.graph.state import State
-    from minitap.mobile_use.tools.mobile.erase_text import get_erase_text_tool
 
     dummy_state = State(
         latest_ui_hierarchy=screen_data.elements,
@@ -362,13 +361,15 @@ if __name__ == "__main__":
         agents_thoughts=[],
     )
 
-    # invoke erase_text tool
-    input_resource_id = "com.google.android.settings.intelligence:id/open_search_view_edit_text"
-    command_output: Command = get_erase_text_tool(ctx=ctx).invoke(
+    from minitap.mobile_use.tools.mobile.input_text import get_input_text_tool
+
+    input_resource_id = "com.google.android.apps.nexuslauncher:id/search_container_hotseat"
+    command_output: Command = get_input_text_tool(ctx=ctx).invoke(
         {
             "tool_call_id": uuid.uuid4().hex,
             "agent_thought": "",
-            "input_text_resource_id": input_resource_id,
+            "text_input_resource_id": input_resource_id,
+            "text": "Hello World",
             "state": dummy_state,
             "executor_metadata": None,
         }
