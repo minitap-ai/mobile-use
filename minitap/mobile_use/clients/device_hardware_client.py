@@ -12,6 +12,9 @@ class DeviceHardwareClient:
         url = urljoin(self.base_url, f"/api/{path.lstrip('/')}")
         return self.session.get(url, **kwargs)
 
+    def get_rich_hierarchy(self) -> list[dict]:
+        return self.get("last-view-hierarchy").json().get("children", [])
+
     def post(self, path: str, **kwargs):
         url = urljoin(self.base_url, f"/api/{path.lstrip('/')}")
         return self.session.post(url, **kwargs)
