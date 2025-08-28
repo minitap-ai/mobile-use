@@ -5,6 +5,10 @@ def get_current_subgoal(subgoals: list[Subgoal]) -> Subgoal | None:
     return next((s for s in subgoals if s.status == SubgoalStatus.PENDING), None)
 
 
+def get_subgoals_by_ids(subgoals: list[Subgoal], ids: list[str]) -> list[Subgoal]:
+    return [s for s in subgoals if s.id in ids]
+
+
 def get_next_subgoal(subgoals: list[Subgoal]) -> Subgoal | None:
     return next((s for s in subgoals if s.status == SubgoalStatus.NOT_STARTED), None)
 
@@ -18,6 +22,13 @@ def complete_current_subgoal(subgoals: list[Subgoal]) -> list[Subgoal]:
     if not current_subgoal:
         return subgoals
     current_subgoal.status = SubgoalStatus.SUCCESS
+    return subgoals
+
+
+def complete_subgoals_by_ids(subgoals: list[Subgoal], ids: list[str]) -> list[Subgoal]:
+    for subgoal in subgoals:
+        if subgoal.id in ids:
+            subgoal.status = SubgoalStatus.SUCCESS
     return subgoals
 
 

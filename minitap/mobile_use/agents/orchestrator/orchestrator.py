@@ -3,12 +3,13 @@ from pathlib import Path
 from jinja2 import Template
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from minitap.mobile_use.agents.orchestrator.types import OrchestratorOutput, OrchestratorStatus
+from minitap.mobile_use.agents.orchestrator.types import OrchestratorOutput
 from minitap.mobile_use.agents.planner.utils import (
     all_completed,
-    complete_current_subgoal,
+    complete_subgoals_by_ids,
     fail_current_subgoal,
     get_current_subgoal,
+    get_subgoals_by_ids,
     nothing_started,
     start_next_subgoal,
 )
@@ -31,24 +32,27 @@ class OrchestratorNode:
         on_failure=lambda _: logger.error("Orchestrator Agent"),
     )
     async def __call__(self, state: State):
-        if nothing_started(state.subgoal_plan):
-            state.subgoal_plan = start_next_subgoal(state.subgoal_plan)
-            new_subgoal = get_current_subgoal(state.subgoal_plan)
-            return state.sanitize_update(
-                ctx=self.ctx,
-                update={
-                    "agents_thoughts": [f"Starting the first subgoal: {new_subgoal}"],
-                    "subgoal_plan": state.subgoal_plan,
-                },
-            )
-
+        no_subgoal_started = nothing_started(state.subgoal_plan)
         current_subgoal = get_current_subgoal(state.subgoal_plan)
 
-        if not current_subgoal:
-            return state.sanitize_update(
-                ctx=self.ctx,
-                update={"agents_thoughts": ["No subgoal to go for."]},
-            )
+        if no_subgoal_started or not current_subgoal:
+            state.subgoal_plan = start_next_subgoal(state.subgoal_plan)
+            new_subgoal = get_current_subgoal(state.subgoal_plan)
+            thoughts = [
+                (
+                    f"Starting the first subgoal: {new_subgoal}"
+                    if no_subgoal_started
+                    else f"Starting the next subgoal: {new_subgoal}"
+                )
+            ]
+            return _get_state_update(ctx=self.ctx, state=state, thoughts=thoughts, update_plan=True)
+
+        subgoals_to_examine = get_subgoals_by_ids(
+            subgoals=state.subgoal_plan,
+            ids=state.complete_subgoals_by_ids,
+        )
+        if len(subgoals_to_examine) <= 0:
+            return _get_state_update(ctx=self.ctx, state=state, thoughts=["No subgoal to examine."])
 
         system_message = Template(
             Path(__file__).parent.joinpath("orchestrator.md").read_text(encoding="utf-8")
@@ -58,7 +62,7 @@ class OrchestratorNode:
         ).render(
             initial_goal=state.initial_goal,
             subgoal_plan="\n".join(str(s) for s in state.subgoal_plan),
-            current_subgoal=str(current_subgoal),
+            subgoals_to_examine="\n".join(str(s) for s in subgoals_to_examine),
             agent_thoughts="\n".join(state.agents_thoughts),
         )
         messages = [
@@ -70,45 +74,41 @@ class OrchestratorNode:
         llm = llm.with_structured_output(OrchestratorOutput)
         response: OrchestratorOutput = await llm.ainvoke(messages)  # type: ignore
 
-        if response.status == OrchestratorStatus.CONTINUE:
-            state.subgoal_plan = complete_current_subgoal(state.subgoal_plan)
-            thoughts = [response.reason]
-
-            if all_completed(state.subgoal_plan):
-                logger.success("All the subgoals have been completed successfully.")
-                return state.sanitize_update(
-                    ctx=self.ctx,
-                    update={
-                        "subgoal_plan": state.subgoal_plan,
-                        "agents_thoughts": thoughts,
-                    },
-                )
-            state.subgoal_plan = start_next_subgoal(state.subgoal_plan)
-            new_subgoal = get_current_subgoal(state.subgoal_plan)
-            thoughts.append(f"==== NEXT SUBGOAL: {new_subgoal} ====")
-            return state.sanitize_update(
-                ctx=self.ctx,
-                update={
-                    "agents_thoughts": thoughts,
-                    "subgoal_plan": state.subgoal_plan,
-                },
-            )
-
-        elif response.status == OrchestratorStatus.REPLAN:
+        if response.needs_replaning:
             thoughts = [response.reason]
             state.subgoal_plan = fail_current_subgoal(state.subgoal_plan)
             thoughts.append("==== END OF PLAN, REPLANNING ====")
-            return state.sanitize_update(
-                ctx=self.ctx,
-                update={
-                    "agents_thoughts": thoughts,
-                    "subgoal_plan": state.subgoal_plan,
-                },
-            )
+            return _get_state_update(ctx=self.ctx, state=state, thoughts=thoughts, update_plan=True)
 
-        return state.sanitize_update(
-            ctx=self.ctx,
-            update={
-                "agents_thoughts": [response.reason],
-            },
+        state.subgoal_plan = complete_subgoals_by_ids(
+            subgoals=state.subgoal_plan,
+            ids=response.completed_subgoal_ids,
         )
+        thoughts = [response.reason]
+        if all_completed(state.subgoal_plan):
+            logger.success("All the subgoals have been completed successfully.")
+            return _get_state_update(ctx=self.ctx, state=state, thoughts=thoughts, update_plan=True)
+
+        if current_subgoal.id not in response.completed_subgoal_ids:
+            # The current subgoal is not yet complete.
+            return _get_state_update(ctx=self.ctx, state=state, thoughts=thoughts, update_plan=True)
+
+        state.subgoal_plan = start_next_subgoal(state.subgoal_plan)
+        new_subgoal = get_current_subgoal(state.subgoal_plan)
+        thoughts.append(f"==== NEXT SUBGOAL: {new_subgoal} ====")
+        return _get_state_update(ctx=self.ctx, state=state, thoughts=thoughts, update_plan=True)
+
+
+def _get_state_update(
+    ctx: MobileUseContext,
+    state: State,
+    thoughts: list[str],
+    update_plan: bool = False,
+):
+    update = {
+        "agents_thoughts": thoughts,
+        "complete_subgoals_by_ids": [],
+    }
+    if update_plan:
+        update["subgoal_plan"] = state.subgoal_plan
+    return state.sanitize_update(ctx=ctx, update=update, agent="orchestrator")

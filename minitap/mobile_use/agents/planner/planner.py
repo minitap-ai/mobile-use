@@ -1,4 +1,5 @@
 from pathlib import Path
+import uuid
 
 from jinja2 import Template
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -47,7 +48,8 @@ class PlannerNode:
 
         subgoals_plan = [
             Subgoal(
-                description=subgoal,
+                id=subgoal.id or str(uuid.uuid4()),
+                description=subgoal.description,
                 status=SubgoalStatus.NOT_STARTED,
                 completion_reason=None,
             )
@@ -61,4 +63,5 @@ class PlannerNode:
             update={
                 "subgoal_plan": subgoals_plan,
             },
+            agent="planner",
         )

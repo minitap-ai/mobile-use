@@ -46,6 +46,7 @@ def get_long_press_on_tool(ctx: MobileUseContext):
                     "agents_thoughts": [agent_thought],
                     EXECUTOR_MESSAGES_KEY: [tool_message],
                 },
+                agent="executor",
             ),
         )
 

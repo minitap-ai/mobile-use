@@ -418,6 +418,7 @@ class Agent:
             focused_app_info=None,
             device_date=None,
             structured_decisions=None,
+            complete_subgoals_by_ids=[],
             agents_thoughts=[],
             remaining_steps=task.request.max_steps,
             executor_messages=[],

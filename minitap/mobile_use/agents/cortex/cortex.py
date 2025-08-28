@@ -80,12 +80,20 @@ class CortexNode:
             fallback_call=lambda: llm_fallback.ainvoke(messages),
         )  # type: ignore
 
-        is_subgoal_completed = response.complete_current_subgoal
+        is_subgoal_completed = (
+            response.complete_subgoals_by_ids is not None
+            and len(response.complete_subgoals_by_ids) > 0
+            and len(response.decisions) == 0
+        )
+        if not is_subgoal_completed:
+            response.complete_subgoals_by_ids = []
+
         return state.sanitize_update(
             ctx=self.ctx,
             update={
                 "agents_thoughts": [response.agent_thought],
                 "structured_decisions": response.decisions if not is_subgoal_completed else None,
+                "complete_subgoals_by_ids": response.complete_subgoals_by_ids or [],
                 "latest_screenshot_base64": None,
                 "latest_ui_hierarchy": None,
                 "focused_app_info": None,
@@ -94,6 +102,7 @@ class CortexNode:
                 EXECUTOR_MESSAGES_KEY: [RemoveMessage(id=REMOVE_ALL_MESSAGES)],
                 "cortex_last_thought": response.agent_thought,
             },
+            agent="cortex",
         )
 
 

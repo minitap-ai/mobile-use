@@ -34,6 +34,7 @@ class ExecutorNode:
                         "No structured decisions found, I cannot execute anything."
                     ],
                 },
+                agent="executor",
             )
 
         system_message = Template(
@@ -66,6 +67,6 @@ class ExecutorNode:
             update={
                 "cortex_last_thought": cortex_last_thought,
                 EXECUTOR_MESSAGES_KEY: [response],
-                "messages": [response],
             },
+            agent="executor",
         )
