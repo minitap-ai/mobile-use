@@ -111,4 +111,4 @@ def _get_state_update(
     }
     if update_plan:
         update["subgoal_plan"] = state.subgoal_plan
-    return state.sanitize_update(ctx=ctx, update=update)
+    return state.sanitize_update(ctx=ctx, update=update, agent="orchestrator")

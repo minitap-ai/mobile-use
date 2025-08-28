@@ -55,6 +55,7 @@ def get_find_packages_tool(ctx: MobileUseContext):
                     "agents_thoughts": [agent_thought, tool_message.content],
                     EXECUTOR_MESSAGES_KEY: [tool_message],
                 },
+                agent="executor",
             ),
         )
 

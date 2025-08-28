@@ -48,6 +48,7 @@ def get_paste_text_tool(ctx: MobileUseContext):
                     "agents_thoughts": [agent_thought],
                     EXECUTOR_MESSAGES_KEY: [tool_message],
                 },
+                agent="executor",
             ),
         )
 

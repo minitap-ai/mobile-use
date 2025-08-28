@@ -159,7 +159,8 @@ def get_input_text_tool(ctx: MobileUseContext):
                     "agents_thoughts": [agent_thought],
                     EXECUTOR_MESSAGES_KEY: [tool_message],
                 },
-            )
+                agent="executor",
+            ),
         )
 
     return input_text

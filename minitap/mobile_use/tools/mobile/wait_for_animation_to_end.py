@@ -52,6 +52,7 @@ def get_wait_for_animation_to_end_tool(ctx: MobileUseContext):
                     "agents_thoughts": [agent_thought],
                     EXECUTOR_MESSAGES_KEY: [tool_message],
                 },
+                agent="executor",
             ),
         )
 

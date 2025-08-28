@@ -99,6 +99,7 @@ class CortexNode:
                 EXECUTOR_MESSAGES_KEY: [RemoveMessage(id=REMOVE_ALL_MESSAGES)],
                 "cortex_last_thought": response.agent_thought,
             },
+            agent="cortex",
         )
 
 

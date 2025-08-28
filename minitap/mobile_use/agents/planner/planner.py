@@ -63,4 +63,5 @@ class PlannerNode:
             update={
                 "subgoal_plan": subgoals_plan,
             },
+            agent="planner",
         )

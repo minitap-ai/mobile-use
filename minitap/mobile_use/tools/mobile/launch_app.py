@@ -41,6 +41,7 @@ def get_launch_app_tool(ctx: MobileUseContext):
                     "agents_thoughts": [agent_thought],
                     EXECUTOR_MESSAGES_KEY: [tool_message],
                 },
+                agent="executor",
             ),
         )
 

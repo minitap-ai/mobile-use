@@ -52,6 +52,7 @@ def get_take_screenshot_tool(ctx: MobileUseContext):
             update=state.sanitize_update(
                 ctx=ctx,
                 update=updates,
+                agent="executor",
             ),
         )
 
