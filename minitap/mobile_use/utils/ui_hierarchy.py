@@ -1,7 +1,45 @@
 from typing import Optional
 
+from pydantic import BaseModel
 
-def find_element_by_resource_id(ui_hierarchy: list[dict], resource_id: str) -> Optional[dict]:
+from minitap.mobile_use.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+def __find_element_by_ressource_id_in_rich_hierarchy(
+    hierarchy: list[dict], resource_id: str
+) -> Optional[dict]:
+    """
+    Retrieves all the sibling elements for a given resource ID from a nested dictionary.
+
+    Args:
+      hierarchy (dict): The nested dictionary representing the UI hierarchy.
+      resource_id (str): The resource-id to find.
+
+    Returns:
+      list: A list of the sibling elements, or None if the resource_id is not found.
+    """
+    if not hierarchy:
+        return None
+
+    for child in hierarchy:
+        if child.get("attributes", {}).get("resource-id") == resource_id:
+            return child.get("attributes", {})
+
+    for child in hierarchy:
+        result = __find_element_by_ressource_id_in_rich_hierarchy(
+            child.get("children", []), resource_id
+        )
+        if result is not None:
+            return result
+
+    return None
+
+
+def find_element_by_resource_id(
+    ui_hierarchy: list[dict], resource_id: str, is_rich_hierarchy: bool = False
+) -> Optional[dict]:
     """
     Find a UI element by its resource-id in the UI hierarchy.
 
@@ -13,6 +51,8 @@ def find_element_by_resource_id(ui_hierarchy: list[dict], resource_id: str) -> O
     Returns:
         The complete UI element dictionary if found, None otherwise
     """
+    if is_rich_hierarchy:
+        return __find_element_by_ressource_id_in_rich_hierarchy(ui_hierarchy, resource_id)
 
     def search_recursive(elements: list[dict]) -> Optional[dict]:
         for element in elements:
@@ -28,3 +68,50 @@ def find_element_by_resource_id(ui_hierarchy: list[dict], resource_id: str) -> O
         return None
 
     return search_recursive(ui_hierarchy)
+
+
+def is_element_focused(element: dict) -> bool:
+    return element.get("focused", None) == "true"
+
+
+class Point(BaseModel):
+    x: int
+    y: int
+
+
+class ElementBounds(BaseModel):
+    x: int
+    y: int
+    width: int
+    height: int
+
+    def get_center(self) -> Point:
+        return Point(x=self.x + self.width // 2, y=self.y + self.height // 2)
+
+    def get_relative_point(self, x_percent: float, y_percent: float) -> Point:
+        """
+        Returns the coordinates of the point at x_percent of the width and y_percent
+        of the height of the element.
+
+        Ex if x_percent = 0.95 and y_percent = 0.95,
+        the point is at the bottom right of the element:
+        <------>
+        |      |
+        |     x|
+        <------>
+        """
+        return Point(
+            x=int((self.x + self.width) * x_percent),
+            y=int((self.y + self.height) * y_percent),
+        )
+
+
+def get_bounds_for_element(element: dict) -> ElementBounds | None:
+    bounds = element.get("bounds", None)
+    if bounds:
+        try:
+            return ElementBounds(**bounds)
+        except Exception as e:
+            logger.error(f"Failed to validate bounds: {e}")
+            return None
+    return None
