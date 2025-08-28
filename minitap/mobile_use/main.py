@@ -4,6 +4,7 @@ from typing import Optional
 
 import typer
 from adbutils import AdbClient
+from langchain.callbacks.base import Callbacks
 from rich.console import Console
 from typing_extensions import Annotated
 
@@ -26,6 +27,7 @@ async def run_automation(
     test_name: Optional[str] = None,
     traces_output_path_str: str = "traces",
     output_description: Optional[str] = None,
+    graph_config_callbacks: Callbacks = [],
 ):
     llm_config = initialize_llm_config()
     agent_profile = AgentProfile(name="default", llm_config=llm_config)
@@ -37,6 +39,8 @@ async def run_automation(
         config.with_hw_bridge_base_url(url=settings.DEVICE_HARDWARE_BRIDGE_BASE_URL)
     if settings.DEVICE_SCREEN_API_BASE_URL:
         config.with_screen_api_base_url(url=settings.DEVICE_SCREEN_API_BASE_URL)
+    if graph_config_callbacks:
+        config.with_graph_config_callbacks(graph_config_callbacks)
 
     agent = Agent(config=config.build())
     agent.init(
