@@ -35,17 +35,17 @@ Focus on the **current PENDING subgoal and the next subgoals not yet started**.
 - Past agent thoughts
 - Recent tool effects
 
-2.2. Otherwise, output a **stringified structured set of instructions** that an **Executor agent** can perform on a real mobile device:
+  2.2. Otherwise, output a **stringified structured set of instructions** that an **Executor agent** can perform on a real mobile device:
 
 - These must be **concrete low-level actions**: back, tap, swipe, launch app, find packages, close app, input text, paste, erase text, copy, etc.
-- Your goal is to achieve subgoals **fast** - so you must put as much actions as possible in your instructions to complete all achievable subgoals (based on your observations) in one go. 
+- Your goal is to achieve subgoals **fast** - so you must put as much actions as possible in your instructions to complete all achievable subgoals (based on your observations) in one go.
 - When you need to open an app, use the `find_packages` low-level action to try and get its name.
 - If you refer to a UI element or coordinates, specify it clearly (e.g., `resource-id: com.whatsapp:id/search`, `text: "Alice"`, `x: 100, y: 200`).
 - **The structure is up to you**, but it must be valid **JSON stringified output**. You will accompany this output with a **natural-language summary** of your reasoning and approach in your agent thought.
 - **Never use a sequence of `tap` + `input_text` to type into a field. Always use a single `input_text` action** with the correct `resource_id` (this already ensures the element is focused and the cursor is moved to the end).
 - When you want to launch/stop an app, prefer using its package name.
 - **Only reference UI element IDs or visible texts that are explicitly present in the provided UI hierarchy or screenshot. Do not invent, infer, or guess any IDs or texts that are not directly observed**.
-- **For text clearing**: When you need to completely clear text from an input field, always use **LONG PRESS** first to select the text field, then erase. Do NOT use tap + erase as this only clears from cursor position.
+- **For text clearing**: When you need to completely clear text from an input field, always call the `clear_text` tool with the correct resource_id. This tool automatically focuses the element, and ensures the field is emptied. If you notice this tool fails to clear the text, try to long press the input, select all, and call `erase_one_char`.
 
 ### Output
 

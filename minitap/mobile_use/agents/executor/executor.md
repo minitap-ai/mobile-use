@@ -64,14 +64,13 @@ When using the `input_text` tool:
 
 #### 🔄 Text Clearing Best Practice
 
-When you need to completely clear text from an input field, **DO NOT** simply use `erase_text` alone, as it only erases from the cursor position, backward. Instead:
+When you need to completely clear text from an input field, always use the clear_text tool with the correct resource_id.
 
-1. **Use `long_press_on` first** to select the text field and bring up selection options
-2. **Then use `erase_text`** to clear the selected content
+This tool automatically takes care of focusing the element (if needed), and ensuring the field is fully emptied.
 
-This approach ensures the **entire text content** is removed, not just the portion before the cursor position. The long press will typically select all text in the field, making the subsequent erase operation more effective.
+Only and if only the clear_text tool fails to clear the text, try to long press the input, select all, and call erase_one_char.
 
-### 🔁 Final Notes
+#### 🔁 Final Notes
 
 - **You do not need to reason or decide strategy** — that's the Cortex's job.
 - You simply interpret and execute — like hands following the brain.
