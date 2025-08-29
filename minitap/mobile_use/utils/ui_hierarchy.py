@@ -74,6 +74,12 @@ def is_element_focused(element: dict) -> bool:
     return element.get("focused", None) == "true"
 
 
+def get_element_text(element: dict, hint_text: bool = False) -> str | None:
+    if hint_text:
+        return element.get("hintText", None)
+    return element.get("text", None)
+
+
 class Point(BaseModel):
     x: int
     y: int
