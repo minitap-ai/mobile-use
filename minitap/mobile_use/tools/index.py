@@ -4,6 +4,7 @@ from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.tools.mobile.back import back_wrapper
 from minitap.mobile_use.tools.mobile.clear_text import clear_text_wrapper
 from minitap.mobile_use.tools.mobile.copy_text_from import copy_text_from_wrapper
+from minitap.mobile_use.tools.mobile.erase_one_char import erase_one_char_wrapper
 from minitap.mobile_use.tools.mobile.find_packages import find_packages_wrapper
 from minitap.mobile_use.tools.mobile.input_text import input_text_wrapper
 from minitap.mobile_use.tools.mobile.launch_app import launch_app_wrapper
@@ -29,6 +30,7 @@ EXECUTOR_WRAPPERS_TOOLS = [
     take_screenshot_wrapper,
     copy_text_from_wrapper,
     input_text_wrapper,
+    erase_one_char_wrapper,
     find_packages_wrapper,
     launch_app_wrapper,
     stop_app_wrapper,
