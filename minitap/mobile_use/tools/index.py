@@ -1,16 +1,17 @@
 from langchain_core.tools import BaseTool
+
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.tools.mobile.back import back_wrapper
+from minitap.mobile_use.tools.mobile.clear_text import clear_text_wrapper
 from minitap.mobile_use.tools.mobile.copy_text_from import copy_text_from_wrapper
-from minitap.mobile_use.tools.mobile.erase_text import erase_text_wrapper
+from minitap.mobile_use.tools.mobile.erase_one_char import erase_one_char_wrapper
+from minitap.mobile_use.tools.mobile.find_packages import find_packages_wrapper
 from minitap.mobile_use.tools.mobile.input_text import input_text_wrapper
 from minitap.mobile_use.tools.mobile.launch_app import launch_app_wrapper
-from minitap.mobile_use.tools.mobile.find_packages import find_packages_wrapper
 from minitap.mobile_use.tools.mobile.long_press_on import long_press_on_wrapper
 from minitap.mobile_use.tools.mobile.open_link import open_link_wrapper
 from minitap.mobile_use.tools.mobile.paste_text import paste_text_wrapper
 from minitap.mobile_use.tools.mobile.press_key import press_key_wrapper
-
 from minitap.mobile_use.tools.mobile.stop_app import stop_app_wrapper
 from minitap.mobile_use.tools.mobile.swipe import swipe_wrapper
 from minitap.mobile_use.tools.mobile.take_screenshot import take_screenshot_wrapper
@@ -29,11 +30,12 @@ EXECUTOR_WRAPPERS_TOOLS = [
     take_screenshot_wrapper,
     copy_text_from_wrapper,
     input_text_wrapper,
+    erase_one_char_wrapper,
     find_packages_wrapper,
     launch_app_wrapper,
     stop_app_wrapper,
     paste_text_wrapper,
-    erase_text_wrapper,
+    clear_text_wrapper,
     press_key_wrapper,
     wait_for_animation_to_end_wrapper,
 ]

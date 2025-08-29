@@ -37,6 +37,10 @@ def __find_element_by_ressource_id_in_rich_hierarchy(
     return None
 
 
+def text_input_is_empty(text: str | None, hint_text: str | None) -> bool:
+    return not text or text == hint_text
+
+
 def find_element_by_resource_id(
     ui_hierarchy: list[dict], resource_id: str, is_rich_hierarchy: bool = False
 ) -> Optional[dict]:
@@ -72,6 +76,12 @@ def find_element_by_resource_id(
 
 def is_element_focused(element: dict) -> bool:
     return element.get("focused", None) == "true"
+
+
+def get_element_text(element: dict, hint_text: bool = False) -> str | None:
+    if hint_text:
+        return element.get("hintText", None)
+    return element.get("text", None)
 
 
 class Point(BaseModel):
