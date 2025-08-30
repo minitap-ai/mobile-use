@@ -1,4 +1,4 @@
-name: Update Graph Documentation
+name: Update Graph Documentation 🦜📚
 
 on:
   push:
@@ -10,11 +10,6 @@ on:
     paths:
       - "minitap/mobile_use/graph/graph.py"
   workflow_dispatch:
-    inputs:
-      force:
-        description: "Force run regardless of path filters"
-        required: false
-        default: "false"
 
 permissions:
   contents: write
