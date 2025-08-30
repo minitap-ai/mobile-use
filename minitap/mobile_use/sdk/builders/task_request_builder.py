@@ -3,7 +3,7 @@ Builder for TaskRequest objects using a fluent interface.
 """
 
 from pathlib import Path
-from typing import Generic, Optional, Self, TypeVar, cast
+from typing import Self, TypeVar, cast
 
 from pydantic import BaseModel
 
@@ -12,7 +12,7 @@ from minitap.mobile_use.sdk.types.agent import AgentProfile
 from minitap.mobile_use.sdk.types.task import TaskRequest, TaskRequestCommon
 
 
-TIn = TypeVar("TIn", bound=Optional[BaseModel])
+TIn = TypeVar("TIn", bound=BaseModel | None)
 TOut = TypeVar("TOut", bound=BaseModel)
 
 
@@ -25,8 +25,8 @@ class TaskRequestCommonBuilder(BaseModel):
         self._max_steps = RECURSION_LIMIT
         self._record_trace = False
         self._trace_path = Path("mobile-use-traces")
-        self._llm_output_path: Optional[Path] = None
-        self._thoughts_output_path: Optional[Path] = None
+        self._llm_output_path: Path | None = None
+        self._thoughts_output_path: Path | None = None
 
     def with_max_steps(self, max_steps: int) -> Self:
         """
@@ -38,7 +38,7 @@ class TaskRequestCommonBuilder(BaseModel):
         self._max_steps = max_steps
         return self
 
-    def with_trace_recording(self, enabled: bool = True, path: Optional[str] = None) -> Self:
+    def with_trace_recording(self, enabled: bool = True, path: str | None = None) -> Self:
         """
         Configure trace recording for the task.
 
@@ -92,7 +92,7 @@ class TaskRequestCommonBuilder(BaseModel):
         )
 
 
-class TaskRequestBuilder(TaskRequestCommonBuilder, Generic[TIn]):
+class TaskRequestBuilder[TIn](TaskRequestCommonBuilder):
     """
     Builder class providing a fluent interface for creating TaskRequest objects.
 
@@ -114,10 +114,10 @@ class TaskRequestBuilder(TaskRequestCommonBuilder, Generic[TIn]):
         """Initialize an empty TaskRequestBuilder."""
         super().__init__()
         self._goal = goal
-        self._profile: Optional[str | AgentProfile] = None
-        self._name: Optional[str] = None
+        self._profile: str | AgentProfile | None = None
+        self._name: str | None = None
         self._output_description = None
-        self._output_format: Optional[type[TIn]] = None
+        self._output_format: type[TIn] | None = None
 
     @classmethod
     def from_common(cls, goal: str, common: TaskRequestCommon):

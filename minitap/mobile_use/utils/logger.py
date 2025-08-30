@@ -2,7 +2,6 @@ import logging
 import sys
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Union
 
 from colorama import Fore, Style, init
 
@@ -22,7 +21,7 @@ class MobileUseLogger:
     def __init__(
         self,
         name: str,
-        log_file: Optional[Union[str, Path]] = None,
+        log_file: str | Path | None = None,
         console_level: str = "INFO",
         file_level: str = "DEBUG",
         enable_file_logging: bool = True,
@@ -57,7 +56,7 @@ class MobileUseLogger:
 
         self.logger.addHandler(console_handler)
 
-    def _setup_file_handler(self, log_file: Optional[Union[str, Path]], level: str):
+    def _setup_file_handler(self, log_file: str | Path | None, level: str):
         if log_file is None:
             log_file = Path("logs") / f"{self.name.replace('.', '_')}.log"
 
@@ -118,7 +117,7 @@ _loggers = {}
 
 def get_logger(
     name: str,
-    log_file: Optional[Union[str, Path]] = None,
+    log_file: str | Path | None = None,
     console_level: str = "INFO",
     file_level: str = "DEBUG",
     enable_file_logging: bool = False,

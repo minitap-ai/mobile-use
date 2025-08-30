@@ -1,7 +1,7 @@
 from langchain_core.messages import AIMessage, AnyMessage
 from langgraph.graph import add_messages
 from langgraph.prebuilt.chat_agent_executor import AgentStatePydantic
-from typing_extensions import Annotated, Optional
+from typing import Annotated
 
 from minitap.mobile_use.agents.planner.types import Subgoal
 from minitap.mobile_use.config import AgentNode
@@ -24,16 +24,16 @@ class State(AgentStatePydantic):
     subgoal_plan: Annotated[list[Subgoal], "The current plan, made of subgoals"]
 
     # contextor related keys
-    latest_screenshot_base64: Annotated[Optional[str], "Latest screenshot of the device", take_last]
+    latest_screenshot_base64: Annotated[str | None, "Latest screenshot of the device", take_last]
     latest_ui_hierarchy: Annotated[
-        Optional[list[dict]], "Latest UI hierarchy of the device", take_last
+        list[dict] | None, "Latest UI hierarchy of the device", take_last
     ]
-    focused_app_info: Annotated[Optional[str], "Focused app info", take_last]
-    device_date: Annotated[Optional[str], "Date of the device", take_last]
+    focused_app_info: Annotated[str | None, "Focused app info", take_last]
+    device_date: Annotated[str | None, "Date of the device", take_last]
 
     # cortex related keys
     structured_decisions: Annotated[
-        Optional[str],
+        str | None,
         "Structured decisions made by the cortex, for the executor to follow",
         take_last,
     ]
@@ -45,7 +45,7 @@ class State(AgentStatePydantic):
 
     # executor related keys
     executor_messages: Annotated[list[AnyMessage], "Sequential Executor messages", add_messages]
-    cortex_last_thought: Annotated[Optional[str], "Last thought of the cortex for the executor"]
+    cortex_last_thought: Annotated[str | None, "Last thought of the cortex for the executor"]
 
     # common keys
     agents_thoughts: Annotated[
@@ -58,13 +58,13 @@ class State(AgentStatePydantic):
         self,
         ctx: MobileUseContext,
         update: dict,
-        agent: Optional[AgentNode] = None,
+        agent: AgentNode | None = None,
     ):
         """
         Sanitizes the state update to ensure it is valid and apply side effect logic where required.
         The agent is required if the update contains the "agents_thoughts" key.
         """
-        updated_agents_thoughts: Optional[str | list[str]] = update.get("agents_thoughts", None)
+        updated_agents_thoughts: str | list[str] | None = update.get("agents_thoughts", None)
         if updated_agents_thoughts is not None:
             if isinstance(updated_agents_thoughts, str):
                 updated_agents_thoughts = [updated_agents_thoughts]

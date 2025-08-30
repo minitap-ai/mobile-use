@@ -4,7 +4,7 @@ import signal
 import sys
 import time
 from enum import Enum
-from typing import Annotated, Optional
+from typing import Annotated
 
 import requests
 import typer
@@ -22,7 +22,7 @@ bridge_instance = None
 shutdown_requested = False
 
 
-def check_device_screen_api_health(base_url: Optional[str] = None, max_retries=30, delay=1):
+def check_device_screen_api_health(base_url: str | None = None, max_retries=30, delay=1):
     base_url = base_url or f"http://localhost:{server_settings.DEVICE_SCREEN_API_PORT}"
     health_url = f"{base_url}/health"
 
@@ -49,7 +49,7 @@ def check_device_screen_api_health(base_url: Optional[str] = None, max_retries=3
     return False
 
 
-def _start_device_screen_api_process() -> Optional[multiprocessing.Process]:
+def _start_device_screen_api_process() -> multiprocessing.Process | None:
     try:
         process = multiprocessing.Process(target=start_device_screen_api, daemon=True)
         process.start()
@@ -61,7 +61,7 @@ def _start_device_screen_api_process() -> Optional[multiprocessing.Process]:
 
 def start_device_hardware_bridge(
     device_id: str, platform: DevicePlatform
-) -> Optional[DeviceHardwareBridge]:
+) -> DeviceHardwareBridge | None:
     logger.info("Starting Device Hardware Bridge...")
 
     try:

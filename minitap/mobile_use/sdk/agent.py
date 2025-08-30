@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from types import NoneType
-from typing import Optional, TypeVar, overload
+from typing import TypeVar, overload
 
 from adbutils import AdbClient
 from langchain_core.messages import AIMessage
@@ -61,7 +61,7 @@ from minitap.mobile_use.utils.recorder import log_agent_thought
 
 logger = get_logger(__name__)
 
-TOutput = TypeVar("TOutput", bound=Optional[BaseModel])
+TOutput = TypeVar("TOutput", bound=BaseModel | None)
 
 
 class Agent:
@@ -74,9 +74,9 @@ class Agent:
     _device_context: DeviceContext
     _screen_api_client: ScreenApiClient
     _hw_bridge_client: DeviceHardwareClient
-    _adb_client: Optional[AdbClient]
+    _adb_client: AdbClient | None
 
-    def __init__(self, config: Optional[AgentConfig] = None):
+    def __init__(self, config: AgentConfig | None = None):
         self._config = config or get_default_agent_config()
         self._tasks = []
         self._tmp_traces_dir = Path(tempfile.gettempdir()) / "mobile-use-traces"
@@ -153,9 +153,9 @@ class Agent:
         *,
         goal: str,
         output: type[TOutput],
-        profile: Optional[str | AgentProfile] = None,
-        name: Optional[str] = None,
-    ) -> Optional[TOutput]: ...
+        profile: str | AgentProfile | None = None,
+        name: str | None = None,
+    ) -> TOutput | None: ...
 
     @overload
     async def run_task(
@@ -163,9 +163,9 @@ class Agent:
         *,
         goal: str,
         output: str,
-        profile: Optional[str | AgentProfile] = None,
-        name: Optional[str] = None,
-    ) -> Optional[str | dict]: ...
+        profile: str | AgentProfile | None = None,
+        name: str | None = None,
+    ) -> str | dict | None: ...
 
     @overload
     async def run_task(
@@ -173,25 +173,25 @@ class Agent:
         *,
         goal: str,
         output=None,
-        profile: Optional[str | AgentProfile] = None,
-        name: Optional[str] = None,
-    ) -> Optional[str]: ...
+        profile: str | AgentProfile | None = None,
+        name: str | None = None,
+    ) -> str | None: ...
 
     @overload
-    async def run_task(self, *, request: TaskRequest[None]) -> Optional[str | dict]: ...
+    async def run_task(self, *, request: TaskRequest[None]) -> str | dict | None: ...
 
     @overload
-    async def run_task(self, *, request: TaskRequest[TOutput]) -> Optional[TOutput]: ...
+    async def run_task(self, *, request: TaskRequest[TOutput]) -> TOutput | None: ...
 
     async def run_task(
         self,
         *,
-        goal: Optional[str] = None,
-        output: Optional[type[TOutput] | str] = None,
-        profile: Optional[str | AgentProfile] = None,
-        name: Optional[str] = None,
-        request: Optional[TaskRequest[TOutput]] = None,
-    ) -> Optional[str | dict | TOutput]:
+        goal: str | None = None,
+        output: type[TOutput] | str | None = None,
+        profile: str | AgentProfile | None = None,
+        name: str | None = None,
+        request: TaskRequest[TOutput] | None = None,
+    ) -> str | dict | TOutput | None:
         if request is not None:
             return await self._run_task(request)
         if goal is None:
@@ -208,7 +208,7 @@ class Agent:
             task_request.with_name(name=name)
         return await self._run_task(task_request.build())
 
-    async def _run_task(self, request: TaskRequest[TOutput]) -> Optional[str | dict | TOutput]:
+    async def _run_task(self, request: TaskRequest[TOutput]) -> str | dict | TOutput | None:
         if not self._initialized:
             raise AgentNotInitializedError()
 
@@ -382,9 +382,9 @@ class Agent:
         task_name: str,
         ctx: MobileUseContext,
         request: TaskRequest[TOutput],
-        output_config: Optional[OutputConfig],
+        output_config: OutputConfig | None,
         state: State,
-    ) -> Optional[str | dict | TOutput]:
+    ) -> str | dict | TOutput | None:
         if output_config and output_config.needs_structured_format():
             logger.info(f"[{task_name}] Generating structured output...")
             try:

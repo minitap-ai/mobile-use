@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pydantic import BaseModel
 
 from minitap.mobile_use.utils.logger import get_logger
@@ -9,7 +7,7 @@ logger = get_logger(__name__)
 
 def __find_element_by_ressource_id_in_rich_hierarchy(
     hierarchy: list[dict], resource_id: str
-) -> Optional[dict]:
+) -> dict | None:
     """
     Retrieves all the sibling elements for a given resource ID from a nested dictionary.
 
@@ -43,7 +41,7 @@ def text_input_is_empty(text: str | None, hint_text: str | None) -> bool:
 
 def find_element_by_resource_id(
     ui_hierarchy: list[dict], resource_id: str, is_rich_hierarchy: bool = False
-) -> Optional[dict]:
+) -> dict | None:
     """
     Find a UI element by its resource-id in the UI hierarchy.
 
@@ -58,7 +56,7 @@ def find_element_by_resource_id(
     if is_rich_hierarchy:
         return __find_element_by_ressource_id_in_rich_hierarchy(ui_hierarchy, resource_id)
 
-    def search_recursive(elements: list[dict]) -> Optional[dict]:
+    def search_recursive(elements: list[dict]) -> dict | None:
         for element in elements:
             if isinstance(element, dict):
                 if element.get("resourceId") == resource_id:

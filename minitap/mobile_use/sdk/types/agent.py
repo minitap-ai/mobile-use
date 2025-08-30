@@ -1,4 +1,4 @@
-from typing import Dict, Literal, Optional
+from typing import Literal
 from urllib.parse import urlparse
 
 from langchain_core.callbacks.base import Callbacks
@@ -15,7 +15,7 @@ class ApiBaseUrl(BaseModel):
 
     scheme: Literal["http", "https"]
     host: str
-    port: Optional[int] = None
+    port: int | None = None
 
     def __eq__(self, other):
         if not isinstance(other, ApiBaseUrl):
@@ -67,11 +67,11 @@ class AgentConfig(BaseModel):
         servers: Custom server configurations.
     """
 
-    agent_profiles: Dict[str, AgentProfile]
+    agent_profiles: dict[str, AgentProfile]
     task_request_defaults: TaskRequestCommon
     default_profile: AgentProfile
-    device_id: Optional[str] = None
-    device_platform: Optional[DevicePlatform] = None
+    device_id: str | None = None
+    device_platform: DevicePlatform | None = None
     servers: ServerConfig
     graph_config_callbacks: Callbacks = None
 

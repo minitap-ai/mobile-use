@@ -1,12 +1,11 @@
 import asyncio
 import os
-from typing import Optional
 
 import typer
 from adbutils import AdbClient
 from langchain.callbacks.base import Callbacks
 from rich.console import Console
-from typing_extensions import Annotated
+from typing import Annotated
 
 from minitap.mobile_use.config import (
     initialize_llm_config,
@@ -24,9 +23,9 @@ logger = get_logger(__name__)
 
 async def run_automation(
     goal: str,
-    test_name: Optional[str] = None,
+    test_name: str | None = None,
     traces_output_path_str: str = "traces",
-    output_description: Optional[str] = None,
+    output_description: str | None = None,
     graph_config_callbacks: Callbacks = [],
 ):
     llm_config = initialize_llm_config()
@@ -70,7 +69,7 @@ async def run_automation(
 def main(
     goal: Annotated[str, typer.Argument(help="The main goal for the agent to achieve.")],
     test_name: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--test-name",
             "-n",
@@ -86,7 +85,7 @@ def main(
         ),
     ] = "traces",
     output_description: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--output-description",
             "-o",

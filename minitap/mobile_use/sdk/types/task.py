@@ -5,7 +5,8 @@ Task-related type definitions for the Mobile-use SDK.
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Generic, Optional, Type, TypeVar, overload
+from typing import Any, TypeVar, overload
+
 from pydantic import BaseModel, Field
 
 from minitap.mobile_use.config import LLMConfig, get_default_llm_config
@@ -36,8 +37,8 @@ class AgentProfile(BaseModel):
         self,
         *,
         name: str,
-        llm_config: Optional[LLMConfig] = None,
-        from_file: Optional[str] = None,
+        llm_config: LLMConfig | None = None,
+        from_file: str | None = None,
         **kwargs,
     ):
         kwargs["name"] = name
@@ -64,7 +65,7 @@ class TaskStatus(str, Enum):
 
 
 T = TypeVar("T", bound=BaseModel)
-TOutput = TypeVar("TOutput", bound=Optional[BaseModel])
+TOutput = TypeVar("TOutput", bound=BaseModel | None)
 
 
 class TaskRequestCommon(BaseModel):
@@ -75,11 +76,11 @@ class TaskRequestCommon(BaseModel):
     max_steps: int = RECURSION_LIMIT
     record_trace: bool = False
     trace_path: Path = Path("mobile-use-traces")
-    llm_output_path: Optional[Path] = None
-    thoughts_output_path: Optional[Path] = None
+    llm_output_path: Path | None = None
+    thoughts_output_path: Path | None = None
 
 
-class TaskRequest(TaskRequestCommon, Generic[TOutput]):
+class TaskRequest[TOutput](TaskRequestCommon):
     """
     Defines the format of a mobile automation task request.
 
@@ -98,10 +99,10 @@ class TaskRequest(TaskRequestCommon, Generic[TOutput]):
     """
 
     goal: str
-    profile: Optional[str] = None
-    task_name: Optional[str] = None
-    output_description: Optional[str] = None
-    output_format: Optional[type[TOutput]] = None
+    profile: str | None = None
+    task_name: str | None = None
+    output_description: str | None = None
+    output_format: type[TOutput] | None = None
 
 
 class TaskResult(BaseModel):
@@ -116,11 +117,11 @@ class TaskResult(BaseModel):
     """
 
     content: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     execution_time_seconds: float
     steps_taken: int
 
-    def get_as_model(self, model_class: Type[T]) -> T:
+    def get_as_model(self, model_class: type[T]) -> T:
         """
         Parse the content into a Pydantic model instance.
 
@@ -158,14 +159,14 @@ class Task(BaseModel):
     status: TaskStatus
     request: TaskRequest
     created_at: datetime
-    ended_at: Optional[datetime] = None
-    result: Optional[TaskResult] = None
+    ended_at: datetime | None = None
+    result: TaskResult | None = None
 
     def finalize(
         self,
-        content: Optional[Any] = None,
-        state: Optional[dict] = None,
-        error: Optional[str] = None,
+        content: Any | None = None,
+        state: dict | None = None,
+        error: str | None = None,
         cancelled: bool = False,
     ):
         self.status = TaskStatus.COMPLETED if error is None else TaskStatus.FAILED

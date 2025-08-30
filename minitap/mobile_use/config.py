@@ -1,7 +1,7 @@
 import json
 import os
 from pathlib import Path
-from typing import Annotated, Any, Literal, Optional, Union
+from typing import Annotated, Any, Literal
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, SecretStr, ValidationError, model_validator
@@ -17,17 +17,17 @@ logger = get_logger(__name__)
 
 
 class Settings(BaseSettings):
-    OPENAI_API_KEY: Optional[SecretStr] = None
-    GOOGLE_API_KEY: Optional[SecretStr] = None
-    XAI_API_KEY: Optional[SecretStr] = None
-    OPEN_ROUTER_API_KEY: Optional[SecretStr] = None
+    OPENAI_API_KEY: SecretStr | None = None
+    GOOGLE_API_KEY: SecretStr | None = None
+    XAI_API_KEY: SecretStr | None = None
+    OPEN_ROUTER_API_KEY: SecretStr | None = None
 
-    OPENAI_BASE_URL: Optional[str] = None
+    OPENAI_BASE_URL: str | None = None
 
-    DEVICE_SCREEN_API_BASE_URL: Optional[str] = None
-    DEVICE_HARDWARE_BRIDGE_BASE_URL: Optional[str] = None
-    ADB_HOST: Optional[str] = None
-    ADB_PORT: Optional[int] = None
+    DEVICE_SCREEN_API_BASE_URL: str | None = None
+    DEVICE_HARDWARE_BRIDGE_BASE_URL: str | None = None
+    ADB_HOST: str | None = None
+    ADB_PORT: int | None = None
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
@@ -71,7 +71,7 @@ def prepare_output_files() -> tuple[str | None, str | None]:
     return validated_events_path, validated_results_path
 
 
-def record_events(output_path: Path | None, events: Union[list[str], BaseModel, Any]):
+def record_events(output_path: Path | None, events: list[str] | BaseModel | Any):
     if not output_path:
         return
 
@@ -170,7 +170,7 @@ def get_default_llm_config() -> LLMConfig:
     try:
         if not os.path.exists(ROOT_DIR / DEFAULT_LLM_CONFIG_FILENAME):
             raise Exception("Default llm config not found")
-        with open(ROOT_DIR / DEFAULT_LLM_CONFIG_FILENAME, "r") as f:
+        with open(ROOT_DIR / DEFAULT_LLM_CONFIG_FILENAME) as f:
             default_config_dict = load_jsonc(f)
         return LLMConfig.model_validate(default_config_dict["default"])
     except Exception as e:
@@ -211,7 +211,7 @@ def parse_llm_config() -> LLMConfig:
     override_config_dict = {}
     if os.path.exists(ROOT_DIR / OVERRIDE_LLM_CONFIG_FILENAME):
         logger.info("Loading custom llm config...")
-        with open(ROOT_DIR / OVERRIDE_LLM_CONFIG_FILENAME, "r") as f:
+        with open(ROOT_DIR / OVERRIDE_LLM_CONFIG_FILENAME) as f:
             override_config_dict = load_jsonc(f)
     else:
         logger.warning("Custom llm config not found, loading default config")
@@ -237,7 +237,7 @@ def initialize_llm_config() -> LLMConfig:
 
 class OutputConfig(BaseModel):
     structured_output: Annotated[
-        Optional[Union[type[BaseModel], dict]],
+        type[BaseModel] | dict | None,
         Field(
             default=None,
             description=(
@@ -247,7 +247,7 @@ class OutputConfig(BaseModel):
         ),
     ]
     output_description: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             description=(

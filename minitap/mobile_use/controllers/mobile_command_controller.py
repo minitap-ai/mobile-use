@@ -1,6 +1,6 @@
 import uuid
 from enum import Enum
-from typing import Annotated, Literal, Optional, Union
+from typing import Annotated, Literal
 
 import yaml
 from langgraph.types import Command
@@ -43,7 +43,7 @@ class RunFlowRequest(BaseModel):
     dry_run: bool = Field(default=False, alias="dryRun")
 
 
-def run_flow(ctx: MobileUseContext, flow_steps: list, dry_run: bool = False) -> Optional[dict]:
+def run_flow(ctx: MobileUseContext, flow_steps: list, dry_run: bool = False) -> dict | None:
     """
     Run a flow i.e, a sequence of commands.
     Returns None on success, or the response body of the failed command.
@@ -137,20 +137,20 @@ class SelectorRequestWithPercentages(BaseModel):
         return {"point": self.percentages.to_str()}
 
 
-SelectorRequest = Union[
-    IdSelectorRequest,
-    SelectorRequestWithCoordinates,
-    SelectorRequestWithPercentages,
-    TextSelectorRequest,
-    IdWithTextSelectorRequest,
-]
+SelectorRequest = (
+    IdSelectorRequest
+    | SelectorRequestWithCoordinates
+    | SelectorRequestWithPercentages
+    | TextSelectorRequest
+    | IdWithTextSelectorRequest
+)
 
 
 def tap(
     ctx: MobileUseContext,
     selector_request: SelectorRequest,
     dry_run: bool = False,
-    index: Optional[int] = None,
+    index: int | None = None,
 ):
     """
     Tap on a selector.
@@ -171,7 +171,7 @@ def long_press_on(
     ctx: MobileUseContext,
     selector_request: SelectorRequest,
     dry_run: bool = False,
-    index: Optional[int] = None,
+    index: int | None = None,
 ):
     long_press_on_body = selector_request.to_dict()
     if not long_press_on_body:
@@ -211,7 +211,7 @@ SwipeDirection = Annotated[
 class SwipeRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     swipe_mode: SwipeStartEndCoordinatesRequest | SwipeStartEndPercentagesRequest | SwipeDirection
-    duration: Optional[int] = None  # in ms, default is 400ms
+    duration: int | None = None  # in ms, default is 400ms
 
     def to_dict(self):
         res = {}
@@ -257,7 +257,7 @@ def paste_text(ctx: MobileUseContext, dry_run: bool = False):
     return run_flow(ctx, ["pasteText"], dry_run=dry_run)
 
 
-def erase_text(ctx: MobileUseContext, nb_chars: Optional[int] = None, dry_run: bool = False):
+def erase_text(ctx: MobileUseContext, nb_chars: int | None = None, dry_run: bool = False):
     """
     Removes characters from the currently selected textfield (if any)
     Removes 50 characters if nb_chars is not specified.
@@ -275,7 +275,7 @@ def launch_app(ctx: MobileUseContext, package_name: str, dry_run: bool = False):
     return run_flow_with_wait_for_animation_to_end(ctx, flow_input, dry_run=dry_run)
 
 
-def stop_app(ctx: MobileUseContext, package_name: Optional[str] = None, dry_run: bool = False):
+def stop_app(ctx: MobileUseContext, package_name: str | None = None, dry_run: bool = False):
     if package_name is None:
         flow_input = ["stopApp"]
     else:
@@ -317,7 +317,7 @@ class WaitTimeout(Enum):
 
 
 def wait_for_animation_to_end(
-    ctx: MobileUseContext, timeout: Optional[WaitTimeout] = None, dry_run: bool = False
+    ctx: MobileUseContext, timeout: WaitTimeout | None = None, dry_run: bool = False
 ):
     if timeout is None:
         return run_flow(ctx, ["waitForAnimationToEnd"], dry_run=dry_run)

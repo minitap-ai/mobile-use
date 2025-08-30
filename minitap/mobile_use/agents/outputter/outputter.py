@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-from typing import Dict, Type, Union
 
 from jinja2 import Template
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
@@ -49,7 +48,7 @@ async def outputter(
     structured_llm = llm
 
     if output_config.structured_output:
-        schema: Union[Dict, Type[BaseModel], None] = None
+        schema: dict | type[BaseModel] | None = None
         so = output_config.structured_output
 
         if isinstance(so, dict):

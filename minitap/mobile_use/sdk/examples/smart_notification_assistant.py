@@ -20,7 +20,6 @@ Run:
 import asyncio
 from datetime import datetime
 from enum import Enum
-from typing import List
 
 from pydantic import BaseModel, Field
 from minitap.mobile_use.config import LLM, LLMConfig, LLMConfigUtils, LLMWithFallback
@@ -52,7 +51,7 @@ class NotificationSummary(BaseModel):
 
     total_count: int = Field(..., description="Total number of notifications found")
     high_priority_count: int = Field(0, description="Count of high priority notifications")
-    notifications: List[Notification] = Field(
+    notifications: list[Notification] = Field(
         default_factory=list, description="List of individual notifications"
     )
 

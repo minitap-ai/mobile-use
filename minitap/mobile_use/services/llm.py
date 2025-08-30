@@ -1,6 +1,7 @@
 import logging
-from typing import Awaitable, Callable, Literal, TypeVar
-from typing_extensions import overload
+from typing import Literal, TypeVar
+from collections.abc import Awaitable, Callable
+from typing import overload
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI

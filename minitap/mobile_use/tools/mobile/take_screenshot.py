@@ -11,7 +11,7 @@ from minitap.mobile_use.controllers.mobile_command_controller import (
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 from minitap.mobile_use.utils.media import compress_base64_jpeg
-from typing_extensions import Annotated
+from typing import Annotated
 
 
 def get_take_screenshot_tool(ctx: MobileUseContext):

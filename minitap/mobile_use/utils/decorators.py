@@ -1,6 +1,7 @@
 import asyncio
 from functools import wraps
-from typing import Any, Awaitable, Callable, Optional, TypeVar, cast, overload
+from typing import Any, TypeVar, cast, overload
+from collections.abc import Awaitable, Callable
 
 R = TypeVar("R")
 
@@ -8,9 +9,9 @@ R = TypeVar("R")
 def wrap_with_callbacks_sync(
     fn: Callable[..., R],
     *,
-    before: Optional[Callable[..., None]] = None,
-    on_success: Optional[Callable[[R], None]] = None,
-    on_failure: Optional[Callable[[Exception], None]] = None,
+    before: Callable[..., None] | None = None,
+    on_success: Callable[[R], None] | None = None,
+    on_failure: Callable[[Exception], None] | None = None,
     suppress_exceptions: bool = False,
 ) -> Callable[..., R]:
     @wraps(fn)
@@ -35,9 +36,9 @@ def wrap_with_callbacks_sync(
 def wrap_with_callbacks_async(
     fn: Callable[..., Awaitable[R]],
     *,
-    before: Optional[Callable[..., None]] = None,
-    on_success: Optional[Callable[[R], None]] = None,
-    on_failure: Optional[Callable[[Exception], None]] = None,
+    before: Callable[..., None] | None = None,
+    on_success: Callable[[R], None] | None = None,
+    on_failure: Callable[[Exception], None] | None = None,
     suppress_exceptions: bool = False,
 ) -> Callable[..., Awaitable[R]]:
     @wraps(fn)
@@ -63,9 +64,9 @@ def wrap_with_callbacks_async(
 def wrap_with_callbacks(
     fn: Callable[..., Awaitable[R]],
     *,
-    before: Optional[Callable[[], None]] = ...,
-    on_success: Optional[Callable[[R], None]] = ...,
-    on_failure: Optional[Callable[[Exception], None]] = ...,
+    before: Callable[[], None] | None = ...,
+    on_success: Callable[[R], None] | None = ...,
+    on_failure: Callable[[Exception], None] | None = ...,
     suppress_exceptions: bool = ...,
 ) -> Callable[..., Awaitable[R]]: ...
 
@@ -73,9 +74,9 @@ def wrap_with_callbacks(
 @overload
 def wrap_with_callbacks(
     *,
-    before: Optional[Callable[..., None]] = ...,
-    on_success: Optional[Callable[[Any], None]] = ...,
-    on_failure: Optional[Callable[[Exception], None]] = ...,
+    before: Callable[..., None] | None = ...,
+    on_success: Callable[[Any], None] | None = ...,
+    on_failure: Callable[[Exception], None] | None = ...,
     suppress_exceptions: bool = ...,
 ) -> Callable[[Callable[..., R]], Callable[..., R]]: ...
 
@@ -84,19 +85,19 @@ def wrap_with_callbacks(
 def wrap_with_callbacks(
     fn: Callable[..., R],
     *,
-    before: Optional[Callable[[], None]] = ...,
-    on_success: Optional[Callable[[R], None]] = ...,
-    on_failure: Optional[Callable[[Exception], None]] = ...,
+    before: Callable[[], None] | None = ...,
+    on_success: Callable[[R], None] | None = ...,
+    on_failure: Callable[[Exception], None] | None = ...,
     suppress_exceptions: bool = ...,
 ) -> Callable[..., R]: ...
 
 
 def wrap_with_callbacks(
-    fn: Optional[Callable[..., Any]] = None,
+    fn: Callable[..., Any] | None = None,
     *,
-    before: Optional[Callable[[], None]] = None,
-    on_success: Optional[Callable[[Any], None]] = None,
-    on_failure: Optional[Callable[[Exception], None]] = None,
+    before: Callable[[], None] | None = None,
+    on_success: Callable[[Any], None] | None = None,
+    on_failure: Callable[[Exception], None] | None = None,
     suppress_exceptions: bool = False,
 ) -> Any:
     def decorator(func: Callable[..., Any]) -> Any:

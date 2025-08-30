@@ -1,6 +1,5 @@
 from datetime import date
 import json
-from typing import Optional
 
 from adbutils import AdbDevice
 from minitap.mobile_use.utils.logger import MobileUseLogger
@@ -20,8 +19,8 @@ def get_adb_device(ctx: MobileUseContext) -> AdbDevice:
 
 
 def get_first_device(
-    logger: Optional[MobileUseLogger] = None,
-) -> tuple[Optional[str], Optional[DevicePlatform]]:
+    logger: MobileUseLogger | None = None,
+) -> tuple[str | None, DevicePlatform | None]:
     """Gets the first available device."""
     try:
         android_output = run_shell_command_on_host("adb devices")
@@ -50,7 +49,7 @@ def get_first_device(
     return None, None
 
 
-def get_focused_app_info(ctx: MobileUseContext) -> Optional[str]:
+def get_focused_app_info(ctx: MobileUseContext) -> str | None:
     if ctx.device.mobile_platform == DevicePlatform.IOS:
         return None
     device = get_adb_device(ctx)

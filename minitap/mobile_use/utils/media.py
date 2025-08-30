@@ -55,7 +55,7 @@ def create_steps_json_from_trace_folder(trace_folder_path: Path):
     steps = []
     for file in trace_folder_path.iterdir():
         if file.suffix == ".json":
-            with open(file, "r", encoding="utf-8", errors="ignore") as f:
+            with open(file, encoding="utf-8", errors="ignore") as f:
                 json_content = f.read()
                 steps.append({"timestamp": int(file.stem), "data": json_content})
 

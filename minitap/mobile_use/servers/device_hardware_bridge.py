@@ -4,7 +4,6 @@ import subprocess
 import threading
 import time
 from enum import Enum
-from typing import Optional
 
 import requests
 from minitap.mobile_use.context import DevicePlatform
@@ -24,7 +23,7 @@ class BridgeStatus(Enum):
 
 
 class DeviceHardwareBridge:
-    def __init__(self, device_id: str, platform: DevicePlatform, adb_host: Optional[str] = None):
+    def __init__(self, device_id: str, platform: DevicePlatform, adb_host: str | None = None):
         self.process = None
         self.status = BridgeStatus.STOPPED
         self.thread = None
@@ -32,7 +31,7 @@ class DeviceHardwareBridge:
         self.lock = threading.Lock()
         self.device_id: str = device_id
         self.platform: DevicePlatform = platform
-        self.adb_host: Optional[str] = adb_host
+        self.adb_host: str | None = adb_host
 
     def _run_maestro_studio(self):
         try:
@@ -207,6 +206,6 @@ class DeviceHardwareBridge:
         with self.lock:
             return {"status": self.status.value, "output": self.output[-10:]}
 
-    def get_device_id(self) -> Optional[str]:
+    def get_device_id(self) -> str | None:
         with self.lock:
             return self.device_id

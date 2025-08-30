@@ -3,10 +3,9 @@ import sys
 from minitap.mobile_use.clients.ios_client import get_ios_devices
 from adbutils import AdbClient
 from rich.console import Console
-from typing import Optional
 
 
-def display_device_status(console: Console, adb_client: Optional[AdbClient] = None):
+def display_device_status(console: Console, adb_client: AdbClient | None = None):
     """Checks for connected devices and displays the status."""
     console.print("\n[bold]📱 Device Status[/bold]")
     devices = None
