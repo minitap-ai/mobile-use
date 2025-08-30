@@ -2,7 +2,7 @@ name: Update Graph Documentation
 
 on:
   push:
-    branches: [main]
+    branches: [main, TASK-173/automatic-langgraph-graph-documentatio]
     paths:
       - "minitap/mobile_use/graph/graph.py"
   pull_request:
