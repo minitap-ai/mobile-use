@@ -204,6 +204,12 @@ python ./src/mobile_use/main.py \
 > [!NOTE]  
 > If you haven't configured a specific model, mobile-use will prompt you to choose one from the available options.
 
+## Graph Visualization
+
+This is the current graph structure of the agentic system (auto-generated):
+
+![Graph Visualization](doc/images/graph.png)
+
 ## ❤️ Contributing
 
 We love contributions! Whether you're fixing a bug, adding a feature, or improving documentation, your help is welcome. Please read our **[Contributing Guidelines](CONTRIBUTING.md)** to get started.
@@ -219,3 +225,7 @@ We love contributions! Whether you're fixing a bug, adding a feature, or improvi
 ## 📜 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+```
+
+```
