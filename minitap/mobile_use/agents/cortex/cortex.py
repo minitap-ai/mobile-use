@@ -86,7 +86,7 @@ class CortexNode:
         is_subgoal_completed = (
             response.complete_subgoals_by_ids is not None
             and len(response.complete_subgoals_by_ids) > 0
-            and len(response.decisions) == 0
+            and (len(response.decisions) == 0 or response.decisions in ["{}", "[]", "null", ""])
         )
         if not is_subgoal_completed:
             response.complete_subgoals_by_ids = []
