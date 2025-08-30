@@ -3,7 +3,7 @@ Builder for TaskRequest objects using a fluent interface.
 """
 
 from pathlib import Path
-from typing import Generic, Self, TypeVar, cast
+from typing import Self, TypeVar, cast
 
 from pydantic import BaseModel
 
@@ -92,7 +92,7 @@ class TaskRequestCommonBuilder(BaseModel):
         )
 
 
-class TaskRequestBuilder(TaskRequestCommonBuilder, Generic[TIn]):
+class TaskRequestBuilder[TIn](TaskRequestCommonBuilder):
     """
     Builder class providing a fluent interface for creating TaskRequest objects.
 

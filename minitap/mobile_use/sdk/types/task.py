@@ -5,7 +5,7 @@ Task-related type definitions for the Mobile-use SDK.
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Generic, TypeVar, overload
+from typing import Any, TypeVar, overload
 
 from pydantic import BaseModel, Field
 
@@ -80,7 +80,7 @@ class TaskRequestCommon(BaseModel):
     thoughts_output_path: Path | None = None
 
 
-class TaskRequest(TaskRequestCommon, Generic[TOutput]):
+class TaskRequest[TOutput](TaskRequestCommon):
     """
     Defines the format of a mobile automation task request.
 
