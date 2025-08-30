@@ -96,8 +96,7 @@ target-version = "py312"
 [tool.ruff.lint]
 # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
 # Also enable TID (flake8-tidy-imports) to enforce absolute imports
-select = ["E", "F", "TID"]
-ignore = []
+select = ["E", "F", "TID", "UP"]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]
