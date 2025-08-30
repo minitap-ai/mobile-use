@@ -37,9 +37,11 @@ Focus on the **current PENDING subgoal and the next subgoals not yet started**.
 
   2.2. Otherwise, output a **stringified structured set of instructions** that an **Executor agent** can perform on a real mobile device:
 
-- These must be **concrete low-level actions**: back, tap, swipe, launch app, find packages, close app, input text, paste, erase text, copy, etc.
+- These must be **concrete low-level actions**.
+- The executor has the following available tools: **{{ executor_tools_list }}**.
 - Your goal is to achieve subgoals **fast** - so you must put as much actions as possible in your instructions to complete all achievable subgoals (based on your observations) in one go.
-- When you need to open an app, use the `find_packages` low-level action to try and get its name.
+- To open URLs/links directly, use the `open_link` tool - it will automatically handle opening in the appropriate browser. It also handles deep links.
+- When you need to open an app, use the `find_packages` low-level action to try and get its name. Then, simply use the `launch_app` low-level action to launch it.
 - If you refer to a UI element or coordinates, specify it clearly (e.g., `resource-id: com.whatsapp:id/search`, `text: "Alice"`, `x: 100, y: 200`).
 - **The structure is up to you**, but it must be valid **JSON stringified output**. You will accompany this output with a **natural-language summary** of your reasoning and approach in your agent thought.
 - **Never use a sequence of `tap` + `input_text` to type into a field. Always use a single `input_text` action** with the correct `resource_id` (this already ensures the element is focused and the cursor is moved to the end).
