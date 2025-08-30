@@ -9,7 +9,7 @@ from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.platform_specific_commands_controller import list_packages
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
-from typing_extensions import Annotated
+from typing import Annotated
 
 
 def get_find_packages_tool(ctx: MobileUseContext):

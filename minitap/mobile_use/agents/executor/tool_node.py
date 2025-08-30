@@ -1,8 +1,8 @@
 import asyncio
-from typing import Any, Optional
+from typing import Any
 from langgraph.types import Command
 from pydantic import BaseModel
-from typing_extensions import override
+from typing import override
 from langchain_core.runnables import RunnableConfig
 from langgraph.store.base import BaseStore
 from langchain_core.messages import AnyMessage, ToolCall, ToolMessage
@@ -21,7 +21,7 @@ class ExecutorToolNode(ToolNode):
         input: list[AnyMessage] | dict[str, Any] | BaseModel,
         config: RunnableConfig,
         *,
-        store: Optional[BaseStore],
+        store: BaseStore | None,
     ):
         return await self.__func(is_async=True, input=input, config=config, store=store)
 
@@ -31,7 +31,7 @@ class ExecutorToolNode(ToolNode):
         input: list[AnyMessage] | dict[str, Any] | BaseModel,
         config: RunnableConfig,
         *,
-        store: Optional[BaseStore],
+        store: BaseStore | None,
     ) -> Any:
         loop = asyncio.get_event_loop()
         return loop.run_until_complete(
@@ -44,7 +44,7 @@ class ExecutorToolNode(ToolNode):
         input: list[AnyMessage] | dict[str, Any] | BaseModel,
         config: RunnableConfig,
         *,
-        store: Optional[BaseStore],
+        store: BaseStore | None,
     ) -> Any:
         tool_calls, input_type = self._parse_input(input, store)
         outputs: list[Command | ToolMessage] = []
@@ -74,7 +74,7 @@ class ExecutorToolNode(ToolNode):
         self,
         call: ToolCall,
         output: ToolMessage | Command,
-    ) -> Optional[bool]:
+    ) -> bool | None:
         if isinstance(output, ToolMessage):
             return output.status == "error"
         if isinstance(output, Command):

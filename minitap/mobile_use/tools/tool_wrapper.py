@@ -1,4 +1,4 @@
-from typing import Callable
+from collections.abc import Callable
 
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel

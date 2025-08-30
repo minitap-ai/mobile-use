@@ -1,6 +1,5 @@
 import sys
 import time
-from typing import List
 
 import psutil
 import requests
@@ -12,7 +11,7 @@ from minitap.mobile_use.utils.logger import get_server_logger
 logger = get_server_logger()
 
 
-def find_processes_by_name(name: str) -> List[psutil.Process]:
+def find_processes_by_name(name: str) -> list[psutil.Process]:
     """Find all processes with the given name."""
     processes = []
     for proc in psutil.process_iter(["pid", "name", "cmdline"]):
@@ -26,7 +25,7 @@ def find_processes_by_name(name: str) -> List[psutil.Process]:
     return processes
 
 
-def find_processes_by_port(port: int) -> List[psutil.Process]:
+def find_processes_by_port(port: int) -> list[psutil.Process]:
     processes = []
     for proc in psutil.process_iter(["pid", "name"]):
         try:

@@ -9,7 +9,7 @@ from minitap.mobile_use.controllers.mobile_command_controller import SwipeReques
 from minitap.mobile_use.controllers.mobile_command_controller import swipe as swipe_controller
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
-from typing_extensions import Annotated
+from typing import Annotated
 
 
 def get_swipe_tool(ctx: MobileUseContext):

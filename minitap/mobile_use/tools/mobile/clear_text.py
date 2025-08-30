@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Annotated
 
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
@@ -6,7 +6,6 @@ from langchain_core.tools.base import InjectedToolCallId
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 from pydantic import BaseModel
-from typing_extensions import Annotated
 
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
@@ -37,9 +36,9 @@ DEFAULT_CHARS_TO_ERASE = 50
 
 class ClearTextResult(BaseModel):
     success: bool
-    error_message: Optional[str]
+    error_message: str | None
     chars_erased: int
-    final_text: Optional[str]
+    final_text: str | None
 
 
 class TextClearer:
@@ -51,9 +50,7 @@ class TextClearer:
         screen_data = get_screen_data(screen_api_client=self.ctx.screen_api_client)
         self.state.latest_ui_hierarchy = screen_data.elements
 
-    def _get_element_info(
-        self, resource_id: str
-    ) -> Tuple[Optional[object], Optional[str], Optional[str]]:
+    def _get_element_info(self, resource_id: str) -> tuple[object | None, str | None, str | None]:
         if not self.state.latest_ui_hierarchy:
             self._refresh_ui_hierarchy()
 
@@ -72,9 +69,7 @@ class TextClearer:
 
         return element, current_text, hint_text
 
-    def _format_text_with_hint_info(
-        self, text: Optional[str], hint_text: Optional[str]
-    ) -> Optional[str]:
+    def _format_text_with_hint_info(self, text: str | None, hint_text: str | None) -> str | None:
         if text is None:
             return None
 
@@ -85,7 +80,7 @@ class TextClearer:
 
         return text
 
-    def _should_clear_text(self, current_text: Optional[str], hint_text: Optional[str]) -> bool:
+    def _should_clear_text(self, current_text: str | None, hint_text: str | None) -> bool:
         return current_text is not None and current_text != "" and current_text != hint_text
 
     def _prepare_element_for_clearing(self, resource_id: str) -> bool:
@@ -95,7 +90,7 @@ class TextClearer:
         move_cursor_to_end_if_bounds(ctx=self.ctx, state=self.state, resource_id=resource_id)
         return True
 
-    def _erase_text_attempt(self, text_length: int) -> Optional[str]:
+    def _erase_text_attempt(self, text_length: int) -> str | None:
         chars_to_erase = text_length + 1
         logger.info(f"Erasing {chars_to_erase} characters from the input")
 
@@ -107,8 +102,8 @@ class TextClearer:
         return None
 
     def _clear_with_retries(
-        self, resource_id: str, initial_text: str, hint_text: Optional[str]
-    ) -> Tuple[bool, Optional[str], int]:
+        self, resource_id: str, initial_text: str, hint_text: str | None
+    ) -> tuple[bool, str | None, int]:
         current_text = initial_text
         erased_chars = 0
 
@@ -142,10 +137,10 @@ class TextClearer:
     def _create_result(
         self,
         success: bool,
-        error_message: Optional[str],
+        error_message: str | None,
         chars_erased: int,
-        final_text: Optional[str],
-        hint_text: Optional[str],
+        final_text: str | None,
+        hint_text: str | None,
     ) -> ClearTextResult:
         formatted_final_text = self._format_text_with_hint_info(final_text, hint_text)
 
@@ -157,7 +152,7 @@ class TextClearer:
         )
 
     def _handle_no_clearing_needed(
-        self, current_text: Optional[str], hint_text: Optional[str]
+        self, current_text: str | None, hint_text: str | None
     ) -> ClearTextResult:
         return self._create_result(
             success=True,
@@ -167,9 +162,7 @@ class TextClearer:
             hint_text=hint_text,
         )
 
-    def _handle_element_not_found(
-        self, resource_id: str, hint_text: Optional[str]
-    ) -> ClearTextResult:
+    def _handle_element_not_found(self, resource_id: str, hint_text: str | None) -> ClearTextResult:
         error = erase_text_controller(ctx=self.ctx)
         self._refresh_ui_hierarchy()
 
@@ -261,7 +254,7 @@ def get_clear_text_tool(ctx: MobileUseContext):
     return clear_text
 
 
-def _format_success_message(nb_char_erased: int, new_text_value: Optional[str]) -> str:
+def _format_success_message(nb_char_erased: int, new_text_value: str | None) -> str:
     if nb_char_erased == -1:
         msg = "No text clearing was needed (the input was already empty)."
     else:
@@ -273,7 +266,7 @@ def _format_success_message(nb_char_erased: int, new_text_value: Optional[str]) 
     return msg
 
 
-def _format_failure_message(output: Optional[str]) -> str:
+def _format_failure_message(output: str | None) -> str:
     return "Failed to erase text. " + (str(output) if output else "")
 
 

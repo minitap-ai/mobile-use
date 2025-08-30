@@ -1,4 +1,3 @@
-from typing import Optional
 
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
@@ -13,7 +12,7 @@ from minitap.mobile_use.controllers.mobile_command_controller import (
 )
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
-from typing_extensions import Annotated
+from typing import Annotated
 
 
 def get_wait_for_animation_to_end_tool(ctx: MobileUseContext):
@@ -22,7 +21,7 @@ def get_wait_for_animation_to_end_tool(ctx: MobileUseContext):
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
         agent_thought: str,
-        timeout: Optional[WaitTimeout],
+        timeout: WaitTimeout | None,
     ):
         """
         Waits for ongoing animations or videos to finish before continuing.

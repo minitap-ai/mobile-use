@@ -1,4 +1,3 @@
-from typing import Optional
 
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
@@ -11,7 +10,7 @@ from minitap.mobile_use.controllers.mobile_command_controller import SelectorReq
 from minitap.mobile_use.controllers.mobile_command_controller import tap as tap_controller
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
-from typing_extensions import Annotated
+from typing import Annotated
 
 
 def get_tap_tool(ctx: MobileUseContext):
@@ -21,7 +20,7 @@ def get_tap_tool(ctx: MobileUseContext):
         state: Annotated[State, InjectedState],
         agent_thought: str,
         selector_request: SelectorRequest,
-        index: Optional[int] = None,
+        index: int | None = None,
     ):
         """
         Taps on a selector.

@@ -1,5 +1,4 @@
 import sys
-from typing import List, Optional
 
 import inquirer
 from rich.console import Console
@@ -8,12 +7,12 @@ from rich.prompt import Prompt
 
 def select_provider_and_model(
     console: Console,
-    available_providers: List[str],
+    available_providers: list[str],
     available_models: dict,
     default_provider: str,
     default_model: str,
-    provider: Optional[str] = None,
-    model: Optional[str] = None,
+    provider: str | None = None,
+    model: str | None = None,
 ) -> tuple[str, str]:
     """
     Interactive selection of LLM provider and model with arrow-key dropdowns when available.
@@ -71,7 +70,7 @@ def select_provider_and_model(
 def _select_from_list(
     console: Console,
     item_type: str,
-    choices: List[str],
+    choices: list[str],
     default: str,
     message: str,
 ) -> str:
@@ -108,7 +107,7 @@ def _select_from_list(
         return _numbered_selection(console, item_type, choices, default)
 
 
-def _numbered_selection(console: Console, item_type: str, choices: List[str], default: str) -> str:
+def _numbered_selection(console: Console, item_type: str, choices: list[str], default: str) -> str:
     """Fallback numbered selection when arrow keys aren't available."""
     choices_text = "\n".join([f"  {i + 1}. {choice}" for i, choice in enumerate(choices)])
     console.print(f"Available {item_type}s:\n{choices_text}")

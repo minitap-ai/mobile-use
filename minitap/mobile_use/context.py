@@ -6,12 +6,11 @@ Uses ContextVar to avoid prop drilling and maintain clean function signatures.
 
 from enum import Enum
 from pathlib import Path
-from typing import Optional
 
 from adbutils import AdbClient
 from openai import BaseModel
 from pydantic import ConfigDict
-from typing_extensions import Literal
+from typing import Literal
 
 from minitap.mobile_use.clients.device_hardware_client import DeviceHardwareClient
 from minitap.mobile_use.clients.screen_api_client import ScreenApiClient
@@ -56,8 +55,8 @@ class MobileUseContext(BaseModel):
     hw_bridge_client: DeviceHardwareClient
     screen_api_client: ScreenApiClient
     llm_config: LLMConfig
-    adb_client: Optional[AdbClient] = None
-    execution_setup: Optional[ExecutionSetup] = None
+    adb_client: AdbClient | None = None
+    execution_setup: ExecutionSetup | None = None
 
     def get_adb_client(self) -> AdbClient:
         if self.adb_client is None:

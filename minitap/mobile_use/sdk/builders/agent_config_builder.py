@@ -3,7 +3,6 @@ Builder for AgentConfig objects using a fluent interface.
 """
 
 import copy
-from typing import Dict, List, Optional
 
 from langchain_core.callbacks.base import Callbacks
 
@@ -39,11 +38,11 @@ class AgentConfigBuilder:
 
     def __init__(self):
         """Initialize an empty AgentConfigBuilder."""
-        self._agent_profiles: Dict[str, AgentProfile] = {}
-        self._task_request_defaults: Optional[TaskRequestCommon] = None
-        self._default_profile: Optional[str | AgentProfile] = None
-        self._device_id: Optional[str] = None
-        self._device_platform: Optional[DevicePlatform] = None
+        self._agent_profiles: dict[str, AgentProfile] = {}
+        self._task_request_defaults: TaskRequestCommon | None = None
+        self._default_profile: str | AgentProfile | None = None
+        self._device_id: str | None = None
+        self._device_platform: DevicePlatform | None = None
         self._servers: ServerConfig = get_default_servers()
         self._graph_config_callbacks: Callbacks = None
 
@@ -58,7 +57,7 @@ class AgentConfigBuilder:
         profile.llm_config.validate_providers()
         return self
 
-    def add_profiles(self, profiles: List[AgentProfile]) -> "AgentConfigBuilder":
+    def add_profiles(self, profiles: list[AgentProfile]) -> "AgentConfigBuilder":
         """
         Add multiple agent profiles to the mobile-use agent.
 
@@ -130,7 +129,7 @@ class AgentConfigBuilder:
         self._servers.screen_api_base_url = url
         return self
 
-    def with_adb_server(self, host: str, port: Optional[int] = None) -> "AgentConfigBuilder":
+    def with_adb_server(self, host: str, port: int | None = None) -> "AgentConfigBuilder":
         """
         Set the ADB server host and port.
 

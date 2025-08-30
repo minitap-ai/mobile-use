@@ -10,7 +10,7 @@ from minitap.mobile_use.controllers.mobile_command_controller import (
 from minitap.mobile_use.graph.state import State
 from langgraph.prebuilt import InjectedState
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
-from typing_extensions import Annotated
+from typing import Annotated
 
 
 def get_paste_text_tool(ctx: MobileUseContext):

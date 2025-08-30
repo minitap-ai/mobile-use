@@ -1,12 +1,11 @@
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel
-from typing_extensions import Annotated
+from typing import Annotated
 
 
 class PlannerSubgoalOutput(BaseModel):
-    id: Annotated[Optional[str], "If not provided, it will be generated"] = None
+    id: Annotated[str | None, "If not provided, it will be generated"] = None
     description: str
 
 
@@ -25,7 +24,7 @@ class Subgoal(BaseModel):
     id: Annotated[str, "Unique identifier of the subgoal"]
     description: Annotated[str, "Description of the subgoal"]
     completion_reason: Annotated[
-        Optional[str], "Reason why the subgoal was completed (failure or success)"
+        str | None, "Reason why the subgoal was completed (failure or success)"
     ] = None
     status: SubgoalStatus
 
