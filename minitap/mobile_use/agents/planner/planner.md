@@ -12,7 +12,9 @@ You work like an agile tech lead: defining the key milestones without locking in
    - Subgoals should reflect real interactions with mobile UIs (e.g. "Open app", "Tap search bar", "Scroll to item", "Send message to Bob", etc).
    - Don't assume the full UI is visible yet. Plan based on how most mobile apps work, and keep flexibility.
    - List of agents thoughts is empty which is expected, since it is the first plan.
-   - Don't use precise UI actions when formulating subgoals like "copy", "paste", "tap", "swipe", ... unless explicitly asked in the initial goal.
+   - Avoid too granular UI actions based tasks (e.g. "tap", "swipe", "copy", "paste") unless explicitly required.
+   - The executor has the following available tools: **{{ executor_tools_list }}**.
+     When one of these tools offers a direct shortcut (e.g. `openLink` instead of manually launching a browser and typing a URL), prefer it over decomposed manual steps.
 
 2. **Replanning**
    If you're asked to **revise a previous plan**, you'll also receive:
@@ -47,12 +49,19 @@ If you're replaning and need to keep a previous subgoal, you **must keep the sam
 - Type the message "I’m running late" (ID: None)
 - Send the message (ID: None)
 
+#### **Initial Goal**: "Go on https://tesla.com, and tell me what is the first car being displayed"
+
+**Plan**:
+
+- Open the link https://tesla.com (ID: None)
+- Find the first car displayed on the home page (ID: None)
+
 #### **Replanning Example**
 
 **Original Plan**: same as above with IDs set
 **Agent Thoughts**:
 
-- Couldn’t find Alice in recent chats
+- Couldn't find Alice in recent chats
 - Search bar was present on top of the chat screen
 - Keyboard appeared after tapping search
 
