@@ -1,13 +1,15 @@
-from pathlib import Path
 import uuid
+from pathlib import Path
 
 from jinja2 import Template
 from langchain_core.messages import HumanMessage, SystemMessage
+
 from minitap.mobile_use.agents.planner.types import PlannerOutput, Subgoal, SubgoalStatus
 from minitap.mobile_use.agents.planner.utils import one_of_them_is_failure
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.services.llm import get_llm
+from minitap.mobile_use.tools.index import EXECUTOR_WRAPPERS_TOOLS, format_tools_list
 from minitap.mobile_use.utils.decorators import wrap_with_callbacks
 from minitap.mobile_use.utils.logger import get_logger
 
@@ -36,6 +38,7 @@ class PlannerNode:
             initial_goal=state.initial_goal,
             previous_plan="\n".join(str(s) for s in state.subgoal_plan),
             agent_thoughts="\n".join(state.agents_thoughts),
+            executor_tools_list=format_tools_list(self.ctx, EXECUTOR_WRAPPERS_TOOLS),
         )
         messages = [
             SystemMessage(content=system_message),

@@ -10,12 +10,14 @@ from langchain_core.messages import (
     ToolMessage,
 )
 from langgraph.graph.message import REMOVE_ALL_MESSAGES
+
 from minitap.mobile_use.agents.cortex.types import CortexOutput
 from minitap.mobile_use.agents.planner.utils import get_current_subgoal
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.services.llm import get_llm, with_fallback
+from minitap.mobile_use.tools.index import EXECUTOR_WRAPPERS_TOOLS, format_tools_list
 from minitap.mobile_use.utils.conversations import get_screenshot_message_for_llm
 from minitap.mobile_use.utils.decorators import wrap_with_callbacks
 from minitap.mobile_use.utils.logger import get_logger
@@ -44,6 +46,7 @@ class CortexNode:
             current_subgoal=get_current_subgoal(state.subgoal_plan),
             agents_thoughts=state.agents_thoughts,
             executor_feedback=executor_feedback,
+            executor_tools_list=format_tools_list(self.ctx, EXECUTOR_WRAPPERS_TOOLS),
         )
         messages = [
             SystemMessage(content=system_message),
