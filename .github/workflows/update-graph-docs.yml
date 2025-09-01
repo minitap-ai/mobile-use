@@ -1,0 +1,70 @@
+name: Update Graph Documentation 🦜📚
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches: [main]
+    paths:
+      - "minitap/mobile_use/graph/graph.py"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          ref: ${{ github.head_ref }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y graphviz graphviz-dev
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: |
+          uv sync
+
+      - name: Generate graph documentation
+        run: uv run python scripts/doc/generate_graph_docs.py
+
+      - name: Check for changes
+        id: changes
+        run: |
+          git add doc/graph.png
+          if git diff --cached --quiet doc/graph.png; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get last commit author
+        if: steps.changes.outputs.changed == 'true'
+        id: author
+        run: |
+          echo "name=$(git log -1 --pretty=format:'%an')" >> $GITHUB_OUTPUT
+          echo "email=$(git log -1 --pretty=format:'%ae')" >> $GITHUB_OUTPUT
+
+      - name: Commit and push changes
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config --local user.email "${{ steps.author.outputs.email }}"
+          git config --local user.name "${{ steps.author.outputs.name }}"
+          git add doc/graph.png
+          git commit -m "chore(doc): Update graph documentation [skip ci]"
+          git push
