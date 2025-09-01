@@ -204,6 +204,16 @@ python ./src/mobile_use/main.py \
 > [!NOTE]  
 > If you haven't configured a specific model, mobile-use will prompt you to choose one from the available options.
 
+## 🔎 Agentic System Overview
+
+<div align="center">
+
+![Graph Visualization](doc/graph.png)
+
+_This diagram is automatically updated from the codebase. This is our current agentic system architecture._
+
+</div>
+
 ## ❤️ Contributing
 
 We love contributions! Whether you're fixing a bug, adding a feature, or improving documentation, your help is welcome. Please read our **[Contributing Guidelines](CONTRIBUTING.md)** to get started.
