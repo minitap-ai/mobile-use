@@ -45,12 +45,5 @@ def record_interaction(ctx: MobileUseContext, response: BaseMessage):
     return "Screenshot recorded successfully"
 
 
-def log_agent_thought(prefix: str, agent_thought: str):
-    if prefix:
-        prefix = prefix[0].upper() + prefix[1:]
-    else:
-        prefix = "New agent thought"
-    logger.info(
-        f"💭 {Fore.LIGHTMAGENTA_EX + Style.BRIGHT}{prefix}{Style.RESET_ALL}: "
-        f"{Fore.LIGHTMAGENTA_EX}{agent_thought}{Style.RESET_ALL}"
-    )
+def log_agent_thought(agent_thought: str):
+    logger.info(f"💭 {Fore.LIGHTMAGENTA_EX}{agent_thought}{Style.RESET_ALL}")
