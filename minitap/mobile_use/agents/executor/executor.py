@@ -3,6 +3,8 @@ from pathlib import Path
 from jinja2 import Template
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_vertexai.chat_models import ChatVertexAI
+
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.graph.state import State
@@ -56,7 +58,7 @@ class ExecutorNode:
         }
 
         # ChatGoogleGenerativeAI does not support the "parallel_tool_calls" keyword
-        if not isinstance(llm, ChatGoogleGenerativeAI):
+        if not isinstance(llm, ChatGoogleGenerativeAI | ChatVertexAI):
             llm_bind_tools_kwargs["parallel_tool_calls"] = True
 
         llm = llm.bind_tools(**llm_bind_tools_kwargs)
