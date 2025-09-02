@@ -1,10 +1,11 @@
 import logging
-from typing import Literal, TypeVar
 from collections.abc import Awaitable, Callable
-from typing import overload
+from typing import Literal, TypeVar, overload
 
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_vertexai import ChatVertexAI
 from langchain_openai import ChatOpenAI
+
 from minitap.mobile_use.config import (
     AgentNode,
     AgentNodeWithFallback,
@@ -27,6 +28,19 @@ def get_google_llm(
         max_tokens=None,
         temperature=temperature,
         api_key=settings.GOOGLE_API_KEY,
+        max_retries=2,
+    )
+    return client
+
+
+def get_vertex_llm(
+    model_name: str = "gemini-2.5-pro",
+    temperature: float = 0.7,
+) -> ChatVertexAI:
+    client = ChatVertexAI(
+        model=model_name,
+        max_tokens=None,
+        temperature=temperature,
         max_retries=2,
     )
     return client
@@ -118,6 +132,8 @@ def get_llm(
         return get_openai_llm(llm.model, temperature)
     elif llm.provider == "google":
         return get_google_llm(llm.model, temperature)
+    elif llm.provider == "vertexai":
+        return get_vertex_llm(llm.model, temperature)
     elif llm.provider == "openrouter":
         return get_openrouter_llm(llm.model, temperature)
     elif llm.provider == "xai":
