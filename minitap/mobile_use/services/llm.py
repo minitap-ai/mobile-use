@@ -2,6 +2,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Literal, TypeVar, overload
 
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_google_vertexai import ChatVertexAI
 from langchain_openai import ChatOpenAI
@@ -89,7 +90,7 @@ def get_llm(
     *,
     use_fallback: bool = False,
     temperature: float = 1,
-): ...
+) -> BaseChatModel: ...
 
 
 @overload
@@ -98,7 +99,7 @@ def get_llm(
     name: AgentNode,
     *,
     temperature: float = 1,
-): ...
+) -> BaseChatModel: ...
 
 
 @overload
@@ -108,7 +109,7 @@ def get_llm(
     *,
     is_utils: Literal[True],
     temperature: float = 1,
-): ...
+) -> BaseChatModel: ...
 
 
 def get_llm(
@@ -117,7 +118,7 @@ def get_llm(
     is_utils: bool = False,
     use_fallback: bool = False,
     temperature: float = 1,
-):
+) -> BaseChatModel:
     llm = (
         ctx.llm_config.get_utils(name)  # type: ignore
         if is_utils
