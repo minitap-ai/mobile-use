@@ -48,11 +48,3 @@ def get_tools_from_wrappers(ctx: MobileUseContext, wrappers: list[ToolWrapper]) 
 
 def format_tools_list(ctx: MobileUseContext, wrappers: list[ToolWrapper]) -> str:
     return "\n".join([tool.name for tool in get_tools_from_wrappers(ctx, wrappers)])
-
-
-def get_tool_wrapper_from_name(name: str) -> ToolWrapper | None:
-    """Get the tool wrapper from the name."""
-    for wrapper in EXECUTOR_WRAPPERS_TOOLS:
-        if wrapper.tool_fn_getter.__name__ == f"get_{name}_tool":
-            return wrapper
-    return None
