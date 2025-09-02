@@ -311,9 +311,9 @@ def press_key(ctx: MobileUseContext, key: Key, dry_run: bool = False):
 
 
 class WaitTimeout(Enum):
-    SHORT = 500
-    MEDIUM = 1000
-    LONG = 5000
+    SHORT = "500"
+    MEDIUM = "1000"
+    LONG = "5000"
 
 
 def wait_for_animation_to_end(
@@ -327,7 +327,7 @@ def wait_for_animation_to_end(
 def run_flow_with_wait_for_animation_to_end(
     ctx: MobileUseContext, base_flow: list, dry_run: bool = False
 ):
-    base_flow.append({"waitForAnimationToEnd": {"timeout": WaitTimeout.MEDIUM.value}})
+    base_flow.append({"waitForAnimationToEnd": {"timeout": int(WaitTimeout.MEDIUM.value)}})
     return run_flow(ctx, base_flow, dry_run=dry_run)
 
 
