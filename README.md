@@ -61,10 +61,25 @@ Ready to automate your mobile experience? Follow these steps to get mobile-use u
 
 2.  **(Optional) Customize LLM Configuration:**
     To use different models or providers, create your own LLM configuration file.
+
     ```bash
     cp llm-config.override.template.jsonc llm-config.override.jsonc
     ```
+
     Then, edit `llm-config.override.jsonc` to fit your needs.
+
+    You can also use local LLMs or any other openai-api compatible providers :
+
+    1. Set `OPENAI_BASE_URL` and `OPENAI_API_KEY` in your `.env`
+    2. In your `llm-config.override.jsonc`, set `openai` as the provider for the agent nodes you want, and choose a model supported by your provider.
+
+    > [!NOTE]  
+    > If you want to use Google Vertex AI, you must either:
+    >
+    > - Have credentials configured for your environment (gcloud, workload identity, etc…)
+    > - Store the path to a service account JSON file as the GOOGLE_APPLICATION_CREDENTIALS environment variable
+    >
+    > More information: - [Credential types](https://cloud.google.com/docs/authentication/application-default-credentials#GAC) - [google.auth API reference](https://googleapis.dev/python/google-auth/latest/reference/google.auth.html#module-google.auth)
 
 ### Quick Launch (Docker)
 

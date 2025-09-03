@@ -278,13 +278,12 @@ class Agent:
                         )
 
                 if stream_mode == "updates":
-                    for key, value in payload.items():  # type: ignore
+                    for _, value in payload.items():  # type: ignore node name, node output
                         if value and "agents_thoughts" in value:
                             new_thoughts = value["agents_thoughts"]
                             last_item = new_thoughts[-1] if new_thoughts else None
                             if last_item:
                                 log_agent_thought(
-                                    prefix=key,
                                     agent_thought=last_item,
                                 )
 

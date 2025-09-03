@@ -3,7 +3,9 @@ import os
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
+import google.auth
 from dotenv import load_dotenv
+from google.auth.exceptions import DefaultCredentialsError
 from pydantic import BaseModel, Field, SecretStr, ValidationError, model_validator
 from pydantic_settings import BaseSettings
 
@@ -88,7 +90,7 @@ def record_events(output_path: Path | None, events: list[str] | BaseModel | Any)
 
 ### LLM Configuration
 
-LLMProvider = Literal["openai", "google", "openrouter", "xai"]
+LLMProvider = Literal["openai", "google", "openrouter", "xai", "vertexai"]
 LLMUtilsNode = Literal["outputter", "hopper"]
 AgentNode = Literal["planner", "orchestrator", "cortex", "executor"]
 AgentNodeWithFallback = Literal["cortex"]
@@ -96,6 +98,17 @@ AgentNodeWithFallback = Literal["cortex"]
 ROOT_DIR = Path(__file__).parent.parent.parent
 DEFAULT_LLM_CONFIG_FILENAME = "llm-config.defaults.jsonc"
 OVERRIDE_LLM_CONFIG_FILENAME = "llm-config.override.jsonc"
+
+
+def validate_vertex_ai_credentials():
+    try:
+        _, project = google.auth.default()
+        if not project:
+            raise Exception("VertexAI requires a Google Cloud project to be set.")
+    except DefaultCredentialsError as e:
+        raise Exception(
+            f"VertexAI requires valid Google Application Default Credentials (ADC): {e}"
+        )
 
 
 class LLM(BaseModel):
@@ -110,6 +123,8 @@ class LLM(BaseModel):
             case "google":
                 if not settings.GOOGLE_API_KEY:
                     raise Exception(f"{name} requires GOOGLE_API_KEY in .env")
+            case "vertexai":
+                validate_vertex_ai_credentials()
             case "openrouter":
                 if not settings.OPEN_ROUTER_API_KEY:
                     raise Exception(f"{name} requires OPEN_ROUTER_API_KEY in .env")

@@ -2,10 +2,10 @@ import os
 from pathlib import Path
 
 from pydantic import ValidationError
+
 from minitap.mobile_use.config import LLMConfig, deep_merge_llm_config, get_default_llm_config
 from minitap.mobile_use.utils.file import load_jsonc
 from minitap.mobile_use.utils.logger import get_logger
-
 
 logger = get_logger(__name__)
 
@@ -24,5 +24,6 @@ def load_llm_config_override(path: Path) -> LLMConfig:
     try:
         return deep_merge_llm_config(default_config, override_config_dict)
     except ValidationError as e:
-        logger.error(f"Invalid LLM config: {e}. Falling back to default config")
+        logger.error(f"Invalid LLM config: {e}")
+        logger.info("Falling back to default config")
         return default_config

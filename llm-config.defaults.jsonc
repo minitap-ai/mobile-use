@@ -46,7 +46,11 @@
     },
     "cortex": {
       "provider": "google",
-      "model": "gemini-2.5-pro"
+      "model": "gemini-2.5-flash",
+      "fallback": {
+        "provider": "openai",
+        "model": "gpt-5"
+      }
     },
     "executor": {
       "provider": "openai",
