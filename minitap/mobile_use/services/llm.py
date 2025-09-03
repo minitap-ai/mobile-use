@@ -39,7 +39,7 @@ def get_vertex_llm(
     temperature: float = 0.7,
 ) -> ChatVertexAI:
     client = ChatVertexAI(
-        model=model_name,
+        model_name=model_name,
         max_tokens=None,
         temperature=temperature,
         max_retries=2,
