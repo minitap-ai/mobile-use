@@ -79,7 +79,7 @@ Ready to automate your mobile experience? Follow these steps to get mobile-use u
     > - Have credentials configured for your environment (gcloud, workload identity, etc…)
     > - Store the path to a service account JSON file as the GOOGLE_APPLICATION_CREDENTIALS environment variable
     >
-    > More information: - [Credential types](https://cloud.google.com/docs/authentication/application-default-credentials#GAC) - [google.auth API reference](https://cloud.google.com/docs/authentication/application-default-credentials#GAC)
+    > More information: - [Credential types](https://cloud.google.com/docs/authentication/application-default-credentials#GAC) - [google.auth API reference](https://googleapis.dev/python/google-auth/latest/reference/google.auth.html#module-google.auth)
 
 ### Quick Launch (Docker)
 
