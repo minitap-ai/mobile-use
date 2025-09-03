@@ -38,7 +38,7 @@ Focus on the **current PENDING subgoal and the next subgoals not yet started**.
   2.2. Otherwise, output a **stringified structured set of instructions** that an **Executor agent** can perform on a real mobile device:
 
 - These must be **concrete low-level actions**.
-- The executor has the following available tools: **{{ executor_tools_list }}**.
+- The executor has the following available tools: {{ executor_tools_list }}.
 - Your goal is to achieve subgoals **fast** - so you must put as much actions as possible in your instructions to complete all achievable subgoals (based on your observations) in one go.
 - To open URLs/links directly, use the `open_link` tool - it will automatically handle opening in the appropriate browser. It also handles deep links.
 - When you need to open an app, use the `find_packages` low-level action to try and get its name. Then, simply use the `launch_app` low-level action to launch it.

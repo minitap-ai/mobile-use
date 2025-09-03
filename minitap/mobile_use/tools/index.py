@@ -61,4 +61,4 @@ def get_tools_from_wrappers(
 
 
 def format_tools_list(ctx: MobileUseContext, wrappers: list[ToolWrapper]) -> str:
-    return "\n".join([tool.name for tool in get_tools_from_wrappers(ctx, wrappers)])
+    return ", ".join([tool.name for tool in get_tools_from_wrappers(ctx, wrappers)])

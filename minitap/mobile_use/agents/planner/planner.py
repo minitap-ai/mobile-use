@@ -30,7 +30,10 @@ class PlannerNode:
 
         system_message = Template(
             Path(__file__).parent.joinpath("planner.md").read_text(encoding="utf-8")
-        ).render(platform=self.ctx.device.mobile_platform.value)
+        ).render(
+            platform=self.ctx.device.mobile_platform.value,
+            executor_tools_list=format_tools_list(ctx=self.ctx, wrappers=EXECUTOR_WRAPPERS_TOOLS),
+        )
         human_message = Template(
             Path(__file__).parent.joinpath("human.md").read_text(encoding="utf-8")
         ).render(
@@ -38,7 +41,6 @@ class PlannerNode:
             initial_goal=state.initial_goal,
             previous_plan="\n".join(str(s) for s in state.subgoal_plan),
             agent_thoughts="\n".join(state.agents_thoughts),
-            executor_tools_list=format_tools_list(self.ctx, EXECUTOR_WRAPPERS_TOOLS),
         )
         messages = [
             SystemMessage(content=system_message),
