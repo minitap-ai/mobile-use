@@ -35,9 +35,9 @@ async def run_automation(
     if settings.ADB_HOST:
         config.with_adb_server(host=settings.ADB_HOST, port=settings.ADB_PORT)
     if settings.DEVICE_HARDWARE_BRIDGE_BASE_URL:
-        config.with_hw_bridge_base_url(url=settings.DEVICE_HARDWARE_BRIDGE_BASE_URL)
+        config.with_hw_bridge(url=settings.DEVICE_HARDWARE_BRIDGE_BASE_URL)
     if settings.DEVICE_SCREEN_API_BASE_URL:
-        config.with_screen_api_base_url(url=settings.DEVICE_SCREEN_API_BASE_URL)
+        config.with_screen_api(url=settings.DEVICE_SCREEN_API_BASE_URL)
     if graph_config_callbacks:
         config.with_graph_config_callbacks(graph_config_callbacks)
 
