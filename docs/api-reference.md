@@ -1,6 +1,6 @@
 # API Reference
 
-This reference provides detailed documentation for the core classes and methods in the Mobile Use SDK.
+This reference provides detailed documentation for the core classes and methods in the mobile-use SDK.
 
 ## Agent Class
 
@@ -16,7 +16,7 @@ from minitap.mobile_use.sdk import Agent
 Agent(config: Optional[AgentConfig] = None)
 ```
 
-- **config**: Optional. Custom agent configuration. If not provided, default configuration is used.
+* **config**: Optional. Custom agent configuration. If not provided, default configuration is used.
 
 ### Methods
 
@@ -33,10 +33,10 @@ def init(
 
 Initializes the agent by connecting to a device and starting required servers.
 
-- **server_restart_attempts**: Maximum number of attempts to start servers if they fail
-- **retry_count**: Number of retries for API calls
-- **retry_wait_seconds**: Seconds to wait between retries
-- **Returns**: True if initialization succeeded
+* **server\_restart\_attempts**: Maximum number of attempts to start servers if they fail
+* **retry\_count**: Number of retries for API calls
+* **retry\_wait\_seconds**: Seconds to wait between retries
+* **Returns**: True if initialization succeeded
 
 #### `run_task`
 
@@ -44,22 +44,22 @@ Initializes the agent by connecting to a device and starting required servers.
 async def run_task(
     self,
     *,
-    goal: Optional[str] = None,
-    output: Optional[type[TOutput] | str] = None,
-    profile: Optional[str | AgentProfile] = None,
-    name: Optional[str] = None,
-    request: Optional[TaskRequest[TOutput]] = None,
-) -> Optional[str | dict | TOutput]
+    goal: str | None = None,
+    output: type[TOutput] | str | None = None,
+    profile: str | AgentProfile | None = None,
+    name: str | None = None,
+    request: TaskRequest[TOutput] | None = None,
+) -> str | dict | TOutput | None
 ```
 
 Executes a mobile automation task.
 
-- **goal**: Natural language description of what to accomplish
-- **output**: Type of output (Pydantic model class or string description)
-- **profile**: Agent profile to use (name or instance)
-- **name**: Optional name for the task
-- **request**: Pre-built TaskRequest (alternative to individual parameters)
-- **Returns**: Task result (string, dict, or Pydantic model instance)
+* **goal**: Natural language description of what to accomplish
+* **output**: Type of output (Pydantic model class or string description)
+* **profile**: Agent profile to use (name or instance)
+* **name**: Optional name for the task
+* **request**: Pre-built TaskRequest (**alternative to individual parameters**)
+* **Returns**: Task result (string, dict, or Pydantic model instance)
 
 #### `new_task`
 
@@ -69,18 +69,20 @@ def new_task(self, goal: str) -> TaskRequestBuilder[None]
 
 Creates a new task request builder for configuring a task.
 
-- **goal**: Natural language description of what to accomplish
-- **Returns**: TaskRequestBuilder instance for fluent configuration
+* **goal**: Natural language description of what to accomplish
+* **Returns**: TaskRequestBuilder instance for fluent configuration
 
 #### `clean`
 
 ```python
-def clean(self) -> None
+def clean(self, force: bool = False) -> None
 ```
 
 Cleans up resources, stops servers, and resets the agent state.
 
-## TaskRequestBuilder Class
+* **force:** Can be set to **true** to clean zombie/pre-existing mobile-use servers
+
+## TaskRequestBuilder\[TOutput=None] Class
 
 Fluent builder for configuring task requests.
 
@@ -98,13 +100,36 @@ def with_name(self, name: str) -> TaskRequestBuilder[TOutput]
 
 Sets a name for the task.
 
+#### `with_max_steps`
+
+```python
+def with_max_steps(self, max_steps: int) -> TaskRequestBuilder[TOutput]
+```
+
+Sets the maximum number of steps the task can take (equivalent to LangGraph recursion limit).
+
+#### `with_llm_output_saving`
+
+```python
+def with_llm_output_saving(self, path: str) -> TaskRequestBuilder[TOutput]
+```
+
+Configures the path where the final mobile-use LLM output for the task must be saved (will be overwritten).
+
+#### `with_thoughts_output_saving`
+
+<pre class="language-python"><code class="lang-python"><strong>def with_thoughts_output_saving(self, path: str) -> TaskRequestBuilder[TOutput]
+</strong></code></pre>
+
+Configures the path where the LLM agent thoughts for the task must be saved (will be overwritten).
+
 #### `with_output_description`
 
 ```python
 def with_output_description(self, description: str) -> TaskRequestBuilder[TOutput]
 ```
 
-Sets a textual description of the expected output format.
+Sets a natural language description of the expected output format.
 
 #### `with_output_format`
 
@@ -125,10 +150,26 @@ Sets the agent profile to use for this task.
 #### `with_trace_recording`
 
 ```python
-def with_trace_recording(self, enabled: bool = True, path: Optional[str | Path] = None) -> TaskRequestBuilder[TOutput]
+def with_trace_recording(self, enabled: bool = True, path: str | Path | None = None) -> TaskRequestBuilder[TOutput]
 ```
 
 Enables or disables trace recording for debugging.
+
+#### `without_llm_output_saving`
+
+```python
+def without_llm_output_saving(self) -> TaskRequestBuilder[TOutput]
+```
+
+Disable LLM output saving for the task (in case it was previously enabled).
+
+#### `without_thoughts_output_saving`
+
+```python
+def without_thoughts_output_saving(self) -> TaskRequestBuilder[TOutput]
+```
+
+Disable agent thoughts output saving for the task (in case it was previously enabled).
 
 #### `build`
 
@@ -151,41 +192,78 @@ from minitap.mobile_use.sdk.builders import AgentConfigBuilder
 #### `for_device`
 
 ```python
-def for_device(self, device_id: str, platform: DevicePlatform) -> AgentConfigBuilder
+def for_device(self, platform: DevicePlatform, device_id: str) -> AgentConfigBuilder
 ```
 
 Specifies a target device instead of auto-detection.
 
-#### `with_profile`
+#### `add_profile`
 
 ```python
-def with_profile(self, profile: AgentProfile) -> AgentConfigBuilder
+def add_profile(self, profile: AgentProfile) -> AgentConfigBuilder
 ```
 
 Adds an agent profile.
 
+#### `add_profiles`
+
+```python
+def add_profile(self, profiles: list[AgentProfile]) -> AgentConfigBuilder
+```
+
+Adds multiple agent profiles.
+
 #### `with_default_profile`
 
 ```python
-def with_default_profile(self, profile_name: str) -> AgentConfigBuilder
+def with_default_profile(self, profile: str | AgentProfile) -> AgentConfigBuilder
 ```
 
-Sets the default agent profile.
+Sets the default agent profile used for the tasks.
 
-#### `with_server_config`
+#### `with_hw_bridge`
 
 ```python
-def with_server_config(
-    self,
-    *,
-    adb_host: Optional[str] = None,
-    adb_port: Optional[int] = None,
-    screen_api_base_url: Optional[str | ApiBaseUrl] = None,
-    hw_bridge_base_url: Optional[str | ApiBaseUrl] = None,
-) -> AgentConfigBuilder
+def with_hw_bridge(self, url: str | ApiBaseUrl) -> AgentConfigBuilder
 ```
 
-Configures server connections.
+Sets the base URL for Device Hardware Bridge API server.
+
+#### `with_screen_api`
+
+```python
+def with_screen_api(self, url: str | ApiBaseUrl) -> AgentConfigBuilder
+```
+
+Sets the base URL for Device Screen API server.
+
+#### `with_adb_server`
+
+```python
+def with_adb_server(self, host: str, port: int | None = None) -> AgentConfigBuilder
+```
+
+Sets the ADB server host and port.
+
+#### `with_servers`
+
+```python
+def with_servers(self, servers: ServerConfig) -> AgentConfigBuilder
+```
+
+Configures server connections. It's basically a shortcut for:
+
+* `with_hw_bridge(...)`
+* `with_screen_api(...)`
+* `with_adb_server(...)`
+
+#### `with_default_task_config`
+
+```python
+def with_default_task_config(self, config: TaskRequestCommon) -> AgentConfigBuilder
+```
+
+Sets the default task configuration for tasks created by the agent.
 
 #### `build`
 
@@ -205,20 +283,20 @@ from minitap.mobile_use.sdk.types import TaskRequest
 
 ### Attributes
 
-- **goal**: str - Natural language description of the task goal
-- **profile**: Optional[str] - Name of the agent profile to use
-- **task_name**: Optional[str] - Name of the task
-- **output_description**: Optional[str] - Description of the expected output format
-- **output_format**: Optional[type[TOutput]] - Pydantic model class for typed output
-- **max_steps**: int - Maximum number of steps the agent can take
-- **record_trace**: bool - Whether to record execution traces
-- **trace_path**: Path - Directory to save trace data
-- **llm_output_path**: Optional[Path] - Path to save LLM outputs
-- **thoughts_output_path**: Optional[Path] - Path to save agent thoughts
+* **goal**: str - Natural language description of the task goal
+* **profile**: str | None - Name of the agent profile to use
+* **task\_name**: str | None - Name of the task
+* **output\_description**: str | None - Description of the expected output format
+* **output\_format**: type\[TOutput] | None - Pydantic model class for typed output
+* **max\_steps**: int - Maximum number of steps the agent can take
+* **record\_trace**: bool - Whether to record execution traces
+* **trace\_path**: Path - Directory to save trace data
+* **llm\_output\_path**: Path | None - Path to save LLM outputs
+* **thoughts\_output\_path**: Path | None - Path to save agent thoughts
 
 ## AgentProfile Class
 
-Represents a profile for an agent with specific capabilities.
+Represents a profile for the mobile-use agent which is composed of multiple internal LLM agents.
 
 ```python
 from minitap.mobile_use.sdk.types import AgentProfile
@@ -230,14 +308,16 @@ from minitap.mobile_use.sdk.types import AgentProfile
 AgentProfile(
     *,
     name: str,
-    llm_config: Optional[LLMConfig] = None,
-    from_file: Optional[str] = None,
+    llm_config: LLMConfig | None = None,
+    from_file: str | None = None,
 )
 ```
 
-- **name**: Name of the profile
-- **llm_config**: LLM configuration for the agent
-- **from_file**: Path to a file containing LLM configuration
+* **name**: Name of the profile
+* **llm\_config**: LLM configuration for the agent
+* **from\_file**: Path to a file containing LLM configuration
+
+N.B. `llm_config` and `from_file` are **mutually exclusive**.
 
 ## Error Classes
 
@@ -255,12 +335,12 @@ from minitap.mobile_use.sdk.types.exceptions import (
 )
 ```
 
-- **MobileUseError**: Base exception for all SDK errors
-- **AgentError**: Base exception for agent-related errors
-- **AgentProfileNotFoundError**: Raised when a specified profile is not found
-- **AgentTaskRequestError**: Raised for task request validation errors
-- **AgentNotInitializedError**: Raised when agent methods are called before initialization
-- **DeviceError**: Base exception for device-related errors
-- **DeviceNotFoundError**: Raised when no device is found
-- **ServerError**: Base exception for server-related errors
-- **ServerStartupError**: Raised when server startup fails
+* **MobileUseError**: Base exception for all SDK errors
+* **AgentError**: Base exception for agent-related errors
+* **AgentProfileNotFoundError**: Raised when a specified profile is not found
+* **AgentTaskRequestError**: Raised for task request validation errors
+* **AgentNotInitializedError**: Raised when agent methods are called before initialization
+* **DeviceError**: Base exception for device-related errors
+* **DeviceNotFoundError**: Raised when no device is found
+* **ServerError**: Base exception for server-related errors
+* **ServerStartupError**: Raised when server startup fails

@@ -1,6 +1,6 @@
-# Examples and Tutorials
+# Examples & Tutorials
 
-This page provides practical examples and tutorials for using the Mobile Use SDK.
+This page provides practical examples and tutorials for using the mobile-use SDK.
 
 ## Basic Examples
 
@@ -403,6 +403,5 @@ if __name__ == "__main__":
 
 ## Next Steps
 
-- Learn about [Advanced Usage Patterns](advanced-usage.md) for more customization
-- Check the [API Reference](api-reference.md) for detailed information
-- See the [Troubleshooting Guide](troubleshooting.md) for common issues
+* Check the [API Reference](api-reference.md) for detailed information
+* See the [Troubleshooting Guide](troubleshooting.md) for common issues

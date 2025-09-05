@@ -1,6 +1,6 @@
-# Quickstart Guide
+# Quickstart
 
-This guide will help you run your first mobile automation task using the Mobile Use SDK.
+This guide will help you run your first mobile automation task using the mobile-use SDK.
 
 ## Creating Your First Automation
 
@@ -9,13 +9,17 @@ Let's write a simple script that opens a calculator app and performs a basic cal
 ```python
 import asyncio
 from minitap.mobile_use.sdk import Agent
+from minitap.mobile_use.sdk.types import AgentProfile
+from minitap.mobile_use.sdk.builders import Builders
 
 async def main():
-    # Create an agent with default configuration
-    agent = Agent()
+    # Create an agent (see Quickstart for the file `llm-config.defaults.jsonc`)
+    default_profile = AgentProfile(name="default", from_file="llm-config.defaults.jsonc")
+    agent_config = Builders.AgentConfig.with_default_profile(default_profile).build()
+    agent = Agent(config=agent_config)
     
     try:
-        # Initialize the agent (connect to a device)
+        # Initialize the agent (connect to the first available device)
         agent.init()
         
         # Define a simple task goal
@@ -45,12 +49,14 @@ python calculator_demo.py
 
 ## Getting Structured Output
 
-Mobile Use SDK can return structured data using Pydantic models:
+mobile-use SDK can return structured data using Pydantic models:
 
 ```python
 import asyncio
 from pydantic import BaseModel, Field
 from minitap.mobile_use.sdk import Agent
+from minitap.mobile_use.sdk.types import AgentProfile
+from minitap.mobile_use.sdk.builders import Builders
 
 # Define a model for structured output
 class CalculationResult(BaseModel):
@@ -59,7 +65,10 @@ class CalculationResult(BaseModel):
     app_used: str = Field(..., description="The name of the calculator app used")
 
 async def main():
-    agent = Agent()
+    # Create an agent (see Quickstart for the file `llm-config.defaults.jsonc`)
+    default_profile = AgentProfile(name="default", from_file="llm-config.defaults.jsonc")
+    agent_config = Builders.AgentConfig.with_default_profile(default_profile).build()
+    agent = Agent(config=agent_config)
     
     try:
         agent.init()
