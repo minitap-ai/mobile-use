@@ -2,406 +2,257 @@
 
 This page provides practical examples and tutorials for using the mobile-use SDK.
 
-## Basic Examples
+### Simple Photo Organizer
 
-### Simple Text Automation
+This example demonstrates a straightforward way to use the mobile-use SDK without builders or advanced configuration. It performs a real-world automation task:
 
-The most basic way to use the SDK is with string input and output:
+1. Opens the photo gallery
+2. Finds photos from a specific date
+3. Creates an album and moves those photos into it
 
 ```python
 import asyncio
+from datetime import date, timedelta
+from pydantic import BaseModel, Field
 from minitap.mobile_use.sdk import Agent
 
-async def basic_automation():
+
+class PhotosResult(BaseModel):
+    """Structured result from photo search."""
+
+    found_photos: int = Field(..., description="Number of photos found")
+    date_range: str = Field(..., description="Date range of photos found")
+    album_created: bool = Field(..., description="Whether an album was created")
+    album_name: str = Field(..., description="Name of the created album")
+    photos_moved: int = Field(0, description="Number of photos moved to the album")
+
+
+async def main() -> None:
+    # Create a simple agent with default configuration
     agent = Agent()
+
     try:
+        # Initialize agent (finds a device, starts required servers)
         agent.init()
-        
-        # Run a simple task and get string output
+
+        # Calculate yesterday's date for the example
+        yesterday = date.today() - timedelta(days=1)
+        formatted_date = yesterday.strftime("%B %d")  # e.g. "August 22"
+
+        print(f"Looking for photos from {formatted_date}...")
+
+        # First task: search for photos and organize them, with typed output
         result = await agent.run_task(
-            goal="Open the settings app and tell me what's the current system version",
-            name="check_system_version"
+            goal=(
+                f"Open the Photos/Gallery app. Find photos taken on {formatted_date}. "
+                f"Create a new album named '{formatted_date} Memories' and "
+                f"move those photos into it. Count how many photos were moved."
+            ),
+            output=PhotosResult,
+            name="organize_photos",
         )
-        
-        print(f"System version: {result}")
-    finally:
-        agent.clean()
 
-if __name__ == "__main__":
-    asyncio.run(basic_automation())
-```
+        # Handle and display the result
+        if result:
+            print("\n=== Photo Organization Complete ===")
+            print(f"Found: {result.found_photos} photos from {result.date_range}")
 
-### Using Structured Output
-
-Define Pydantic models to get structured, typed outputs:
-
-```python
-import asyncio
-from pydantic import BaseModel, Field
-from minitap.mobile_use.sdk import Agent
-
-class SystemInfo(BaseModel):
-    os_name: str = Field(..., description="Operating system name")
-    os_version: str = Field(..., description="Operating system version")
-    device_model: str = Field(..., description="Device model name")
-    available_storage: str = Field(..., description="Available storage space")
-
-async def structured_output_demo():
-    agent = Agent()
-    try:
-        agent.init()
-        
-        # Get structured system information
-        system_info = await agent.run_task(
-            goal="Open Settings, navigate to About Phone or About Device, and extract the system information",
-            output=SystemInfo,
-            name="get_system_info"
-        )
-        
-        if system_info:
-            print(f"OS: {system_info.os_name} {system_info.os_version}")
-            print(f"Model: {system_info.device_model}")
-            print(f"Storage: {system_info.available_storage}")
-    finally:
-        agent.clean()
-
-if __name__ == "__main__":
-    asyncio.run(structured_output_demo())
-```
-
-## Intermediate Tutorials
-
-### Using Different Agent Profiles
-
-Create specialized agent profiles for different task types:
-
-```python
-import asyncio
-from minitap.mobile_use.sdk import Agent
-from minitap.mobile_use.sdk.types import AgentProfile
-from minitap.mobile_use.config import LLMConfig
-
-async def profile_demo():
-    # Create two specialized agent profiles
-    thorough_profile = AgentProfile(
-        name="thorough_inspector",
-        llm_config=LLMConfig(
-            model="gpt-4",
-            temperature=0.2,
-            system_prompt=(
-                "You are a meticulous mobile UI inspector. "
-                "Take your time to thoroughly analyze each screen element. "
-                "Be precise and detailed in your observations."
-            )
-        )
-    )
-    
-    quick_profile = AgentProfile(
-        name="quick_navigator",
-        llm_config=LLMConfig(
-            model="gpt-3.5-turbo",
-            temperature=0.7,
-            system_prompt=(
-                "You are a quick mobile navigator. "
-                "Focus on completing tasks efficiently with minimal steps. "
-                "Don't overthink - just get the job done fast."
-            )
-        )
-    )
-    
-    # Create agent with both profiles
-    agent = Agent(
-        AgentConfigBuilder()
-        .with_profile(thorough_profile)
-        .with_profile(quick_profile)
-        .build()
-    )
-    
-    try:
-        agent.init()
-        
-        # Use quick profile for navigation
-        await agent.run_task(
-            goal="Open the photo gallery app",
-            profile="quick_navigator",
-            name="open_gallery"
-        )
-        
-        # Use thorough profile for analysis
-        photo_details = await agent.run_task(
-            goal="Analyze the first photo and describe it in detail",
-            profile="thorough_inspector",
-            name="analyze_photo"
-        )
-        
-        print(f"Photo analysis: {photo_details}")
-    finally:
-        agent.clean()
-
-if __name__ == "__main__":
-    asyncio.run(profile_demo())
-```
-
-### Recording Execution Traces
-
-Enable trace recording for debugging and visualization:
-
-```python
-import asyncio
-from minitap.mobile_use.sdk import Agent
-
-async def trace_recording_demo():
-    agent = Agent()
-    try:
-        agent.init()
-        
-        # Create a task request with trace recording enabled
-        task_request = agent.new_task(
-            goal="Open the weather app and check the 5-day forecast"
-        ).with_name("weather_forecast").with_trace_recording(enabled=True)
-        
-        result = await agent.run_task(request=task_request.build())
-        print(f"Weather forecast: {result}")
-        print("Trace saved to mobile-use-traces directory")
-        
-    finally:
-        agent.clean()
-
-if __name__ == "__main__":
-    asyncio.run(trace_recording_demo())
-```
-
-## Advanced Tutorials
-
-### Creating a Custom Task Pipeline
-
-Build a multi-step automation pipeline that processes results between steps:
-
-```python
-import asyncio
-from enum import Enum
-from typing import List, Optional
-from pydantic import BaseModel, Field
-from minitap.mobile_use.sdk import Agent
-from minitap.mobile_use.sdk.builders import AgentConfigBuilder
-
-# Define structured models for each step
-class MessagePriority(str, Enum):
-    HIGH = "high"
-    MEDIUM = "medium"
-    LOW = "low"
-
-class Message(BaseModel):
-    sender: str = Field(..., description="Name or number of the message sender")
-    text: str = Field(..., description="Content of the message")
-    timestamp: str = Field(..., description="When the message was received")
-    is_unread: bool = Field(..., description="Whether message is unread")
-    
-class MessagesResult(BaseModel):
-    messages: List[Message] = Field(..., description="List of messages found")
-    app_name: str = Field(..., description="Name of the messaging app used")
-
-class ReplyResult(BaseModel):
-    recipient: str = Field(..., description="Person replied to")
-    message_sent: str = Field(..., description="Content of the sent reply")
-    success: bool = Field(..., description="Whether reply was sent successfully")
-
-async def message_workflow_demo():
-    agent = Agent()
-    
-    try:
-        agent.init()
-        
-        # Step 1: Check for new messages
-        messages_result = await agent.run_task(
-            goal="Open the main messaging app and identify the three most recent unread messages",
-            output=MessagesResult,
-            name="check_messages"
-        )
-        
-        # Process results and determine action
-        if messages_result and messages_result.messages:
-            important_contacts = ["Boss", "Mom", "Dad", "Spouse", "Partner"]
-            urgent_message = None
-            
-            for message in messages_result.messages:
-                if message.is_unread and any(contact in message.sender for contact in important_contacts):
-                    urgent_message = message
-                    break
-            
-            # Step 2: Reply to important message if found
-            if urgent_message:
-                reply_result = await agent.run_task(
-                    goal=f"Reply to {urgent_message.sender} with: 'Thanks for your message. I'll get back to you soon.'",
-                    output=ReplyResult,
-                    name="send_reply"
-                )
-                
-                if reply_result and reply_result.success:
-                    print(f"Successfully replied to {reply_result.recipient}")
-                else:
-                    print("Failed to send reply")
+            if result.album_created:
+                print(f"Created album: '{result.album_name}'")
+                print(f"Moved {result.photos_moved} photos to the album")
             else:
-                print("No urgent messages found")
+                print("No album was created")
         else:
-            print("No messages found or error occurred")
-            
+            print("Failed to organize photos")
+
+    except Exception as e:
+        print(f"Error: {e}")
     finally:
+        # Always clean up resources
         agent.clean()
 
-if __name__ == "__main__":
-    asyncio.run(message_workflow_demo())
-```
-
-### Custom Device Configuration
-
-Connect to specific devices with custom server configurations:
-
-```python
-import asyncio
-from minitap.mobile_use.sdk import Agent
-from minitap.mobile_use.sdk.builders import AgentConfigBuilder
-from minitap.mobile_use.sdk.types import DevicePlatform, ApiBaseUrl
-
-async def custom_device_demo():
-    # Create a custom agent configuration
-    config = AgentConfigBuilder() \
-        .for_device(
-            device_id="emulator-5554",  # ADB device ID
-            platform=DevicePlatform.ANDROID
-        ) \
-        .with_server_config(
-            adb_host="127.0.0.1",
-            adb_port=5037,
-            screen_api_base_url="http://localhost:9998",
-            hw_bridge_base_url="http://localhost:9999"
-        ) \
-        .build()
-    
-    # Create agent with custom configuration
-    agent = Agent(config)
-    
-    try:
-        agent.init()
-        
-        # Run a task on the specific device
-        result = await agent.run_task(
-            goal="Open Settings and enable airplane mode, then disable it after 5 seconds",
-            name="toggle_airplane_mode"
-        )
-        
-        print(f"Task result: {result}")
-    finally:
-        agent.clean()
 
 if __name__ == "__main__":
-    asyncio.run(custom_device_demo())
+    asyncio.run(main())
 ```
 
-## Real-World Use Cases
+### Smart Notification Assistant
 
-### Social Media Content Automation
+This example demonstrates more advanced SDK features including:
+
+* TaskRequestBuilder pattern
+* Multiple agent profiles for different reasoning tasks
+* Tracing for debugging/visualization
+* Structured output with Pydantic
+* Exception handling
+
+It performs a practical automation task:
+
+1. Checks notification panel for unread notifications
+2. Categorizes them by priority/app
+3. Performs actions based on notification content
 
 ```python
 import asyncio
 from datetime import datetime
+from enum import Enum
+
 from pydantic import BaseModel, Field
+from minitap.mobile_use.config import LLM, LLMConfig, LLMConfigUtils, LLMWithFallback
 from minitap.mobile_use.sdk import Agent
+from minitap.mobile_use.sdk.builders import Builders
+from minitap.mobile_use.sdk.types import AgentProfile
+from minitap.mobile_use.sdk.types.exceptions import AgentError
 
-class SocialPost(BaseModel):
-    platform: str = Field(..., description="Social media platform where post was made")
-    post_url: Optional[str] = Field(None, description="URL or identifier of the post")
-    content: str = Field(..., description="Content that was posted")
-    media_added: bool = Field(..., description="Whether media was attached to the post")
-    timestamp: str = Field(..., description="When the post was published")
 
-async def social_media_automation():
-    agent = Agent()
-    
+class NotificationPriority(str, Enum):
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+class Notification(BaseModel):
+    """Individual notification details."""
+
+    app_name: str = Field(..., description="Name of the app that sent the notification")
+    title: str = Field(..., description="Title/header of the notification")
+    message: str = Field(..., description="Message content of the notification")
+    priority: NotificationPriority = Field(
+        default=NotificationPriority.MEDIUM, description="Priority level of notification"
+    )
+
+
+class NotificationSummary(BaseModel):
+    """Summary of all notifications."""
+
+    total_count: int = Field(..., description="Total number of notifications found")
+    high_priority_count: int = Field(0, description="Count of high priority notifications")
+    notifications: list[Notification] = Field(
+        default_factory=list, description="List of individual notifications"
+    )
+
+
+def get_agent() -> Agent:
+    # Create two specialized profiles:
+    # 1. An analyzer profile for detailed inspection tasks
+    analyzer_profile = AgentProfile(
+        name="analyzer",
+        llm_config=LLMConfig(
+            planner=LLM(provider="openrouter", model="meta-llama/llama-4-scout"),
+            orchestrator=LLM(provider="openrouter", model="meta-llama/llama-4-scout"),
+            cortex=LLMWithFallback(
+                provider="openai",
+                model="o4-mini",
+                fallback=LLM(provider="openai", model="gpt-5"),
+            ),
+            executor=LLM(provider="openai", model="gpt-5-nano"),
+            utils=LLMConfigUtils(
+                outputter=LLM(provider="openai", model="gpt-5-nano"),
+                hopper=LLM(provider="openai", model="gpt-4.1"),
+            ),
+        ),
+        # from_file="/tmp/analyzer.jsonc"  # can be loaded from file
+    )
+
+    # 2. An action profile for handling easy & fast actions based on notifications
+    action_profile = AgentProfile(
+        name="note_taker",
+        llm_config=LLMConfig(
+            planner=LLM(provider="openai", model="o3"),
+            orchestrator=LLM(provider="google", model="gemini-2.5-flash"),
+            cortex=LLMWithFallback(
+                provider="openai",
+                model="o4-mini",
+                fallback=LLM(provider="openai", model="gpt-5"),
+            ),
+            executor=LLM(provider="openai", model="gpt-4o-mini"),
+            utils=LLMConfigUtils(
+                outputter=LLM(provider="openai", model="gpt-5-nano"),
+                hopper=LLM(provider="openai", model="gpt-4.1"),
+            ),
+        ),
+    )
+
+    # Configure default task settings with tracing
+    task_defaults = Builders.TaskDefaults.with_max_steps(200).build()
+
+    # Configure the agent
+    config = (
+        Builders.AgentConfig.add_profiles(profiles=[analyzer_profile, action_profile])
+        .with_default_profile(profile=action_profile)
+        .with_default_task_config(config=task_defaults)
+        .build()
+    )
+    return Agent(config=config)
+
+
+async def main():
+    # Set up traces directory with timestamp for uniqueness
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+    traces_dir = f"/tmp/notification_traces/{timestamp}"
+    agent = get_agent()
+
     try:
+        # Initialize agent (finds a device, starts required servers)
         agent.init()
-        
-        # Prepare post content
-        today = datetime.now().strftime("%Y-%m-%d")
-        post_text = f"Excited to share my progress with Mobile Use SDK automation! #MobileAI #Python #{today}"
-        
-        # Post to social media
-        result = await agent.run_task(
-            goal=f"Open Instagram, create a new post with the text: '{post_text}'. "
-                 f"Add the most recent photo from gallery, apply a filter, and publish it.",
-            output=SocialPost,
-            name="instagram_post"
-        )
-        
-        if result:
-            print(f"Posted to {result.platform} at {result.timestamp}")
-            print(f"Content: {result.content}")
-            print(f"Media included: {'Yes' if result.media_added else 'No'}")
-    finally:
-        agent.clean()
 
-if __name__ == "__main__":
-    asyncio.run(social_media_automation())
-```
+        print("Checking for notifications...")
 
-### E-commerce Product Research
-
-```python
-import asyncio
-from typing import List
-from pydantic import BaseModel, Field
-from minitap.mobile_use.sdk import Agent
-
-class Product(BaseModel):
-    name: str = Field(..., description="Product name")
-    price: str = Field(..., description="Product price")
-    rating: Optional[float] = Field(None, description="Product rating (0-5 stars)")
-    review_count: Optional[int] = Field(None, description="Number of reviews")
-
-class ProductSearch(BaseModel):
-    query: str = Field(..., description="Search query used")
-    products: List[Product] = Field(..., description="Products found in search results")
-    app_name: str = Field(..., description="E-commerce app used for search")
-
-async def product_research():
-    agent = Agent()
-    
-    try:
-        agent.init()
-        
-        # Search for products
-        search_result = await agent.run_task(
-            goal="Open Amazon app, search for 'wireless headphones under $100', "
-                 "and collect details on the top 5 search results",
-            output=ProductSearch,
-            name="amazon_search"
-        )
-        
-        if search_result:
-            print(f"Found {len(search_result.products)} products on {search_result.app_name}")
-            
-            # Sort by rating
-            sorted_products = sorted(
-                search_result.products, 
-                key=lambda p: p.rating if p.rating is not None else 0, 
-                reverse=True
+        # Task 1: Get and analyze notifications with analyzer profile
+        notification_task = (
+            agent.new_task(
+                goal="Open the notification panel (swipe down from top). "
+                "Scroll through the first 3 unread notifications. "
+                "For each notification, identify the app name, title, and content. "
+                "Tag messages from messaging apps or email as high priority."
             )
-            
-            # Display top products
-            print("\nTop Products:")
-            for i, product in enumerate(sorted_products[:3], 1):
-                print(f"{i}. {product.name}")
-                print(f"   Price: {product.price}")
-                print(f"   Rating: {product.rating}/5 ({product.review_count} reviews)")
-                print()
+            .with_output_format(NotificationSummary)
+            .using_profile("analyzer")
+            .with_name("notification_scan")
+            .with_max_steps(400)
+            .with_trace_recording(enabled=True, path=traces_dir)
+            .build()
+        )
+
+        # Execute the task with proper exception handling
+        try:
+            notifications = await agent.run_task(request=notification_task)
+
+            # Display the structured results
+            if notifications:
+                print("\n=== Notification Summary ===")
+                print(f"Total notifications: {notifications.total_count}")
+                print(f"High priority: {notifications.high_priority_count}")
+
+                # Task 2: Create a note to store the notification summary
+                response = await agent.run_task(
+                    goal="Open my Notes app and create a new note summarizing the following "
+                    f"information:\n{notifications}",
+                    name="email_action",
+                    profile="note_taker",
+                )
+                print(f"Action result: {response}")
+
+            else:
+                print("Failed to retrieve notifications")
+
+        except AgentError as e:
+            print(f"Agent error occurred: {e}")
+        except Exception as e:
+            print(f"Unexpected error: {type(e).__name__}: {e}")
+            raise
+
     finally:
+        # Clean up
         agent.clean()
+        print(f"\nTraces saved to: {traces_dir}")
+
 
 if __name__ == "__main__":
-    asyncio.run(product_research())
+    asyncio.run(main())
 ```
 
-## Next Steps
+### Next Steps
 
-* Check the [API Reference](api-reference.md) for detailed information
-* See the [Troubleshooting Guide](troubleshooting.md) for common issues
+* Check the [api-reference.md](api-reference.md "mention") for detailed information
+* See the [core-concepts.md](core-concepts.md "mention") to understand the SDK architecture
