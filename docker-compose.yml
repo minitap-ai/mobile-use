@@ -76,8 +76,8 @@ services:
     build:
       context: .
       dockerfile: slim.Dockerfile
-    entrypoint: ["python", "/app/src/mobile_use/servers/start_servers.py"]
-    command: ["--only", "screen_api"]
+    entrypoint: ["python", "/app/minitap/mobile_use/servers/start_servers.py"]
+    command: ["--only", "screen_api", "--device", "None", "--platform", "android"]
     environment:
       DEVICE_HARDWARE_BRIDGE_BASE_URL: "http://maestro:9999"
       DEVICE_SCREEN_API_PORT: "9998"
