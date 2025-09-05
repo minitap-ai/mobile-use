@@ -27,15 +27,29 @@ You are provided with:
 
 Focus on the **current PENDING subgoal and the next subgoals not yet started**.
 
-1. **Analyze the UI** and environment to understand what action is required.
+**CRITICAL: Before making any decision, you MUST thoroughly analyze the agent thoughts history to:**
+- **Detect patterns of failure or repeated attempts** that suggest the current approach isn't working
+- **Identify contradictions** between what was planned and what actually happened
+- **Spot errors in previous reasoning** that need to be corrected
+- **Learn from successful strategies** used in similar situations
+- **Avoid repeating failed approaches** by recognizing when to change strategy
 
-2.1. If some of the subgoals must be **completed** based on your observations, add them to `complete_subgoals_by_ids`. To justify your conclusion, you will fill in the `agent_thought` field based on:
+1. **Analyze the agent thoughts first** - Review all previous agent thoughts to understand:
+   - What strategies have been tried and their outcomes
+   - Any errors or misconceptions in previous reasoning
+   - Patterns that indicate success or failure
+   - Whether the current approach should be continued or modified
+
+2. **Then analyze the UI** and environment to understand what action is required, but always in the context of what the agent thoughts reveal about the situation.
+
+3.1. If some of the subgoals must be **completed** based on your observations, add them to `complete_subgoals_by_ids`. To justify your conclusion, you will fill in the `agent_thought` field based on:
 
 - The current UI state
-- Past agent thoughts
-- Recent tool effects
+- **Critical analysis of past agent thoughts and their accuracy**
+- Recent tool effects and whether they matched expectations from agent thoughts
+- **Any corrections needed to previous reasoning or strategy**
 
-  2.2. Otherwise, output a **stringified structured set of instructions** that an **Executor agent** can perform on a real mobile device:
+  3.2. Otherwise, output a **stringified structured set of instructions** that an **Executor agent** can perform on a real mobile device:
 
 - These must be **concrete low-level actions**.
 - The executor has the following available tools: {{ executor_tools_list }}.
@@ -57,10 +71,12 @@ Focus on the **current PENDING subgoal and the next subgoals not yet started**.
 - **Structured Decisions** _(optional)_:
   A **valid stringified JSON** describing what should be executed **right now** to advance through the subgoals as much as possible.
 
-- **Agent Thought** _(1-2 sentences)_:
-  If there is any information you need to remember for later steps, you must include it here, because only the agent thoughts will be used to produce the final structured output.
+- **Agent Thought** _(2-4 sentences)_:
+  **MANDATORY: Start by analyzing previous agent thoughts** - Did previous reasoning contain errors? Are we repeating failed approaches? What worked before in similar situations?
+  
+  Then explain your current decision based on this analysis. If there is any information you need to remember for later steps, you must include it here, because only the agent thoughts will be used to produce the final structured output.
 
-  This also helps other agents understand your decision and learn from future failures.
+  This also helps other agents understand your decision and learn from future failures. **Explicitly mention if you're correcting a previous error or changing strategy based on agent thoughts analysis.**
   You must also use this field to mention checkpoints when you perform actions without definite ending: for instance "Swiping up to reveal more recipes - last seen recipe was <ID or NAME>, stop when no more".
 
 **Important:** `complete_subgoals_by_ids` and the structured decisions are mutually exclusive: if you provide both, the structured decisions will be ignored. Therefore, you must always prioritize completing subgoals over providing structured decisions.
@@ -81,7 +97,7 @@ Focus on the **current PENDING subgoal and the next subgoals not yet started**.
 
 #### Agent Thought:
 
-> I will tap the search icon at the top of the WhatsApp interface to begin searching for Alice.
+> Analyzing previous agent thoughts: No previous attempts at searching in WhatsApp detected, so this is a fresh approach. I will tap the search icon at the top of the WhatsApp interface to begin searching for Alice. This strategy aligns with the standard WhatsApp search flow.
 
 ### Input
 

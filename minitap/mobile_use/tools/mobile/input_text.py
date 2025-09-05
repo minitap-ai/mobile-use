@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
@@ -8,10 +8,12 @@ from langchain_core.tools.base import InjectedToolCallId
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 from pydantic import BaseModel
-from typing import Annotated
 
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
+from minitap.mobile_use.controllers.mobile_command_controller import (
+    get_screen_data,
+)
 from minitap.mobile_use.controllers.mobile_command_controller import (
     input_text as input_text_controller,
 )
@@ -19,6 +21,7 @@ from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 from minitap.mobile_use.tools.utils import focus_element_if_needed, move_cursor_to_end_if_bounds
 from minitap.mobile_use.utils.logger import get_logger
+from minitap.mobile_use.utils.ui_hierarchy import find_element_by_resource_id, get_element_text
 
 logger = get_logger(__name__)
 
@@ -63,15 +66,31 @@ def get_input_text_tool(ctx: MobileUseContext):
         result = _controller_input_text(ctx=ctx, text=text)
 
         status: Literal["success", "error"] = "success" if result.ok else "error"
-        content_msg = (
-            input_text_wrapper.on_success_fn(text)
+
+        text_input_content = ""
+        if status == "success":
+            screen_data = get_screen_data(screen_api_client=ctx.screen_api_client)
+            state.latest_ui_hierarchy = screen_data.elements
+
+            element = find_element_by_resource_id(
+                ui_hierarchy=state.latest_ui_hierarchy, resource_id=text_input_resource_id
+            )
+
+            if not element:
+                result = InputResult(ok=False, error="Element not found")
+
+            if element:
+                text_input_content = get_element_text(element)
+
+        agent_outcome = (
+            input_text_wrapper.on_success_fn(text, text_input_content, text_input_resource_id)
             if result.ok
-            else input_text_wrapper.on_failure_fn(text)
+            else input_text_wrapper.on_failure_fn(text, result.error)
         )
 
         tool_message = ToolMessage(
             tool_call_id=tool_call_id,
-            content=content_msg,
+            content=agent_outcome,
             additional_kwargs={"error": result.error} if not result.ok else {},
             status=status,
         )
@@ -80,7 +99,7 @@ def get_input_text_tool(ctx: MobileUseContext):
             update=state.sanitize_update(
                 ctx=ctx,
                 update={
-                    "agents_thoughts": [agent_thought],
+                    "agents_thoughts": [agent_thought, agent_outcome],
                     EXECUTOR_MESSAGES_KEY: [tool_message],
                 },
                 agent="executor",
@@ -92,6 +111,8 @@ def get_input_text_tool(ctx: MobileUseContext):
 
 input_text_wrapper = ToolWrapper(
     tool_fn_getter=get_input_text_tool,
-    on_success_fn=lambda text: f"Successfully typed {text}",
-    on_failure_fn=lambda text: f"Failed to input text {text}",
+    on_success_fn=lambda text, text_input_content, text_input_resource_id: f"Typed {text}."
+    + "Here is the whole content of input with id {text_input_resource_id} :"
+    + " {repr(text_input_content)}",
+    on_failure_fn=lambda text, error: f"Failed to input text {text}. Reason: {error}",
 )
