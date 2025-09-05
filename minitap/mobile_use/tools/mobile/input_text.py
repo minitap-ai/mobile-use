@@ -1,26 +1,27 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
 from langchain_core.tools.base import InjectedToolCallId
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
-from minitap.mobile_use.utils.ui_hierarchy import get_element_text, find_element_by_resource_id
 from pydantic import BaseModel
-from typing import Annotated
 
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.mobile_command_controller import (
-    input_text as input_text_controller,
     get_screen_data,
+)
+from minitap.mobile_use.controllers.mobile_command_controller import (
+    input_text as input_text_controller,
 )
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 from minitap.mobile_use.tools.utils import focus_element_if_needed, move_cursor_to_end_if_bounds
 from minitap.mobile_use.utils.logger import get_logger
+from minitap.mobile_use.utils.ui_hierarchy import find_element_by_resource_id, get_element_text
 
 logger = get_logger(__name__)
 
@@ -67,7 +68,7 @@ def get_input_text_tool(ctx: MobileUseContext):
         status: Literal["success", "error"] = "success" if result.ok else "error"
 
         text_input_content = ""
-        if (status == "success"):
+        if status == "success":
             screen_data = get_screen_data(screen_api_client=ctx.screen_api_client)
             state.latest_ui_hierarchy = screen_data.elements
 
@@ -77,7 +78,7 @@ def get_input_text_tool(ctx: MobileUseContext):
 
             if not element:
                 result = InputResult(ok=False, error="Element not found")
-            
+
             if element:
                 text_input_content = get_element_text(element)
 
@@ -110,6 +111,8 @@ def get_input_text_tool(ctx: MobileUseContext):
 
 input_text_wrapper = ToolWrapper(
     tool_fn_getter=get_input_text_tool,
-    on_success_fn=lambda text, text_input_content, text_input_resource_id: f"Typed {text}. Here is the whole content of input with id {text_input_resource_id} : {repr(text_input_content)}",
+    on_success_fn=lambda text, text_input_content, text_input_resource_id: f"Typed {text}."
+    + "Here is the whole content of input with id {text_input_resource_id} :"
+    + " {repr(text_input_content)}",
     on_failure_fn=lambda text, error: f"Failed to input text {text}. Reason: {error}",
 )

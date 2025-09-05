@@ -1,18 +1,22 @@
+from typing import Annotated
+
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
 from langchain_core.tools.base import InjectedToolCallId
+from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
-from minitap.mobile_use.utils.ui_hierarchy import get_element_text, find_element_by_resource_id
+
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.mobile_command_controller import (
-    paste_text as paste_text_controller,
     get_screen_data,
 )
+from minitap.mobile_use.controllers.mobile_command_controller import (
+    paste_text as paste_text_controller,
+)
 from minitap.mobile_use.graph.state import State
-from langgraph.prebuilt import InjectedState
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
-from typing import Annotated
+from minitap.mobile_use.utils.ui_hierarchy import find_element_by_resource_id, get_element_text
 
 
 def get_paste_text_tool(ctx: MobileUseContext):
@@ -43,10 +47,9 @@ def get_paste_text_tool(ctx: MobileUseContext):
         element = find_element_by_resource_id(
             ui_hierarchy=state.latest_ui_hierarchy, resource_id=focused_element_resource_id
         )
-        
+
         if element:
             text_input_content = get_element_text(element)
-
 
         has_failed = output is not None
 
@@ -78,6 +81,8 @@ def get_paste_text_tool(ctx: MobileUseContext):
 
 paste_text_wrapper = ToolWrapper(
     tool_fn_getter=get_paste_text_tool,
-    on_success_fn=lambda input_content: f"Text pasted successfully. Here is the actual content of the text field : {repr(input_content)}",
-    on_failure_fn=lambda input_content: f"Failed to paste text. Here is the actual content of the text field : {repr(input_content)}",
+    on_success_fn=lambda input_content: "Text pasted successfully. Here is the actual"
+    + "content of the text field : {repr(input_content)}",
+    on_failure_fn=lambda input_content: "Failed to paste text."
+    + "Here is the actual content of the text field : {repr(input_content)}",
 )
