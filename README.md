@@ -8,13 +8,6 @@
 
 <div align="center">
 
-![Feature](https://github.com/minitap-ai/mobile-use/actions/workflows/feature.yml/badge.svg)
-![Deployment](https://github.com/minitap-ai/mobile-use/actions/workflows/deployment.yml/badge.svg)
-
-[![PyPI version](https://img.shields.io/pypi/v/minitap-mobile-use.svg?color=green)](https://pypi.org/project/minitap-mobile-use/)
-[![Python Version](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-MIT-yellow)](https://github.com/minitap-ai/mobile-use/blob/main/LICENSE)
-
 [![Discord](https://img.shields.io/discord/1403058278342201394?color=7289DA&label=Discord&logo=discord&logoColor=white&style=for-the-badge)](https://discord.gg/6nSqmQ9pQs)
 [![GitHub stars](https://img.shields.io/github/stars/minitap-ai/mobile-use?style=for-the-badge&color=e0a8dd)](https://github.com/minitap-ai/mobile-use/stargazers)
 
@@ -22,6 +15,10 @@
     <a href="https://discord.gg/6nSqmQ9pQs"><b>Discord</b></a> •
     <a href="https://x.com/minitap_ai?t=iRWtI497UhRGLeCKYQekig&s=09"><b>Twitter / X</b></a>
 </p>
+
+[![PyPI version](https://img.shields.io/pypi/v/minitap-mobile-use.svg?color=blue)](https://pypi.org/project/minitap-mobile-use/)
+[![Python Version](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-MIT-blue)](https://github.com/minitap-ai/mobile-use/blob/main/LICENSE)
 
 </div>
 
