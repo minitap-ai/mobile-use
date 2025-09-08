@@ -1,4 +1,5 @@
 from minitap.mobile_use.agents.executor.utils import is_last_tool_message_take_screenshot
+from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.mobile_command_controller import get_screen_data
 from minitap.mobile_use.controllers.platform_specific_commands_controller import (
     get_device_date,
@@ -7,7 +8,6 @@ from minitap.mobile_use.controllers.platform_specific_commands_controller import
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.utils.decorators import wrap_with_callbacks
 from minitap.mobile_use.utils.logger import get_logger
-from minitap.mobile_use.context import MobileUseContext
 
 logger = get_logger(__name__)
 
@@ -26,7 +26,9 @@ class ContextorNode:
         focused_app_info = get_focused_app_info(self.ctx)
         device_date = get_device_date(self.ctx)
 
-        should_add_screenshot_context = is_last_tool_message_take_screenshot(list(state.messages))
+        should_add_screenshot_context = is_last_tool_message_take_screenshot(
+            list(state.executor_messages)
+        )
 
         return state.sanitize_update(
             ctx=self.ctx,
