@@ -82,7 +82,7 @@ def get_paste_text_tool(ctx: MobileUseContext):
 paste_text_wrapper = ToolWrapper(
     tool_fn_getter=get_paste_text_tool,
     on_success_fn=lambda input_content: "Text pasted successfully. Here is the actual"
-    + "content of the text field : {repr(input_content)}",
+    + f"content of the text field : {repr(input_content)}",
     on_failure_fn=lambda input_content: "Failed to paste text."
-    + "Here is the actual content of the text field : {repr(input_content)}",
+    + f"Here is the actual content of the text field : {repr(input_content)}",
 )
