@@ -111,8 +111,8 @@ def get_input_text_tool(ctx: MobileUseContext):
 
 input_text_wrapper = ToolWrapper(
     tool_fn_getter=get_input_text_tool,
-    on_success_fn=lambda text, text_input_content, text_input_resource_id: f"Typed {text}."
-    + "Here is the whole content of input with id {text_input_resource_id} :"
-    + " {repr(text_input_content)}",
-    on_failure_fn=lambda text, error: f"Failed to input text {text}. Reason: {error}",
+    on_success_fn=lambda text, text_input_content, text_input_resource_id: f"Typed {repr(text)}.\n"
+    + f"Here is the whole content of input with id {repr(text_input_resource_id)} :"
+    + f" {repr(text_input_content)}",
+    on_failure_fn=lambda text, error: f"Failed to input text {repr(text)}. Reason: {error}",
 )
