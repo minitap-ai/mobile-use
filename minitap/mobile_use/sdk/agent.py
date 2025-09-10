@@ -496,7 +496,10 @@ class Agent:
 
     def _check_device_screen_api_health(self) -> bool:
         try:
+            # Required to know if the Screen API is up
             self._screen_api_client.get_with_retry("/health", timeout=5)
+            # Required to know if the Screen API actually receives screenshot from the HW Bridge API
+            self._screen_api_client.get_with_retry("/screen-info", timeout=5)
             return True
         except Exception as e:
             logger.error(f"Device Screen API health check failed: {e}")
