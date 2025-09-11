@@ -105,7 +105,7 @@ class TaskRequest[TOutput](TaskRequestCommon):
     output_format: type[TOutput] | None = None
 
 
-class MinitapTaskRequest[TOutput](TaskRequestCommon):
+class PlatformTaskRequest[TOutput](TaskRequestCommon):
     """
     Minitap-specific task request for SDK usage via the gateway platform.
 
@@ -203,6 +203,6 @@ class Task(BaseModel):
         )
 
     def get_name(self) -> str:
-        if isinstance(self.request, MinitapTaskRequest):
+        if isinstance(self.request, PlatformTaskRequest):
             return self.request.task_id
         return self.request.task_name or self.id

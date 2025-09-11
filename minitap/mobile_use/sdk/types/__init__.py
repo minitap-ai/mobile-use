@@ -1,30 +1,30 @@
 """Type definitions for the mobile-use SDK."""
 
 from minitap.mobile_use.sdk.types.agent import (
-    ApiBaseUrl,
     AgentConfig,
+    ApiBaseUrl,
     DevicePlatform,
     ServerConfig,
 )
-from minitap.mobile_use.sdk.types.task import (
-    AgentProfile,
-    TaskRequest,
-    MinitapTaskRequest,
-    TaskStatus,
-    TaskResult,
-    TaskRequestCommon,
-    Task,
-)
 from minitap.mobile_use.sdk.types.exceptions import (
-    AgentProfileNotFoundError,
-    AgentTaskRequestError,
-    DeviceNotFoundError,
-    ServerStartupError,
     AgentError,
     AgentNotInitializedError,
+    AgentProfileNotFoundError,
+    AgentTaskRequestError,
     DeviceError,
+    DeviceNotFoundError,
     MobileUseError,
     ServerError,
+    ServerStartupError,
+)
+from minitap.mobile_use.sdk.types.task import (
+    AgentProfile,
+    PlatformTaskRequest,
+    Task,
+    TaskRequest,
+    TaskRequestCommon,
+    TaskResult,
+    TaskStatus,
 )
 
 __all__ = [
@@ -34,7 +34,7 @@ __all__ = [
     "AgentProfile",
     "ServerConfig",
     "TaskRequest",
-    "MinitapTaskRequest",
+    "PlatformTaskRequest",
     "TaskStatus",
     "TaskResult",
     "TaskRequestCommon",
