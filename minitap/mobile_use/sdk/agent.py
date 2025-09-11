@@ -5,6 +5,7 @@ import time
 import uuid
 from datetime import datetime
 from pathlib import Path
+from shutil import which
 from types import NoneType
 from typing import TypeVar, overload
 
@@ -41,6 +42,7 @@ from minitap.mobile_use.sdk.types.exceptions import (
     AgentProfileNotFoundError,
     AgentTaskRequestError,
     DeviceNotFoundError,
+    ExecutableNotFoundError,
     ServerStartupError,
 )
 from minitap.mobile_use.sdk.types.task import AgentProfile, Task, TaskRequest, TaskStatus
@@ -81,6 +83,12 @@ class Agent:
         self._tasks = []
         self._tmp_traces_dir = Path(tempfile.gettempdir()) / "mobile-use-traces"
         self._initialized = False
+        self._is_default_hw_bridge = (
+            self._config.servers.hw_bridge_base_url == DEFAULT_HW_BRIDGE_BASE_URL
+        )
+        self._is_default_screen_api = (
+            self._config.servers.screen_api_base_url == DEFAULT_SCREEN_API_BASE_URL
+        )
 
     def init(
         self,
@@ -88,6 +96,11 @@ class Agent:
         retry_count: int = 5,
         retry_wait_seconds: int = 5,
     ):
+        if not which("adb"):
+            raise ExecutableNotFoundError("adb")
+        if self._is_default_hw_bridge and not which("maestro"):
+            raise ExecutableNotFoundError("maestro")
+
         if self._initialized:
             logger.warning("Agent is already initialized. Skipping...")
             return True
@@ -433,16 +446,10 @@ class Agent:
         self._hw_bridge_client = DeviceHardwareClient(
             base_url=self._config.servers.hw_bridge_base_url.to_url(),
         )
-        self._is_default_hw_bridge = (
-            self._config.servers.hw_bridge_base_url == DEFAULT_HW_BRIDGE_BASE_URL
-        )
         self._screen_api_client = ScreenApiClient(
             base_url=self._config.servers.screen_api_base_url.to_url(),
             retry_count=retry_count,
             retry_wait_seconds=retry_wait_seconds,
-        )
-        self._is_default_screen_api = (
-            self._config.servers.screen_api_base_url == DEFAULT_SCREEN_API_BASE_URL
         )
 
     def _run_servers(self, device_id: str, platform: DevicePlatform) -> bool:

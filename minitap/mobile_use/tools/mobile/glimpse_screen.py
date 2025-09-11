@@ -67,6 +67,8 @@ def get_glimpse_screen_tool(ctx: MobileUseContext):
 
 glimpse_screen_wrapper = ToolWrapper(
     tool_fn_getter=get_glimpse_screen_tool,
-    on_success_fn=lambda: "Visual context captured successfully. It is now available for immediate analysis.",
+    on_success_fn=lambda: (
+        "Visual context captured successfully. It is now available for immediate analysis."
+    ),
     on_failure_fn=lambda: "Failed to capture visual context.",
 )
