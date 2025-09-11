@@ -1,4 +1,5 @@
 import asyncio
+import os
 import sys
 import tempfile
 import time
@@ -9,13 +10,14 @@ from types import NoneType
 from typing import TypeVar, overload
 
 from adbutils import AdbClient
+from dotenv import load_dotenv
 from langchain_core.messages import AIMessage
 from pydantic import BaseModel
 
 from minitap.mobile_use.agents.outputter.outputter import outputter
 from minitap.mobile_use.clients.device_hardware_client import DeviceHardwareClient
 from minitap.mobile_use.clients.screen_api_client import ScreenApiClient
-from minitap.mobile_use.config import OutputConfig, record_events
+from minitap.mobile_use.config import OutputConfig, get_default_llm_config, record_events
 from minitap.mobile_use.context import (
     DeviceContext,
     DevicePlatform,
@@ -37,13 +39,20 @@ from minitap.mobile_use.sdk.constants import (
 )
 from minitap.mobile_use.sdk.types.agent import AgentConfig
 from minitap.mobile_use.sdk.types.exceptions import (
+    AgentInvalidApiKeyError,
     AgentNotInitializedError,
     AgentProfileNotFoundError,
     AgentTaskRequestError,
     DeviceNotFoundError,
     ServerStartupError,
 )
-from minitap.mobile_use.sdk.types.task import AgentProfile, Task, TaskRequest, TaskStatus
+from minitap.mobile_use.sdk.types.task import (
+    AgentProfile,
+    PlatformTaskRequest,
+    Task,
+    TaskRequest,
+    TaskStatus,
+)
 from minitap.mobile_use.servers.device_hardware_bridge import BridgeStatus
 from minitap.mobile_use.servers.start_servers import (
     start_device_hardware_bridge,
@@ -63,6 +72,8 @@ logger = get_logger(__name__)
 
 TOutput = TypeVar("TOutput", bound=BaseModel | None)
 
+load_dotenv()
+
 
 class Agent:
     _config: AgentConfig
@@ -75,12 +86,21 @@ class Agent:
     _screen_api_client: ScreenApiClient
     _hw_bridge_client: DeviceHardwareClient
     _adb_client: AdbClient | None
+    _minitap_api_key: str | None
 
-    def __init__(self, config: AgentConfig | None = None):
+    @overload
+    def __init__(self, *, config: AgentConfig) -> None: ...
+    @overload
+    def __init__(self, *, minitap_api_key: str) -> None: ...
+    @overload
+    def __init__(self) -> None: ...
+
+    def __init__(self, *, config: AgentConfig | None = None, minitap_api_key: str | None = None):
         self._config = config or get_default_agent_config()
         self._tasks = []
         self._tmp_traces_dir = Path(tempfile.gettempdir()) / "mobile-use-traces"
         self._initialized = False
+        self._minitap_api_key = minitap_api_key or os.getenv("MINITAP_API_KEY", None)
 
     def init(
         self,
@@ -183,6 +203,9 @@ class Agent:
     @overload
     async def run_task(self, *, request: TaskRequest[TOutput]) -> TOutput | None: ...
 
+    @overload
+    async def run_task(self, *, request: PlatformTaskRequest[TOutput]) -> TOutput | None: ...
+
     async def run_task(
         self,
         *,
@@ -190,9 +213,17 @@ class Agent:
         output: type[TOutput] | str | None = None,
         profile: str | AgentProfile | None = None,
         name: str | None = None,
-        request: TaskRequest[TOutput] | None = None,
+        request: TaskRequest[TOutput] | PlatformTaskRequest[TOutput] | None = None,
     ) -> str | dict | TOutput | None:
         if request is not None:
+            if isinstance(request, PlatformTaskRequest):
+                if not self._minitap_api_key:
+                    raise AgentInvalidApiKeyError()
+                request = self._fetch_task_request_from_platform(
+                    api_key=self._minitap_api_key,
+                    task_id=request.task_id,
+                    profile_name=request.profile,
+                )
             return await self._run_task(request)
         if goal is None:
             raise AgentTaskRequestError("Goal is required")
@@ -212,7 +243,11 @@ class Agent:
         if not self._initialized:
             raise AgentNotInitializedError()
 
-        if request.profile:
+        if self._minitap_api_key and request.profile:
+            agent_profile = self._fetch_agent_profile_from_platform(
+                profile_name=request.profile, api_key=self._minitap_api_key
+            )
+        elif request.profile:
             agent_profile = self._config.agent_profiles.get(request.profile)
             if agent_profile is None:
                 raise AgentProfileNotFoundError(request.profile)
@@ -316,6 +351,49 @@ class Agent:
         finally:
             self._finalize_tracing(task=task, context=context)
         return output
+
+    def _fetch_agent_profile_from_platform(
+        self, api_key: str, profile_name: str | None
+    ) -> AgentProfile:
+        """
+        Fetch the agent profile from the Minitap platform (backend) using the API key
+        and optional profile name.
+
+        Args:
+            api_key: Minitap platform API key
+            profile_name: Optional unique profile name to select server-side profile
+
+        Returns:
+            AgentProfile fetched from backend (currently default as placeholder).
+        """
+        logger.info("Fetching agent profile from platform")
+        # TODO: integrate with real backend client to retrieve the agent profile
+        return AgentProfile(name="default", llm_config=get_default_llm_config())
+
+    def _fetch_task_request_from_platform(
+        self, api_key: str, task_id: str, profile_name: str | None
+    ) -> TaskRequest:
+        """
+        Fetch platform task configuration (goal/output, etc.) for a given task_id.
+        Placeholder implementation that should be replaced by a real backend call.
+
+        Returns a dict with at least keys: goal (str) and optionally output_description (str).
+        """
+        logger.info(f"Fetching task config from platform for task_id={task_id}")
+        # TODO: integrate with real backend client to retrieve the task details
+        return TaskRequest(
+            goal="...",
+            profile=profile_name,
+            # Optional :
+            output_description="...",
+            output_format=None,
+            max_steps=1,
+            record_trace=False,
+            trace_path=Path("mobile-use-traces"),
+            llm_output_path=None,
+            thoughts_output_path=None,
+            task_name="...",
+        )
 
     def clean(self, force: bool = False):
         if not self._initialized and not force:
