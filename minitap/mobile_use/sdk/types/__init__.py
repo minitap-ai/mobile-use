@@ -9,6 +9,7 @@ from minitap.mobile_use.sdk.types.agent import (
 from minitap.mobile_use.sdk.types.task import (
     AgentProfile,
     TaskRequest,
+    MinitapTaskRequest,
     TaskStatus,
     TaskResult,
     TaskRequestCommon,
@@ -33,6 +34,7 @@ __all__ = [
     "AgentProfile",
     "ServerConfig",
     "TaskRequest",
+    "MinitapTaskRequest",
     "TaskStatus",
     "TaskResult",
     "TaskRequestCommon",
