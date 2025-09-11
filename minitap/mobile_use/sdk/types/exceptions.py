@@ -72,3 +72,17 @@ class AgentProfileNotFoundError(AgentTaskRequestError):
 
     def __init__(self, profile_name: str):
         super().__init__(f"Agent profile {profile_name} not found")
+
+
+class ExecutableNotFoundError(MobileUseError):
+    """Exception raised when a required executable is not found."""
+
+    def __init__(self, executable_name: str):
+        install_instructions = {
+            "adb": "https://developer.android.com/tools/adb",
+            "maestro": "https://docs.maestro.dev/getting-started/installing-maestro",
+        }
+        message = f"Required executable '{executable_name}' not found in PATH."
+        if executable_name in install_instructions:
+            message += f"\nTo install it, please visit: {install_instructions[executable_name]}"
+        super().__init__(message)

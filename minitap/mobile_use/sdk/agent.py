@@ -5,6 +5,7 @@ import time
 import uuid
 from datetime import datetime
 from pathlib import Path
+from shutil import which
 from types import NoneType
 from typing import TypeVar, overload
 
@@ -41,6 +42,7 @@ from minitap.mobile_use.sdk.types.exceptions import (
     AgentProfileNotFoundError,
     AgentTaskRequestError,
     DeviceNotFoundError,
+    ExecutableNotFoundError,
     ServerStartupError,
 )
 from minitap.mobile_use.sdk.types.task import AgentProfile, Task, TaskRequest, TaskStatus
@@ -88,6 +90,11 @@ class Agent:
         retry_count: int = 5,
         retry_wait_seconds: int = 5,
     ):
+        if not which("adb"):
+            raise ExecutableNotFoundError("adb")
+        if not which("maestro"):
+            raise ExecutableNotFoundError("maestro")
+
         if self._initialized:
             logger.warning("Agent is already initialized. Skipping...")
             return True
