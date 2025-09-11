@@ -72,3 +72,13 @@ class AgentProfileNotFoundError(AgentTaskRequestError):
 
     def __init__(self, profile_name: str):
         super().__init__(f"Agent profile {profile_name} not found")
+
+
+class AgentInvalidApiKeyError(AgentTaskRequestError):
+    """Exception raise when the API key could not have been found"""
+
+    def __init__(self):
+        super().__init__(
+            "Minitap API key is incorrect. Visit https://platform.minitap.ai/api-keys "
+            "to get your API key."
+        )
