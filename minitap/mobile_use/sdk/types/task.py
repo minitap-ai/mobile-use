@@ -105,6 +105,20 @@ class TaskRequest[TOutput](TaskRequestCommon):
     output_format: type[TOutput] | None = None
 
 
+class MinitapTaskRequest[TOutput](TaskRequestCommon):
+    """
+    Minitap-specific task request for SDK usage via the gateway platform.
+
+    Attributes:
+        task_id: Required unique identifier provided by the platform, uuid or plaintext
+                 if edited by user
+        profile: Optional profile name (unique in DB, LLM config managed in cloud)
+    """
+
+    task_id: str  # Required, provided by platform (no auto-generation)
+    profile: str | None = None  # Optional: select profile by unique name from DB
+
+
 class TaskResult(BaseModel):
     """
     Result of a mobile automation task.
@@ -189,4 +203,6 @@ class Task(BaseModel):
         )
 
     def get_name(self) -> str:
+        if isinstance(self.request, MinitapTaskRequest):
+            return self.request.task_id
         return self.request.task_name or self.id
