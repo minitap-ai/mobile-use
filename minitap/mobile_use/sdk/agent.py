@@ -1,4 +1,5 @@
 import asyncio
+import os
 import sys
 import tempfile
 import time
@@ -10,6 +11,7 @@ from types import NoneType
 from typing import TypeVar, overload
 
 from adbutils import AdbClient
+from dotenv import load_dotenv
 from langchain_core.messages import AIMessage
 from pydantic import BaseModel
 
@@ -71,6 +73,8 @@ from minitap.mobile_use.utils.recorder import log_agent_thought
 logger = get_logger(__name__)
 
 TOutput = TypeVar("TOutput", bound=BaseModel | None)
+
+load_dotenv()
 
 
 class Agent:
