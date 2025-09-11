@@ -3,7 +3,7 @@ Platform Usage - Minitap SDK with API Key Example
 
 This example demonstrates how to use the mobile-use SDK via the Minitap platform:
 - Agent with minitap_api_key
-- MinitapTaskRequest with platform-provided task_id
+- PlatformTaskRequest with platform-provided task_id
 - All task configuration (goal, output format, etc.) managed by platform UI
 
 Platform Model:
@@ -19,7 +19,7 @@ Run:
 import asyncio
 
 from minitap.mobile_use.sdk import Agent
-from minitap.mobile_use.sdk.types import MinitapTaskRequest
+from minitap.mobile_use.sdk.types import PlatformTaskRequest
 
 
 async def main() -> None:
@@ -32,7 +32,7 @@ async def main() -> None:
     agent = Agent(minitap_api_key="your-api-key")
     agent.init()
     result = await agent.run_task(
-        request=MinitapTaskRequest(
+        request=PlatformTaskRequest(
             task_id="your-task-id",
             profile="your-profile-name",
         )

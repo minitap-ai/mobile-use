@@ -48,7 +48,7 @@ from minitap.mobile_use.sdk.types.exceptions import (
 )
 from minitap.mobile_use.sdk.types.task import (
     AgentProfile,
-    MinitapTaskRequest,
+    PlatformTaskRequest,
     Task,
     TaskRequest,
     TaskStatus,
@@ -213,7 +213,7 @@ class Agent:
     async def run_task(self, *, request: TaskRequest[TOutput]) -> TOutput | None: ...
 
     @overload
-    async def run_task(self, *, request: MinitapTaskRequest[TOutput]) -> TOutput | None: ...
+    async def run_task(self, *, request: PlatformTaskRequest[TOutput]) -> TOutput | None: ...
 
     async def run_task(
         self,
@@ -222,10 +222,10 @@ class Agent:
         output: type[TOutput] | str | None = None,
         profile: str | AgentProfile | None = None,
         name: str | None = None,
-        request: TaskRequest[TOutput] | MinitapTaskRequest[TOutput] | None = None,
+        request: TaskRequest[TOutput] | PlatformTaskRequest[TOutput] | None = None,
     ) -> str | dict | TOutput | None:
         if request is not None:
-            if isinstance(request, MinitapTaskRequest):
+            if isinstance(request, PlatformTaskRequest):
                 if not self._minitap_api_key:
                     raise AgentInvalidApiKeyError()
                 request = self._fetch_task_request_from_platform(
