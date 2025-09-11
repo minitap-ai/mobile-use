@@ -1,4 +1,5 @@
 import asyncio
+import os
 import sys
 import tempfile
 import time
@@ -9,6 +10,7 @@ from types import NoneType
 from typing import TypeVar, overload
 
 from adbutils import AdbClient
+from dotenv import load_dotenv
 from langchain_core.messages import AIMessage
 from pydantic import BaseModel
 
@@ -70,6 +72,8 @@ logger = get_logger(__name__)
 
 TOutput = TypeVar("TOutput", bound=BaseModel | None)
 
+load_dotenv()
+
 
 class Agent:
     _config: AgentConfig
@@ -96,7 +100,7 @@ class Agent:
         self._tasks = []
         self._tmp_traces_dir = Path(tempfile.gettempdir()) / "mobile-use-traces"
         self._initialized = False
-        self._minitap_api_key = minitap_api_key
+        self._minitap_api_key = minitap_api_key or os.getenv("MINITAP_API_KEY", None)
 
     def init(
         self,
