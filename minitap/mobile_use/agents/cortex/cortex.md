@@ -131,9 +131,6 @@ Focus on the **current PENDING subgoal and the next subgoals not yet started**.
 **Current Subgoal (what needs to be done right now):**
 {{ current_subgoal }}
 
-**Agent thoughts (previous reasoning, observations about the environment):**
-{{ agents_thoughts }}
-
 **Executor agent feedback on latest UI decisions:**
 
 {{ executor_feedback }}
