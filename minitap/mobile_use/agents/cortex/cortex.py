@@ -44,7 +44,6 @@ class CortexNode:
             initial_goal=state.initial_goal,
             subgoal_plan=state.subgoal_plan,
             current_subgoal=get_current_subgoal(state.subgoal_plan),
-            agents_thoughts=state.agents_thoughts,
             executor_feedback=executor_feedback,
             executor_tools_list=format_tools_list(ctx=self.ctx, wrappers=EXECUTOR_WRAPPERS_TOOLS),
         )
