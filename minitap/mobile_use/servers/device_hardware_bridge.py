@@ -6,6 +6,7 @@ import time
 from enum import Enum
 
 import requests
+
 from minitap.mobile_use.context import DevicePlatform
 from minitap.mobile_use.servers.utils import is_port_in_use
 
@@ -175,7 +176,7 @@ class DeviceHardwareBridge:
         ]
 
     def start(self):
-        if is_port_in_use(DEVICE_HARDWARE_BRIDGE_PORT):
+        if is_port_in_use(port=DEVICE_HARDWARE_BRIDGE_PORT):
             print("Maestro port already in use - assuming Maestro is running.")
             self.status = BridgeStatus.RUNNING
             return True
