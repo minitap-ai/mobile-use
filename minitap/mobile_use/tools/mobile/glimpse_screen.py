@@ -24,11 +24,8 @@ def get_glimpse_screen_tool(ctx: MobileUseContext):
         agent_thought: str,
     ):
         """
-        Your primary tool for visual perception. Call this to get an up-to-date
-        image of the screen for immediate analysis. It is the most reliable way
-        to confirm what is actually displayed, especially for visual elements like
-        icons, images, or when the UI hierarchy seems ambiguous. The captured
-        visual context is ephemeral and must be analyzed in the very next step.
+        Captures the current screen as an image.
+        The resulting screenshot is added to the context for the next reasoning step.
         """
         compressed_image_base64 = None
         has_failed = False
@@ -67,6 +64,7 @@ def get_glimpse_screen_tool(ctx: MobileUseContext):
 
 glimpse_screen_wrapper = ToolWrapper(
     tool_fn_getter=get_glimpse_screen_tool,
-    on_success_fn=lambda: "Visual context captured successfully. It is now available for immediate analysis.",
+    on_success_fn=lambda: "Visual context captured successfully."
+    + "It is now available for immediate analysis.",
     on_failure_fn=lambda: "Failed to capture visual context.",
 )
