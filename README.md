@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![mobile-use in Action](./doc/linkedin-demo-with-text.gif)
+![mobile-use in Action](./doc/banner-v2.png)
 
 </div>
 
