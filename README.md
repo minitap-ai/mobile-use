@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![mobile-use in Action](./doc/banner.jpg)
+![mobile-use in Action](./doc/banner.png)
 
 </div>
 
