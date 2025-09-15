@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from minitap.mobile_use.utils.ui_hierarchy import (
     ElementBounds,
     Point,
@@ -125,16 +127,19 @@ def test_get_bounds_for_element():
     element_no_bounds = {"text": "Button"}
     bounds = get_bounds_for_element(element_no_bounds)
     assert bounds is None
-    element_invalid_bounds = {
-        "bounds": {
-            "x": "invalid",  # Should be int
-            "y": 20,
-            "width": 100,
-            "height": 50,
+
+    # Suppress logger output for the invalid bounds test case
+    with patch("minitap.mobile_use.utils.ui_hierarchy.logger.error"):
+        element_invalid_bounds = {
+            "bounds": {
+                "x": "invalid",  # Should be int
+                "y": 20,
+                "width": 100,
+                "height": 50,
+            }
         }
-    }
-    bounds = get_bounds_for_element(element_invalid_bounds)
-    assert bounds is None
+        bounds = get_bounds_for_element(element_invalid_bounds)
+        assert bounds is None
 
 
 def test_element_bounds():
