@@ -109,8 +109,8 @@ class ElementBounds(BaseModel):
         <------>
         """
         return Point(
-            x=int((self.x + self.width) * x_percent),
-            y=int((self.y + self.height) * y_percent),
+            x=int(self.x + self.width * x_percent),
+            y=int(self.y + self.height * y_percent),
         )
 
 
