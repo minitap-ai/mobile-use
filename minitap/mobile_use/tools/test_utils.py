@@ -1,18 +1,18 @@
-from unittest.mock import Mock, patch
 import sys
+from unittest.mock import Mock, patch
 
 import pytest
 
 # Mock the problematic langgraph import at module level
-sys.modules['langgraph.prebuilt.chat_agent_executor'] = Mock()
-sys.modules['minitap.mobile_use.graph.state'] = Mock()
+sys.modules["langgraph.prebuilt.chat_agent_executor"] = Mock()
+sys.modules["minitap.mobile_use.graph.state"] = Mock()
 
-from minitap.mobile_use.context import MobileUseContext
-from minitap.mobile_use.controllers.mobile_command_controller import (
+from minitap.mobile_use.context import MobileUseContext  # noqa: E402
+from minitap.mobile_use.controllers.mobile_command_controller import (  # noqa: E402
     IdSelectorRequest,
     SelectorRequestWithCoordinates,
 )
-from minitap.mobile_use.tools.utils import (
+from minitap.mobile_use.tools.utils import (  # noqa: E402
     focus_element_if_needed,
     move_cursor_to_end_if_bounds,
 )
@@ -83,7 +83,7 @@ class TestMoveCursorToEndIfBounds:
         mock_tap.assert_called_once()
         call_args = mock_tap.call_args[1]
         assert call_args["ctx"] == mock_context
-        
+
         # Check that coordinates are calculated correctly (99% of width and height)
         selector_request = call_args["selector_request"]
         assert isinstance(selector_request, SelectorRequestWithCoordinates)
@@ -115,9 +115,7 @@ class TestMoveCursorToEndIfBounds:
             assert result == sample_element
 
     @patch("minitap.mobile_use.tools.utils.find_element_by_resource_id")
-    def test_move_cursor_element_not_found(
-        self, mock_find_element, mock_context, mock_state
-    ):
+    def test_move_cursor_element_not_found(self, mock_find_element, mock_context, mock_state):
         """Test when element is not found."""
         mock_state.latest_ui_hierarchy = []
         mock_find_element.return_value = None
@@ -150,9 +148,7 @@ class TestMoveCursorToEndIfBounds:
         assert result == element_no_bounds
 
     @patch("minitap.mobile_use.tools.utils.find_element_by_resource_id")
-    def test_move_cursor_empty_ui_hierarchy(
-        self, mock_find_element, mock_context, mock_state
-    ):
+    def test_move_cursor_empty_ui_hierarchy(self, mock_find_element, mock_context, mock_state):
         """Test when UI hierarchy is None."""
         mock_state.latest_ui_hierarchy = None
         mock_find_element.return_value = None
@@ -185,9 +181,7 @@ class TestFocusElementIfNeeded:
         mock_context.hw_bridge_client.get_rich_hierarchy.return_value = [focused_element]
         mock_find_element.return_value = focused_element["attributes"]
 
-        result = focus_element_if_needed(
-            ctx=mock_context, resource_id="com.example:id/text_input"
-        )
+        result = focus_element_if_needed(ctx=mock_context, resource_id="com.example:id/text_input")
 
         # Should not tap since already focused
         mock_tap.assert_not_called()
@@ -213,7 +207,7 @@ class TestFocusElementIfNeeded:
 
         focused_element = {
             "attributes": {
-                "resource-id": "com.example:id/text_input", 
+                "resource-id": "com.example:id/text_input",
                 "focused": "true",
             },
             "children": [],
@@ -231,9 +225,7 @@ class TestFocusElementIfNeeded:
             focused_element["attributes"],
         ]
 
-        result = focus_element_if_needed(
-            ctx=mock_context, resource_id="com.example:id/text_input"
-        )
+        result = focus_element_if_needed(ctx=mock_context, resource_id="com.example:id/text_input")
 
         # Should tap to focus
         mock_tap.assert_called_once_with(
@@ -259,9 +251,7 @@ class TestFocusElementIfNeeded:
         mock_context.hw_bridge_client.get_rich_hierarchy.return_value = [unfocused_element]
         mock_find_element.return_value = unfocused_element["attributes"]
 
-        result = focus_element_if_needed(
-            ctx=mock_context, resource_id="com.example:id/text_input"
-        )
+        result = focus_element_if_needed(ctx=mock_context, resource_id="com.example:id/text_input")
 
         # Should tap to try to focus
         mock_tap.assert_called_once()
@@ -277,9 +267,7 @@ class TestFocusElementIfNeeded:
         mock_context.hw_bridge_client.get_rich_hierarchy.return_value = []
         mock_find_element.return_value = None
 
-        result = focus_element_if_needed(
-            ctx=mock_context, resource_id="com.example:id/nonexistent"
-        )
+        result = focus_element_if_needed(ctx=mock_context, resource_id="com.example:id/nonexistent")
 
         assert result is False
 
@@ -303,9 +291,7 @@ class TestFocusElementIfNeeded:
             None,
         ]
 
-        result = focus_element_if_needed(
-            ctx=mock_context, resource_id="com.example:id/text_input"
-        )
+        result = focus_element_if_needed(ctx=mock_context, resource_id="com.example:id/text_input")
 
         mock_tap.assert_called_once()
         assert result is False
