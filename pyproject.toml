@@ -122,3 +122,37 @@ skip-magic-trailing-comma = false
 
 # Like Black, automatically detect the appropriate line ending.
 line-ending = "auto"
+
+[tool.pytest.ini_options]
+# Add project root to Python path for absolute imports
+pythonpath = [
+    "."
+]
+# Specify test discovery patterns
+testpaths = [
+    "minitap"
+]
+python_files = [
+    "*.test.py",
+    "test_*.py",
+    "*_test.py"
+]
+python_functions = [
+    "test_*"
+]
+python_classes = [
+    "Test*"
+]
+# Add useful options
+addopts = [
+    "-v",                    # verbose output
+    "--tb=short",           # shorter traceback format
+    "--strict-markers",     # strict marker checking
+    "--disable-warnings",   # disable warnings for cleaner output
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.2.0",
+]
