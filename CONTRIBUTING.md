@@ -29,7 +29,11 @@ Got an idea or a fix? Here’s the general workflow:
     ruff format .
     ```
 
-5.  **Commit Your Changes**: Use clear and descriptive commit messages. We follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) standard.
+5.  **Run Tests**: Make sure all the tests pass with `pytest`.
+    ```bash
+    pytest
+    ```
+6.  **Commit Your Changes**: Use clear and descriptive commit messages. We follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) standard.
 
 ## ✨ Submitting a Pull Request
 
@@ -37,6 +41,7 @@ When your code is ready, open a Pull Request!
 
 - Push your branch to your fork.
 - Open a PR against the `main` branch of the original repository.
+- Make sure all the tests pass with `pytest`.
 - Provide a clear description of the changes you've made. We'll review it as soon as we can!
 
 ## 📦 Dependency Management with `uv`
