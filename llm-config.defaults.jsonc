@@ -42,7 +42,7 @@
     },
     "orchestrator": {
       "provider": "openrouter",
-      "model": "meta-llama/llama-4-scout"
+      "model": "openai/gpt-oss-120b"
     },
     "cortex": {
       "provider": "google",
