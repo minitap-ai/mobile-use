@@ -12,16 +12,13 @@ from pydantic import BaseModel
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.mobile_command_controller import (
-    get_screen_data,
-)
-from minitap.mobile_use.controllers.mobile_command_controller import (
     input_text as input_text_controller,
 )
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
-from minitap.mobile_use.tools.utils import focus_element_if_needed, move_cursor_to_end_if_bounds
+from minitap.mobile_use.tools.utils import find_and_focus_text_input, move_cursor_to_end_if_bounds
 from minitap.mobile_use.utils.logger import get_logger
-from minitap.mobile_use.utils.ui_hierarchy import find_element_by_resource_id, get_element_text
+from minitap.mobile_use.utils.ui_hierarchy import get_text_from_nested_input
 
 logger = get_logger(__name__)
 
@@ -53,37 +50,30 @@ def get_input_text_tool(ctx: MobileUseContext):
         text_input_resource_id: str,
     ):
         """
-        Focus a text field and type text into it.
-
-        - Ensure the corresponding element is focused (tap if necessary).
-        - If bounds are available, tap near the end to place the cursor at the end.
-        - Type the provided `text` using the controller.
+        Finds a text field within a container, focuses it, and types text into it.
         """
-        focused = focus_element_if_needed(ctx=ctx, resource_id=text_input_resource_id)
-        if focused:
-            move_cursor_to_end_if_bounds(ctx=ctx, state=state, resource_id=text_input_resource_id)
+        actual_input_id = find_and_focus_text_input(
+            ctx=ctx, container_resource_id=text_input_resource_id
+        )
+
+        if actual_input_id:
+            move_cursor_to_end_if_bounds(ctx=ctx, state=state, resource_id=actual_input_id)
 
         result = _controller_input_text(ctx=ctx, text=text)
 
         status: Literal["success", "error"] = "success" if result.ok else "error"
 
+        final_id_to_check = actual_input_id or text_input_resource_id
         text_input_content = ""
         if status == "success":
-            screen_data = get_screen_data(screen_api_client=ctx.screen_api_client)
-            state.latest_ui_hierarchy = screen_data.elements
-
-            element = find_element_by_resource_id(
-                ui_hierarchy=state.latest_ui_hierarchy, resource_id=text_input_resource_id
+            fresh_rich_hierarchy = ctx.hw_bridge_client.get_rich_hierarchy()
+            text_input_content = get_text_from_nested_input(
+                hierarchy=fresh_rich_hierarchy,
+                container_resource_id=text_input_resource_id,
             )
 
-            if not element:
-                result = InputResult(ok=False, error="Element not found")
-
-            if element:
-                text_input_content = get_element_text(element)
-
         agent_outcome = (
-            input_text_wrapper.on_success_fn(text, text_input_content, text_input_resource_id)
+            input_text_wrapper.on_success_fn(text, text_input_content, final_id_to_check)
             if result.ok
             else input_text_wrapper.on_failure_fn(text, result.error)
         )

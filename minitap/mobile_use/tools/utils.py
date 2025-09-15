@@ -11,9 +11,10 @@ from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.utils.logger import get_logger
 from minitap.mobile_use.utils.ui_hierarchy import (
     Point,
+    find_child_element_by_class,
     find_element_by_resource_id,
+    find_element_recursive,
     get_bounds_for_element,
-    is_element_focused,
 )
 
 logger = get_logger(__name__)
@@ -56,31 +57,63 @@ def move_cursor_to_end_if_bounds(
     return elt
 
 
-def focus_element_if_needed(
-    ctx: MobileUseContext,
-    resource_id: str,
-) -> bool:
+def find_and_focus_text_input(ctx: MobileUseContext, container_resource_id: str) -> str | None:
     """
-    Ensures the element identified by `resource_id` is focused.
-    """
-    rich_hierarchy: list[dict] = ctx.hw_bridge_client.get_rich_hierarchy()
-    rich_elt = find_element_by_resource_id(
-        ui_hierarchy=rich_hierarchy,
-        resource_id=resource_id,
-        is_rich_hierarchy=True,
-    )
-    if rich_elt and not is_element_focused(rich_elt):
-        tap(ctx=ctx, selector_request=IdSelectorRequest(id=resource_id))
-        logger.debug(f"Focused (tap) on resource_id={resource_id}")
-        rich_hierarchy = ctx.hw_bridge_client.get_rich_hierarchy()
-        rich_elt = find_element_by_resource_id(
-            ui_hierarchy=rich_hierarchy,
-            resource_id=resource_id,
-            is_rich_hierarchy=True,
-        )
-    if rich_elt and is_element_focused(rich_elt):
-        logger.debug(f"Text input is focused: {resource_id}")
-        return True
+    Finds a container by its ID in the rich hierarchy, then finds the actual EditText
+    child element and focuses it.
 
-    logger.warning(f"Failed to focus resource_id={resource_id}")
-    return False
+    Returns the resource_id of the actual input field if found, otherwise None.
+    """
+    logger.info(
+        f"Attempting to find and focus text input within container: {container_resource_id}"
+    )
+    rich_hierarchy_children: list[dict] = ctx.hw_bridge_client.get_rich_hierarchy()
+
+    parent_element = None
+    for root_node in rich_hierarchy_children:
+        parent_element = find_element_recursive(root_node, container_resource_id)
+        if parent_element:
+            break
+
+    if not parent_element:
+        logger.warning(
+            f"Could not find parent container '{container_resource_id}'"
+            + "in rich hierarchy. Falling back."
+        )
+        tap(ctx=ctx, selector_request=IdSelectorRequest(id=container_resource_id))
+        return container_resource_id
+
+    text_input_element = find_child_element_by_class(parent_element, "android.widget.EditText")
+    # TODO: IOS support
+
+    if not text_input_element:
+        logger.warning(
+            f"Could not find an EditText child in '{container_resource_id}'."
+            + "Tapping container as fallback."
+        )
+        tap(ctx=ctx, selector_request=IdSelectorRequest(id=container_resource_id))
+        return container_resource_id
+
+    attributes = text_input_element.get("attributes", {})
+    input_resource_id = attributes.get("resource-id")
+
+    if input_resource_id and input_resource_id != "":
+        logger.info(f"Found specific input field with ID: {input_resource_id}. Tapping to focus.")
+        tap(ctx=ctx, selector_request=IdSelectorRequest(id=input_resource_id))
+        return input_resource_id
+    else:
+        logger.info("Found input field with no ID. Tapping its coordinates to focus.")
+        bounds = get_bounds_for_element(text_input_element)
+        if bounds:
+            center_point: Point = bounds.get_center()
+            tap(
+                ctx=ctx,
+                selector_request=SelectorRequestWithCoordinates(
+                    coordinates=CoordinatesSelectorRequest(x=center_point.x, y=center_point.y)
+                ),
+            )
+            return container_resource_id
+        else:
+            logger.warning("Could not get bounds for the child input field. Tapping container.")
+            tap(ctx=ctx, selector_request=IdSelectorRequest(id=container_resource_id))
+            return container_resource_id
