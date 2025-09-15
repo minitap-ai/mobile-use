@@ -96,8 +96,8 @@ class Agent:
         retry_count: int = 5,
         retry_wait_seconds: int = 5,
     ):
-        if not which("adb"):
-            raise ExecutableNotFoundError("adb")
+        if not which("adb") and not which("xcrun"):
+            raise ExecutableNotFoundError("cli_tools")
         if self._is_default_hw_bridge and not which("maestro"):
             raise ExecutableNotFoundError("maestro")
 
