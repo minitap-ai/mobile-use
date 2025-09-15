@@ -29,7 +29,7 @@ Mobile-use is a powerful, open-source AI agent that controls your Android or IOS
 ## ✨ Features
 
 - 🗣️ **Natural Language Control**: Interact with your phone using your native language.
-- 📱 **UI-Aware Automation**: Intelligently navigates through app interfaces.
+- 📱 **UI-Aware Automation**: Intelligently navigates through app interfaces (note: currently has limited effectiveness with games as they don't provide accessibility tree data).
 - 📊 **Data Scraping**: Extract information from any app and structure it into your desired format (e.g., JSON) using a natural language description.
 - 🔧 **Extensible & Customizable**: Easily configure different LLMs to power the agents that power mobile-use.
 
@@ -98,7 +98,7 @@ Then run in your terminal:
 
 ```bash
 chmod +x mobile-use.sh
-./mobile-use.sh \
+bash ./mobile-use.sh \
   "Open Gmail, find first 3 unread emails, and list their sender and subject line" \
   --output-description "A JSON list of objects, each with 'sender' and 'subject' keys"
 ```
