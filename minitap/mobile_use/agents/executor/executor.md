@@ -28,7 +28,6 @@ and your previous actions, you must:
 {
   "action": "tap",
   "target": {
-    "text": "Alice",
     "resource_id": "com.whatsapp:id/conversation_item"
   }
 }
@@ -39,7 +38,6 @@ and your previous actions, you must:
 Call the `tap_on_element` tool with:
 
 - `resource_id = "com.whatsapp:id/conversation_item"`
-- `text = "Alice"`
 - `agent_thought = "I'm tapping on the chat item labeled 'Alice' to open the conversation."`
 
 ---
@@ -55,10 +53,14 @@ Call the `tap_on_element` tool with:
 
 When using the `input_text` tool:
 
-- **Always provide the `resource_id` of the element** you want to type into.
+- **Provide all available information** from the following optional parameters to identify the text input element:
+  - `text_input_resource_id`: The resource ID of the text input element (when available)
+  - `text_input_coordinates`: The bounds (ElementBounds) of the text input element (when available)
+  - `text_input_text`: The current text content of the text input element (when available)
+
 - The tool will automatically:
 
-  1. **Focus the element first**
+  1. **Focus the element** using the provided identification parameters
   2. **Move the cursor to the end** of the existing text
   3. **Then type the new text**
 
