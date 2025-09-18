@@ -23,30 +23,34 @@ logger = get_logger(__name__)
 
 def find_element_by_text(ui_hierarchy: list[dict], text: str) -> dict | None:
     """
-    Find a UI element by its text content in the rich hierarchy.
+    Find a UI element by its text content (adapted to both flat and rich hierarchy)
+
+    This function performs a recursive, case-insensitive partial search.
 
     Args:
-        ui_hierarchy: List of UI element dictionaries (rich hierarchy format)
-        text: The text content to search for
+        ui_hierarchy: List of UI element dictionaries.
+        text: The text content to search for.
 
     Returns:
-        The complete UI element dictionary if found, None otherwise
+        The complete UI element dictionary if found, None otherwise.
     """
 
     def search_recursive(elements: list[dict]) -> dict | None:
         for element in elements:
-            if isinstance(element, dict):
-                attrs = element.get("attributes", {})
-                element_text = attrs.get("text", "")
+            if not isinstance(element, dict):
+                continue
 
-                if text and text.lower() in element_text.lower():
-                    return attrs
+            source = element.get("attributes", element)
+            element_text = source.get("text", "")
 
-                children = element.get("children", [])
-                if children:
-                    result = search_recursive(children)
-                    if result:
-                        return result
+            if text and text.lower() in element_text.lower():
+                return element
+
+            children = element.get("children", [])
+            if children:
+                result = search_recursive(children)
+                if result:
+                    return result
         return None
 
     return search_recursive(ui_hierarchy)
@@ -160,7 +164,7 @@ def focus_element_if_needed(
         logger.warning(f"Failed to focus using resource_id='{text_input_resource_id}'. Fallback...")
 
     if text_input_coordinates:
-        relative_point = text_input_coordinates.get_relative_point(x_percent=0.95, y_percent=0.95)
+        relative_point = text_input_coordinates.get_center()
         tap(
             ctx=ctx,
             selector_request=SelectorRequestWithCoordinates(
