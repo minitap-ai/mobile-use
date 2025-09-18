@@ -71,7 +71,9 @@ class TestMoveCursorToEndIfBounds:
         result = move_cursor_to_end_if_bounds(
             ctx=mock_context,
             state=mock_state,
-            resource_id="com.example:id/text_input",
+            text_input_resource_id="com.example:id/text_input",
+            text_input_coordinates=sample_element["bounds"],
+            text_input_text=sample_element["text"],
         )
 
         # Verify element was found
@@ -103,7 +105,9 @@ class TestMoveCursorToEndIfBounds:
             result = move_cursor_to_end_if_bounds(
                 ctx=mock_context,
                 state=mock_state,
-                resource_id="com.example:id/text_input",
+                text_input_resource_id="com.example:id/text_input",
+                text_input_coordinates=sample_element["bounds"],
+                text_input_text=sample_element["text"],
                 elt=sample_element,
             )
 
@@ -123,7 +127,9 @@ class TestMoveCursorToEndIfBounds:
         result = move_cursor_to_end_if_bounds(
             ctx=mock_context,
             state=mock_state,
-            resource_id="com.example:id/nonexistent",
+            text_input_resource_id="com.example:id/nonexistent",
+            text_input_coordinates=None,
+            text_input_text=None,
         )
 
         assert result is None
@@ -139,7 +145,9 @@ class TestMoveCursorToEndIfBounds:
         result = move_cursor_to_end_if_bounds(
             ctx=mock_context,
             state=mock_state,
-            resource_id="com.example:id/text_input",
+            text_input_resource_id="com.example:id/text_input",
+            text_input_coordinates=None,
+            text_input_text=None,
             elt=element_no_bounds,
         )
 
@@ -156,7 +164,9 @@ class TestMoveCursorToEndIfBounds:
         result = move_cursor_to_end_if_bounds(
             ctx=mock_context,
             state=mock_state,
-            resource_id="com.example:id/text_input",
+            text_input_resource_id="com.example:id/text_input",
+            text_input_coordinates=None,
+            text_input_text=None,
         )
 
         mock_find_element.assert_called_once_with(
@@ -181,7 +191,12 @@ class TestFocusElementIfNeeded:
         mock_context.hw_bridge_client.get_rich_hierarchy.return_value = [focused_element]
         mock_find_element.return_value = focused_element["attributes"]
 
-        result = focus_element_if_needed(ctx=mock_context, resource_id="com.example:id/text_input")
+        result = focus_element_if_needed(
+            ctx=mock_context,
+            text_input_resource_id="com.example:id/text_input",
+            text_input_coordinates=None,
+            text_input_text=None,
+        )
 
         # Should not tap since already focused
         mock_tap.assert_not_called()
@@ -225,7 +240,12 @@ class TestFocusElementIfNeeded:
             focused_element["attributes"],
         ]
 
-        result = focus_element_if_needed(ctx=mock_context, resource_id="com.example:id/text_input")
+        result = focus_element_if_needed(
+            ctx=mock_context,
+            text_input_resource_id="com.example:id/text_input",
+            text_input_coordinates=None,
+            text_input_text=None,
+        )
 
         # Should tap to focus
         mock_tap.assert_called_once_with(
@@ -251,7 +271,12 @@ class TestFocusElementIfNeeded:
         mock_context.hw_bridge_client.get_rich_hierarchy.return_value = [unfocused_element]
         mock_find_element.return_value = unfocused_element["attributes"]
 
-        result = focus_element_if_needed(ctx=mock_context, resource_id="com.example:id/text_input")
+        result = focus_element_if_needed(
+            ctx=mock_context,
+            text_input_resource_id="com.example:id/text_input",
+            text_input_coordinates=None,
+            text_input_text=None,
+        )
 
         # Should tap to try to focus
         mock_tap.assert_called_once()
@@ -267,7 +292,12 @@ class TestFocusElementIfNeeded:
         mock_context.hw_bridge_client.get_rich_hierarchy.return_value = []
         mock_find_element.return_value = None
 
-        result = focus_element_if_needed(ctx=mock_context, resource_id="com.example:id/nonexistent")
+        result = focus_element_if_needed(
+            ctx=mock_context,
+            text_input_resource_id="com.example:id/nonexistent",
+            text_input_coordinates=None,
+            text_input_text=None,
+        )
 
         assert result is False
 
@@ -291,7 +321,12 @@ class TestFocusElementIfNeeded:
             None,
         ]
 
-        result = focus_element_if_needed(ctx=mock_context, resource_id="com.example:id/text_input")
+        result = focus_element_if_needed(
+            ctx=mock_context,
+            text_input_resource_id="com.example:id/text_input",
+            text_input_coordinates=None,
+            text_input_text=None,
+        )
 
         mock_tap.assert_called_once()
         assert result is False
@@ -309,7 +344,12 @@ class TestFocusElementIfNeeded:
         mock_context.hw_bridge_client.get_rich_hierarchy.return_value = [focused_element]
         mock_find_element.return_value = focused_element["attributes"]
 
-        focus_element_if_needed(ctx=mock_context, resource_id="com.example:id/text_input")
+        focus_element_if_needed(
+            ctx=mock_context,
+            text_input_resource_id="com.example:id/text_input",
+            text_input_coordinates=None,
+            text_input_text=None,
+        )
 
         # Should log successful focus
         mock_logger.debug.assert_called_with("Text input is focused: com.example:id/text_input")
