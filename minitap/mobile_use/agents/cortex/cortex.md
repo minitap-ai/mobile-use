@@ -85,7 +85,7 @@ When you target a UI element (for a `tap`, `input_text`, `clear_text`, etc.), yo
 
 ### Outputting Your Decisions
 
-If you decide to act, output a **stringified structured set of instructions** for the Executor.
+If you decide to act, output a **valid JSON stringified structured set of instructions** for the Executor.
 
 - These must be **concrete low-level actions**.
 - The executor has the following available tools: {{ executor_tools_list }}.
