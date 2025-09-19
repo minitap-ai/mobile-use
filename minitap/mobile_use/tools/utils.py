@@ -119,52 +119,49 @@ def move_cursor_to_end_if_bounds(
 
 def focus_element_if_needed(
     ctx: MobileUseContext,
-    text_input_resource_id: str | None,
-    text_input_coordinates: ElementBounds | None,
-    text_input_text: str | None,
+    input_resource_id: str | None,
+    input_coordinates: ElementBounds | None,
+    input_text: str | None,
 ) -> bool:
     """
     Ensures the element is focused, with a sanity check to prevent trusting misleading IDs.
     """
     rich_hierarchy = ctx.hw_bridge_client.get_rich_hierarchy()
 
-    if text_input_resource_id and text_input_text:
+    elt_from_id = None
+    if input_resource_id:
         elt_from_id = find_element_by_resource_id(
-            ui_hierarchy=rich_hierarchy, resource_id=text_input_resource_id, is_rich_hierarchy=True
+            ui_hierarchy=rich_hierarchy, resource_id=input_resource_id, is_rich_hierarchy=True
         )
-        if elt_from_id:
-            text_from_id_elt = get_element_text(elt_from_id)
-            if not text_from_id_elt or text_input_text.lower() not in text_from_id_elt.lower():
-                logger.warning(
-                    f"ID '{text_input_resource_id}' and text '{text_input_text}'"
-                    + "seem to be on different elements. "
-                    "Ignoring the resource_id and falling back to other locators."
-                )
-                text_input_resource_id = None
 
-    if text_input_resource_id:
-        rich_elt = find_element_by_resource_id(
-            ui_hierarchy=rich_hierarchy,
-            resource_id=text_input_resource_id,
-            is_rich_hierarchy=True,
-        )
-        if rich_elt and not is_element_focused(rich_elt):
-            tap(ctx=ctx, selector_request=IdSelectorRequest(id=text_input_resource_id))
-            logger.debug(f"Focused (tap) on resource_id={text_input_resource_id}")
+    if elt_from_id and input_text:
+        text_from_id_elt = get_element_text(elt_from_id)
+        if not text_from_id_elt or input_text.lower() not in text_from_id_elt.lower():
+            logger.warning(
+                f"ID '{input_resource_id}' and text '{input_text}'"
+                + "seem to be on different elements. "
+                "Ignoring the resource_id and falling back to other locators."
+            )
+            elt_from_id = None
+
+    if elt_from_id:
+        if not is_element_focused(elt_from_id):
+            tap(ctx=ctx, selector_request=IdSelectorRequest(id=input_resource_id))  # type: ignore
+            logger.debug(f"Focused (tap) on resource_id={input_resource_id}")
             rich_hierarchy = ctx.hw_bridge_client.get_rich_hierarchy()
-            rich_elt = find_element_by_resource_id(
+            elt_from_id = find_element_by_resource_id(
                 ui_hierarchy=rich_hierarchy,
-                resource_id=text_input_resource_id,
+                resource_id=input_resource_id,  # type: ignore
                 is_rich_hierarchy=True,
             )
-        if rich_elt and is_element_focused(rich_elt):
-            logger.debug(f"Text input is focused: {text_input_resource_id}")
+        if elt_from_id and is_element_focused(elt_from_id):
+            logger.debug(f"Text input is focused: {input_resource_id}")
             return True
 
-        logger.warning(f"Failed to focus using resource_id='{text_input_resource_id}'. Fallback...")
+        logger.warning(f"Failed to focus using resource_id='{input_resource_id}'. Fallback...")
 
-    if text_input_coordinates:
-        relative_point = text_input_coordinates.get_center()
+    if input_coordinates:
+        relative_point = input_coordinates.get_center()
         tap(
             ctx=ctx,
             selector_request=SelectorRequestWithCoordinates(
@@ -177,8 +174,8 @@ def focus_element_if_needed(
         logger.debug(f"Tapped on coordinates ({relative_point.x}, {relative_point.y}) to focus.")
         return True
 
-    if text_input_text:
-        text_elt = find_element_by_text(rich_hierarchy, text_input_text)
+    if input_text:
+        text_elt = find_element_by_text(rich_hierarchy, input_text)
         if text_elt:
             bounds = get_bounds_for_element(text_elt)
             if bounds:
@@ -192,7 +189,7 @@ def focus_element_if_needed(
                         ),
                     ),
                 )
-                logger.debug(f"Tapped on text element '{text_input_text}' to focus.")
+                logger.debug(f"Tapped on text element '{input_text}' to focus.")
                 return True
 
     logger.error("Failed to focus element. No valid locator (ID, coordinates, or text) succeeded.")

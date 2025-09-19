@@ -96,9 +96,9 @@ class TextClearer:
     ) -> bool:
         if not focus_element_if_needed(
             ctx=self.ctx,
-            text_input_resource_id=text_input_resource_id,
-            text_input_coordinates=text_input_coordinates,
-            text_input_text=text_input_text,
+            input_resource_id=text_input_resource_id,
+            input_coordinates=text_input_coordinates,
+            input_text=text_input_text,
         ):
             return False
 

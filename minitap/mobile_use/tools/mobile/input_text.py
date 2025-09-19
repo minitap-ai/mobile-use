@@ -77,9 +77,9 @@ def get_input_text_tool(ctx: MobileUseContext):
 
         focused = focus_element_if_needed(
             ctx=ctx,
-            text_input_resource_id=text_input_resource_id,
-            text_input_coordinates=text_input_coordinates,
-            text_input_text=text_input_text,
+            input_resource_id=text_input_resource_id,
+            input_coordinates=text_input_coordinates,
+            input_text=text_input_text,
         )
         if not focused:
             error_message = "Failed to focus the text input element before typing."
