@@ -51,15 +51,29 @@ class PlannerNode:
         llm = llm.with_structured_output(PlannerOutput)
         response: PlannerOutput = await llm.ainvoke(messages)  # type: ignore
 
-        subgoals_plan = [
-            Subgoal(
-                id=subgoal.id or str(uuid.uuid4()),
-                description=subgoal.description,
-                status=SubgoalStatus.NOT_STARTED,
-                completion_reason=None,
+        used_ids = set()
+        subgoals_plan = []
+        for subgoal in response.subgoals:
+            subgoal_id = subgoal.id
+            if subgoal_id and subgoal_id in used_ids:
+                logger.warning(
+                    f"Duplicate subgoal ID '{subgoal_id}' from LLM. Generating a new one."
+                )
+                subgoal_id = str(uuid.uuid4())
+            elif not subgoal_id:
+                subgoal_id = str(uuid.uuid4())
+
+            used_ids.add(subgoal_id)
+
+            subgoals_plan.append(
+                Subgoal(
+                    id=subgoal_id,
+                    description=subgoal.description,
+                    status=SubgoalStatus.NOT_STARTED,
+                    completion_reason=None,
+                )
             )
-            for subgoal in response.subgoals
-        ]
+
         logger.info("📜 Generated plan:")
         logger.info("\n".join(str(s) for s in subgoals_plan))
 
