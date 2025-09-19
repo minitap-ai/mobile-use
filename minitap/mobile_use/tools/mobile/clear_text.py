@@ -23,6 +23,7 @@ from minitap.mobile_use.tools.utils import (
 )
 from minitap.mobile_use.utils.logger import get_logger
 from minitap.mobile_use.utils.ui_hierarchy import (
+    ElementBounds,
     find_element_by_resource_id,
     get_element_text,
     text_input_is_empty,
@@ -50,16 +51,20 @@ class TextClearer:
         screen_data = get_screen_data(screen_api_client=self.ctx.screen_api_client)
         self.state.latest_ui_hierarchy = screen_data.elements
 
-    def _get_element_info(self, resource_id: str) -> tuple[object | None, str | None, str | None]:
+    def _get_element_info(
+        self, resource_id: str | None
+    ) -> tuple[object | None, str | None, str | None]:
         if not self.state.latest_ui_hierarchy:
             self._refresh_ui_hierarchy()
 
         if not self.state.latest_ui_hierarchy:
             return None, None, None
 
-        element = find_element_by_resource_id(
-            ui_hierarchy=self.state.latest_ui_hierarchy, resource_id=resource_id
-        )
+        element = None
+        if resource_id:
+            element = find_element_by_resource_id(
+                ui_hierarchy=self.state.latest_ui_hierarchy, resource_id=resource_id
+            )
 
         if not element:
             return None, None, None
@@ -83,11 +88,27 @@ class TextClearer:
     def _should_clear_text(self, current_text: str | None, hint_text: str | None) -> bool:
         return current_text is not None and current_text != "" and current_text != hint_text
 
-    def _prepare_element_for_clearing(self, resource_id: str) -> bool:
-        if not focus_element_if_needed(ctx=self.ctx, resource_id=resource_id):
+    def _prepare_element_for_clearing(
+        self,
+        text_input_resource_id: str | None,
+        text_input_coordinates: ElementBounds | None,
+        text_input_text: str | None,
+    ) -> bool:
+        if not focus_element_if_needed(
+            ctx=self.ctx,
+            input_resource_id=text_input_resource_id,
+            input_coordinates=text_input_coordinates,
+            input_text=text_input_text,
+        ):
             return False
 
-        move_cursor_to_end_if_bounds(ctx=self.ctx, state=self.state, resource_id=resource_id)
+        move_cursor_to_end_if_bounds(
+            ctx=self.ctx,
+            state=self.state,
+            text_input_resource_id=text_input_resource_id,
+            text_input_coordinates=text_input_coordinates,
+            text_input_text=text_input_text,
+        )
         return True
 
     def _erase_text_attempt(self, text_length: int) -> str | None:
@@ -102,7 +123,12 @@ class TextClearer:
         return None
 
     def _clear_with_retries(
-        self, resource_id: str, initial_text: str, hint_text: str | None
+        self,
+        text_input_resource_id: str | None,
+        text_input_coordinates: ElementBounds | None,
+        text_input_text: str | None,
+        initial_text: str,
+        hint_text: str | None,
     ) -> tuple[bool, str | None, int]:
         current_text = initial_text
         erased_chars = 0
@@ -118,18 +144,25 @@ class TextClearer:
             erased_chars += chars_to_erase
 
             self._refresh_ui_hierarchy()
-            elt = find_element_by_resource_id(
-                ui_hierarchy=self.state.latest_ui_hierarchy or [],
-                resource_id=resource_id,
-            )
-            if elt:
-                current_text = get_element_text(elt)
-                logger.info(f"Current text: {current_text}")
-                if text_input_is_empty(text=current_text, hint_text=hint_text):
-                    break
+            elt = None
+            if text_input_resource_id:
+                elt = find_element_by_resource_id(
+                    ui_hierarchy=self.state.latest_ui_hierarchy or [],
+                    resource_id=text_input_resource_id,
+                )
+                if elt:
+                    current_text = get_element_text(elt)
+                    logger.info(f"Current text: {current_text}")
+                    if text_input_is_empty(text=current_text, hint_text=hint_text):
+                        break
 
             move_cursor_to_end_if_bounds(
-                ctx=self.ctx, state=self.state, resource_id=resource_id, elt=elt
+                ctx=self.ctx,
+                state=self.state,
+                text_input_resource_id=text_input_resource_id,
+                text_input_coordinates=text_input_coordinates,
+                text_input_text=text_input_text,
+                elt=elt,
             )
 
         return True, current_text, erased_chars
@@ -162,7 +195,9 @@ class TextClearer:
             hint_text=hint_text,
         )
 
-    def _handle_element_not_found(self, resource_id: str, hint_text: str | None) -> ClearTextResult:
+    def _handle_element_not_found(
+        self, resource_id: str | None, hint_text: str | None
+    ) -> ClearTextResult:
         error = erase_text_controller(ctx=self.ctx)
         self._refresh_ui_hierarchy()
 
@@ -176,16 +211,23 @@ class TextClearer:
             hint_text=hint_text,
         )
 
-    def clear_text_by_resource_id(self, resource_id: str) -> ClearTextResult:
-        element, current_text, hint_text = self._get_element_info(resource_id)
+    def clear_input_text(
+        self,
+        text_input_resource_id: str | None,
+        text_input_coordinates: ElementBounds | None,
+        text_input_text: str | None,
+    ) -> ClearTextResult:
+        element, current_text, hint_text = self._get_element_info(text_input_resource_id)
 
         if not element:
-            return self._handle_element_not_found(resource_id, hint_text)
+            return self._handle_element_not_found(text_input_resource_id, hint_text)
 
         if not self._should_clear_text(current_text, hint_text):
             return self._handle_no_clearing_needed(current_text, hint_text)
 
-        if not self._prepare_element_for_clearing(resource_id):
+        if not self._prepare_element_for_clearing(
+            text_input_resource_id, text_input_coordinates, text_input_text
+        ):
             return self._create_result(
                 success=False,
                 error_message="Failed to focus element",
@@ -195,7 +237,9 @@ class TextClearer:
             )
 
         success, final_text, chars_erased = self._clear_with_retries(
-            resource_id=resource_id,
+            text_input_resource_id=text_input_resource_id,
+            text_input_coordinates=text_input_coordinates,
+            text_input_text=text_input_text,
             initial_text=current_text or "",
             hint_text=hint_text,
         )
@@ -218,12 +262,16 @@ def get_clear_text_tool(ctx: MobileUseContext):
         state: Annotated[State, InjectedState],
         agent_thought: str,
         text_input_resource_id: str,
+        text_input_coordinates: ElementBounds | None,
+        text_input_text: str | None,
     ):
         """
         Clears all the text from the text field, by focusing it if needed.
         """
         clearer = TextClearer(ctx, state)
-        result = clearer.clear_text_by_resource_id(text_input_resource_id)
+        result = clearer.clear_input_text(
+            text_input_resource_id, text_input_coordinates, text_input_text
+        )
 
         content = (
             clear_text_wrapper.on_failure_fn(result.error_message)
