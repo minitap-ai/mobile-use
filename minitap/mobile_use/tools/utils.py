@@ -37,20 +37,14 @@ def find_element_by_text(ui_hierarchy: list[dict], text: str) -> dict | None:
 
     def search_recursive(elements: list[dict]) -> dict | None:
         for element in elements:
-            if not isinstance(element, dict):
-                continue
-
-            source = element.get("attributes", element)
-            element_text = source.get("text", "")
-
-            if text and text.lower() in element_text.lower():
-                return element
-
-            children = element.get("children", [])
-            if children:
-                result = search_recursive(children)
-                if result:
-                    return result
+            if isinstance(element, dict):
+                src = element.get("attributes", element)
+                if text and text.lower() in src.get("text", "").lower():
+                    return element
+                if (children := element.get("children", [])) and (
+                    found := search_recursive(children)
+                ):
+                    return found
         return None
 
     return search_recursive(ui_hierarchy)
@@ -136,7 +130,7 @@ def focus_element_if_needed(
 
     if elt_from_id and input_text:
         text_from_id_elt = get_element_text(elt_from_id)
-        if not text_from_id_elt or input_text.lower() not in text_from_id_elt.lower():
+        if not text_from_id_elt or input_text.lower() != text_from_id_elt.lower():
             logger.warning(
                 f"ID '{input_resource_id}' and text '{input_text}'"
                 + "seem to be on different elements. "
