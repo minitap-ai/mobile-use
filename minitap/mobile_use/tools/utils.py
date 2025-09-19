@@ -179,7 +179,7 @@ def focus_element_if_needed(
         if text_elt:
             bounds = get_bounds_for_element(text_elt)
             if bounds:
-                relative_point = bounds.get_relative_point(x_percent=0.95, y_percent=0.95)
+                relative_point = bounds.get_center()
                 tap(
                     ctx=ctx,
                     selector_request=SelectorRequestWithCoordinates(
@@ -192,5 +192,8 @@ def focus_element_if_needed(
                 logger.debug(f"Tapped on text element '{input_text}' to focus.")
                 return True
 
-    logger.error("Failed to focus element. No valid locator (ID, coordinates, or text) succeeded.")
+    logger.error(
+        "Failed to focus element. No valid locator"
+        + "(resource_id, coordinates, or text) succeeded."
+    )
     return False
