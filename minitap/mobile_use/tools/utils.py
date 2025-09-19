@@ -39,7 +39,7 @@ def find_element_by_text(ui_hierarchy: list[dict], text: str) -> dict | None:
         for element in elements:
             if isinstance(element, dict):
                 src = element.get("attributes", element)
-                if text and text.lower() in src.get("text", "").lower():
+                if text and text.lower() == src.get("text", "").lower():
                     return element
                 if (children := element.get("children", [])) and (
                     found := search_recursive(children)
