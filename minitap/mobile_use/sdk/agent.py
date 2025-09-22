@@ -3,12 +3,12 @@ import sys
 import tempfile
 import time
 import uuid
+from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime
 from pathlib import Path
 from shutil import which
 from types import NoneType
 from typing import Any, TypeVar, overload
-from collections.abc import Callable, Coroutine
 
 from adbutils import AdbClient
 from dotenv import load_dotenv
@@ -36,10 +36,7 @@ from minitap.mobile_use.graph.graph import get_graph
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.sdk.builders.agent_config_builder import get_default_agent_config
 from minitap.mobile_use.sdk.builders.task_request_builder import TaskRequestBuilder
-from minitap.mobile_use.sdk.constants import (
-    DEFAULT_HW_BRIDGE_BASE_URL,
-    DEFAULT_SCREEN_API_BASE_URL,
-)
+from minitap.mobile_use.sdk.constants import DEFAULT_HW_BRIDGE_BASE_URL, DEFAULT_SCREEN_API_BASE_URL
 from minitap.mobile_use.sdk.services.platform import PlatformService
 from minitap.mobile_use.sdk.types.agent import AgentConfig
 from minitap.mobile_use.sdk.types.exceptions import (

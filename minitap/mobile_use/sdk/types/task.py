@@ -2,10 +2,10 @@
 Task-related type definitions for the Mobile-use SDK.
 """
 
+from collections.abc import Callable, Coroutine
 from datetime import datetime
 from pathlib import Path
 from typing import Any, TypeVar, overload
-from collections.abc import Callable, Coroutine
 
 from pydantic import BaseModel, Field
 

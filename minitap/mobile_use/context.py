@@ -4,15 +4,14 @@ Context variables for global state management.
 Uses ContextVar to avoid prop drilling and maintain clean function signatures.
 """
 
+from collections.abc import Callable, Coroutine
 from enum import Enum
 from pathlib import Path
+from typing import Literal
 
 from adbutils import AdbClient
 from openai import BaseModel
 from pydantic import ConfigDict
-from typing import Literal
-from collections.abc import Coroutine
-from collections.abc import Callable
 
 from minitap.mobile_use.agents.planner.types import Subgoal
 from minitap.mobile_use.clients.device_hardware_client import DeviceHardwareClient
