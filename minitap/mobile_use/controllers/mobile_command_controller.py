@@ -319,6 +319,7 @@ def run_flow_with_wait_for_animation_to_end(
 
 if __name__ == "__main__":
     ctx = MobileUseContext(
+        trace_id="trace_id",
         llm_config=initialize_llm_config(),
         device=DeviceContext(
             host_platform="WINDOWS",

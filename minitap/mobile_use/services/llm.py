@@ -55,6 +55,31 @@ async def invoke_llm_with_timeout_message[T](
         return await llm_task
 
 
+def get_minitap_llm(
+    trace_id: str,
+    remote_tracing: bool = False,
+    model: str = "google/gemini-2.5-pro",
+    temperature: float | None = None,
+    max_retries: int | None = None,
+) -> ChatOpenAI:
+    assert settings.MINITAP_API_KEY is not None
+    assert settings.MINITAP_API_BASE_URL is not None
+    if max_retries is None and model.startswith("google/"):
+        max_retries = 2
+    client = ChatOpenAI(
+        model=model,
+        temperature=temperature,
+        max_retries=max_retries,
+        api_key=settings.MINITAP_API_KEY,
+        base_url=settings.MINITAP_API_BASE_URL,
+        default_query={
+            "sessionId": trace_id,
+            "traceOnlyUsage": remote_tracing,
+        },
+    )
+    return client
+
+
 def get_google_llm(
     model_name: str = "gemini-2.5-pro",
     temperature: float = 0.7,
@@ -175,6 +200,16 @@ def get_llm(
         return get_openrouter_llm(llm.model, temperature)
     elif llm.provider == "xai":
         return get_grok_llm(llm.model, temperature)
+    elif llm.provider == "minitap":
+        remote_tracing = False
+        if ctx.execution_setup:
+            remote_tracing = ctx.execution_setup.enable_remote_tracing
+        return get_minitap_llm(
+            trace_id=ctx.trace_id,
+            remote_tracing=remote_tracing,
+            model=llm.model,
+            temperature=temperature,
+        )
     else:
         raise ValueError(f"Unsupported provider: {llm.provider}")
 

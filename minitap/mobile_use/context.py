@@ -45,12 +45,14 @@ class ExecutionSetup(BaseModel):
     """Execution setup for a task."""
 
     traces_path: Path
-    trace_id: str
+    trace_name: str
+    enable_remote_tracing: bool
 
 
 class MobileUseContext(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
+    trace_id: str
     device: DeviceContext
     hw_bridge_client: DeviceHardwareClient
     screen_api_client: ScreenApiClient

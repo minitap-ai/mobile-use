@@ -1,5 +1,4 @@
 import asyncio
-import os
 import sys
 import tempfile
 import time
@@ -8,7 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from shutil import which
 from types import NoneType
-from typing import TypeVar, overload
+from typing import Any, TypeVar, overload
+from collections.abc import Callable, Coroutine
 
 from adbutils import AdbClient
 from dotenv import load_dotenv
@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from minitap.mobile_use.agents.outputter.outputter import outputter
 from minitap.mobile_use.clients.device_hardware_client import DeviceHardwareClient
 from minitap.mobile_use.clients.screen_api_client import ScreenApiClient
-from minitap.mobile_use.config import OutputConfig, get_default_llm_config, record_events
+from minitap.mobile_use.config import OutputConfig, record_events, settings
 from minitap.mobile_use.context import (
     DeviceContext,
     DevicePlatform,
@@ -38,18 +38,20 @@ from minitap.mobile_use.sdk.constants import (
     DEFAULT_HW_BRIDGE_BASE_URL,
     DEFAULT_SCREEN_API_BASE_URL,
 )
+from minitap.mobile_use.sdk.services.platform import PlatformService
 from minitap.mobile_use.sdk.types.agent import AgentConfig
 from minitap.mobile_use.sdk.types.exceptions import (
-    AgentInvalidApiKeyError,
     AgentNotInitializedError,
     AgentProfileNotFoundError,
     AgentTaskRequestError,
     DeviceNotFoundError,
     ExecutableNotFoundError,
+    PlatformServiceUninitializedError,
     ServerStartupError,
 )
 from minitap.mobile_use.sdk.types.task import (
     AgentProfile,
+    PlatformTaskInfo,
     PlatformTaskRequest,
     Task,
     TaskRequest,
@@ -88,16 +90,8 @@ class Agent:
     _screen_api_client: ScreenApiClient
     _hw_bridge_client: DeviceHardwareClient
     _adb_client: AdbClient | None
-    _minitap_api_key: str | None
 
-    @overload
-    def __init__(self, *, config: AgentConfig) -> None: ...
-    @overload
-    def __init__(self, *, minitap_api_key: str) -> None: ...
-    @overload
-    def __init__(self) -> None: ...
-
-    def __init__(self, *, config: AgentConfig | None = None, minitap_api_key: str | None = None):
+    def __init__(self, *, config: AgentConfig | None = None):
         self._config = config or get_default_agent_config()
         self._tasks = []
         self._tmp_traces_dir = Path(tempfile.gettempdir()) / "mobile-use-traces"
@@ -108,7 +102,10 @@ class Agent:
         self._is_default_screen_api = (
             self._config.servers.screen_api_base_url == DEFAULT_SCREEN_API_BASE_URL
         )
-        self._minitap_api_key = minitap_api_key
+        if settings.MINITAP_API_KEY:
+            self._platform_service = PlatformService()
+        else:
+            self._platform_service = None
 
     def init(
         self,
@@ -217,6 +214,9 @@ class Agent:
     async def run_task(self, *, request: TaskRequest[TOutput]) -> TOutput | None: ...
 
     @overload
+    async def run_task(self, *, request: PlatformTaskRequest[None]) -> str | dict | None: ...
+
+    @overload
     async def run_task(self, *, request: PlatformTaskRequest[TOutput]) -> TOutput | None: ...
 
     async def run_task(
@@ -229,15 +229,14 @@ class Agent:
         request: TaskRequest[TOutput] | PlatformTaskRequest[TOutput] | None = None,
     ) -> str | dict | TOutput | None:
         if request is not None:
+            task_info = None
             if isinstance(request, PlatformTaskRequest):
-                if not self._minitap_api_key:
-                    raise AgentInvalidApiKeyError()
-                request = self._fetch_task_request_from_platform(
-                    api_key=self._minitap_api_key,
-                    task_id=request.task_id,
-                    profile_name=request.profile,
-                )
-            return await self._run_task(request)
+                if not self._platform_service:
+                    raise PlatformServiceUninitializedError()
+                task_info = await self._platform_service.create_task_run(request=request)
+                self._config.agent_profiles[task_info.llm_profile.name] = task_info.llm_profile
+                request = task_info.task_request
+            return await self._run_task(request=request, task_info=task_info)
         if goal is None:
             raise AgentTaskRequestError("Goal is required")
         task_request = self.new_task(goal=goal)
@@ -252,15 +251,15 @@ class Agent:
             task_request.with_name(name=name)
         return await self._run_task(task_request.build())
 
-    async def _run_task(self, request: TaskRequest[TOutput]) -> str | dict | TOutput | None:
+    async def _run_task(
+        self,
+        request: TaskRequest[TOutput],
+        task_info: PlatformTaskInfo | None = None,
+    ) -> str | dict | TOutput | None:
         if not self._initialized:
             raise AgentNotInitializedError()
 
-        if self._minitap_api_key and request.profile:
-            agent_profile = self._fetch_agent_profile_from_platform(
-                profile_name=request.profile, api_key=self._minitap_api_key
-            )
-        elif request.profile:
+        if request.profile:
             agent_profile = self._config.agent_profiles.get(request.profile)
             if agent_profile is None:
                 raise AgentProfileNotFoundError(request.profile)
@@ -268,17 +267,25 @@ class Agent:
             agent_profile = self._config.default_profile
         logger.info(str(agent_profile))
 
+        on_status_changed = None
+        task_id = str(uuid.uuid4())
+        if task_info:
+            on_status_changed = self._get_task_status_change_callback(task_info=task_info)
+            task_id = task_info.task_run.id
+
         task = Task(
-            id=str(uuid.uuid4()),
+            id=task_id,
             device=self._device_context,
             status=TaskStatus.PENDING,
             request=request,
             created_at=datetime.now(),
+            on_status_changed=on_status_changed,
         )
         self._tasks.append(task)
         task_name = task.get_name()
 
         context = MobileUseContext(
+            trace_id=task.id,
             device=self._device_context,
             hw_bridge_client=self._hw_bridge_client,
             screen_api_client=self._screen_api_client,
@@ -306,7 +313,7 @@ class Agent:
         output = None
         try:
             logger.info(f"[{task_name}] Invoking graph with input: {graph_input}")
-            task.status = TaskStatus.RUNNING
+            await task.set_status(status=TaskStatus.RUNNING, message="Invoking graph...")
             async for chunk in (await get_graph(context)).astream(
                 input=graph_input,
                 config={
@@ -338,7 +345,7 @@ class Agent:
             if not last_state:
                 err = f"[{task_name}] No result received from graph"
                 logger.warning(err)
-                task.finalize(content=output, state=last_state_snapshot, error=err)
+                await task.finalize(content=output, state=last_state_snapshot, error=err)
                 return None
 
             print_ai_response_to_stderr(graph_result=last_state)
@@ -350,63 +357,29 @@ class Agent:
                 state=last_state,
             )
             logger.info(f"✅ Automation '{task_name}' is success ✅")
-            task.finalize(content=output, state=last_state_snapshot)
+            await task.finalize(content=output, state=last_state_snapshot)
         except asyncio.CancelledError:
             err = f"[{task_name}] Task cancelled"
             logger.warning(err)
-            task.finalize(content=output, state=last_state_snapshot, error=err, cancelled=True)
+            await task.finalize(
+                content=output,
+                state=last_state_snapshot,
+                error=err,
+                cancelled=True,
+            )
             raise
         except Exception as e:
             err = f"[{task_name}] Error running automation: {e}"
             logger.error(err)
-            task.finalize(content=output, state=last_state_snapshot, error=err)
+            await task.finalize(
+                content=output,
+                state=last_state_snapshot,
+                error=err,
+            )
             raise
         finally:
             self._finalize_tracing(task=task, context=context)
         return output
-
-    def _fetch_agent_profile_from_platform(
-        self, api_key: str, profile_name: str | None
-    ) -> AgentProfile:
-        """
-        Fetch the agent profile from the Minitap platform (backend) using the API key
-        and optional profile name.
-
-        Args:
-            api_key: Minitap platform API key
-            profile_name: Optional unique profile name to select server-side profile
-
-        Returns:
-            AgentProfile fetched from backend (currently default as placeholder).
-        """
-        logger.info("Fetching agent profile from platform")
-        # TODO: integrate with real backend client to retrieve the agent profile
-        return AgentProfile(name="default", llm_config=get_default_llm_config())
-
-    def _fetch_task_request_from_platform(
-        self, api_key: str, task_id: str, profile_name: str | None
-    ) -> TaskRequest:
-        """
-        Fetch platform task configuration (goal/output, etc.) for a given task_id.
-        Placeholder implementation that should be replaced by a real backend call.
-
-        Returns a dict with at least keys: goal (str) and optionally output_description (str).
-        """
-        logger.info(f"Fetching task config from platform for task_id={task_id}")
-        # TODO: integrate with real backend client to retrieve the task details
-        return TaskRequest(
-            goal="...",
-            profile=profile_name,
-            # Optional :
-            output_description="...",
-            output_format=None,
-            max_steps=1,
-            record_trace=False,
-            trace_path=Path("mobile-use-traces"),
-            llm_output_path=None,
-            thoughts_output_path=None,
-            task_name="...",
-        )
 
     def clean(self, force: bool = False):
         if not self._initialized and not force:
@@ -433,7 +406,9 @@ class Agent:
         traces_output_path.mkdir(parents=True, exist_ok=True)
         temp_trace_path.mkdir(parents=True, exist_ok=True)
         context.execution_setup = ExecutionSetup(
-            traces_path=self._tmp_traces_dir, trace_id=task_name
+            traces_path=self._tmp_traces_dir,
+            trace_name=task_name,
+            enable_remote_tracing=task.request.enable_remote_tracing,
         )
 
     def _finalize_tracing(self, task: Task, context: MobileUseContext):
@@ -444,9 +419,9 @@ class Agent:
         task_name = task.get_name()
         status = "_PASS" if task.status == TaskStatus.COMPLETED else "_FAIL"
         ts = task.created_at.strftime("%Y-%m-%dT%H-%M-%S")
-        new_name = f"{exec_setup_ctx.trace_id}{status}_{ts}"
+        new_name = f"{exec_setup_ctx.trace_name}{status}_{ts}"
 
-        temp_trace_path = (self._tmp_traces_dir / exec_setup_ctx.trace_id).resolve()
+        temp_trace_path = (self._tmp_traces_dir / exec_setup_ctx.trace_name).resolve()
         traces_output_path = Path(task.request.trace_path).resolve()
 
         logger.info(f"[{task_name}] Compiling trace FROM FOLDER: " + str(temp_trace_path))
@@ -606,6 +581,26 @@ class Agent:
             device_width=screen_data.width,
             device_height=screen_data.height,
         )
+
+    def _get_task_status_change_callback(
+        self,
+        task_info: PlatformTaskInfo,
+    ) -> Callable[[TaskStatus, str | None, Any | None], Coroutine]:
+        async def change_status(
+            status: TaskStatus,
+            message: str | None = None,
+            output: Any | None = None,
+        ):
+            if not self._platform_service:
+                raise PlatformServiceUninitializedError()
+            await self._platform_service.update_task_run_status(
+                task_run_id=task_info.task_run.id,
+                status=status,
+                message=message,
+                output=output,
+            )
+
+        return change_status
 
 
 def _validate_and_prepare_file(file_path: Path):
