@@ -70,18 +70,17 @@ def stop_process_gracefully(process: psutil.Process, timeout: int = 5) -> bool:
         return False
 
 
-def check_service_health(port: int, service_name: str) -> bool:
+def check_service_running(port: int, service_name: str) -> bool:
     try:
         if port == server_settings.DEVICE_SCREEN_API_PORT:
-            response = requests.get(f"http://localhost:{port}/health", timeout=2)
+            requests.get(f"http://localhost:{port}/health", timeout=2)
         elif port == DEVICE_HARDWARE_BRIDGE_PORT:
-            response = requests.get(f"http://localhost:{port}/api/banner-message", timeout=2)
+            requests.get(f"http://localhost:{port}/api/banner-message", timeout=2)
         else:
             return False
 
-        if response.status_code == 200:
-            logger.debug(f"{service_name} is still responding on port {port}")
-            return True
+        logger.debug(f"{service_name} is still responding on port {port}")
+        return True
     except requests.exceptions.RequestException:
         pass
 
@@ -92,7 +91,7 @@ def stop_device_screen_api() -> bool:
     logger.info("Stopping Device Screen API...")
     api_port = server_settings.DEVICE_SCREEN_API_PORT
 
-    if not check_service_health(api_port, "Device Screen API"):
+    if not check_service_running(api_port, "Device Screen API"):
         logger.success("Device Screen API is not running")
         return True
 
@@ -109,7 +108,7 @@ def stop_device_screen_api() -> bool:
         logger.warning("No Device Screen API processes found, but service is still responding")
         # Still try to verify if service actually stops
         time.sleep(1)
-        if not check_service_health(api_port, "Device Screen API"):
+        if not check_service_running(api_port, "Device Screen API"):
             logger.success("Device Screen API stopped successfully (was orphaned)")
             return True
         return False
@@ -120,7 +119,7 @@ def stop_device_screen_api() -> bool:
 
     # Verify service is stopped
     time.sleep(1)
-    if check_service_health(api_port, "Device Screen API"):
+    if check_service_running(api_port, "Device Screen API"):
         logger.error("Device Screen API is still running after stop attempt")
         return False
 
@@ -131,7 +130,7 @@ def stop_device_screen_api() -> bool:
 def stop_device_hardware_bridge() -> bool:
     logger.info("Stopping Device Hardware Bridge...")
 
-    if not check_service_health(DEVICE_HARDWARE_BRIDGE_PORT, "Maestro Studio"):
+    if not check_service_running(DEVICE_HARDWARE_BRIDGE_PORT, "Maestro Studio"):
         logger.success("Device Hardware Bridge is not running")
         return True
 
@@ -145,7 +144,7 @@ def stop_device_hardware_bridge() -> bool:
         logger.warning("No Device Hardware Bridge processes found, but service is still responding")
         # Still try to verify if service actually stops
         time.sleep(1)
-        if not check_service_health(DEVICE_HARDWARE_BRIDGE_PORT, "Maestro Studio"):
+        if not check_service_running(DEVICE_HARDWARE_BRIDGE_PORT, "Maestro Studio"):
             logger.success("Device Hardware Bridge stopped successfully (was orphaned)")
             return True
         return False
@@ -154,7 +153,7 @@ def stop_device_hardware_bridge() -> bool:
         stop_process_gracefully(proc)
 
     time.sleep(1)
-    if check_service_health(DEVICE_HARDWARE_BRIDGE_PORT, "Maestro Studio"):
+    if check_service_running(DEVICE_HARDWARE_BRIDGE_PORT, "Maestro Studio"):
         logger.error("Device Hardware Bridge is still running after stop attempt")
         return False
 
