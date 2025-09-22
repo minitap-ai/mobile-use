@@ -24,7 +24,6 @@ from minitap.mobile_use.sdk.types.task import (
     TaskRequest,
     TaskRequestCommon,
     TaskResult,
-    TaskStatus,
 )
 
 __all__ = [
@@ -35,7 +34,6 @@ __all__ = [
     "ServerConfig",
     "TaskRequest",
     "PlatformTaskRequest",
-    "TaskStatus",
     "TaskResult",
     "TaskRequestCommon",
     "Task",
