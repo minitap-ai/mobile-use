@@ -1,7 +1,7 @@
 import json
 from typing import Any
 import httpx
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from minitap.mobile_use.sdk.types.platform import (
     CreateTaskRunRequest,
     LLMProfileResponse,
@@ -132,6 +132,8 @@ class PlatformService:
             response.raise_for_status()
             task_run_data = response.json()
             return TaskRunResponse(**task_run_data)
+        except ValidationError as e:
+            raise PlatformServiceError(message=f"API response validation error: {e}")
         except httpx.HTTPStatusError as e:
             raise PlatformServiceError(message=f"Failed to create task run: {e}")
 
@@ -147,5 +149,7 @@ class PlatformService:
                 llm_config=LLMConfig(**profile.llms),
             )
             return profile, agent_profile
+        except ValidationError as e:
+            raise PlatformServiceError(message=f"API response validation error: {e}")
         except httpx.HTTPStatusError as e:
             raise PlatformServiceError(message=f"Failed to get agent profile: {e}")
