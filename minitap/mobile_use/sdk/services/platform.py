@@ -7,6 +7,7 @@ from minitap.mobile_use.sdk.types.platform import (
     LLMProfileResponse,
     TaskResponse,
     TaskRunResponse,
+    TaskRunStatus,
     UpdateTaskRunStatusRequest,
 )
 from minitap.mobile_use.utils.logger import get_logger
@@ -18,7 +19,6 @@ from minitap.mobile_use.sdk.types.task import (
     PlatformTaskInfo,
     PlatformTaskRequest,
     TaskRequest,
-    TaskStatus,
 )
 
 logger = get_logger(__name__)
@@ -85,25 +85,12 @@ class PlatformService:
     async def update_task_run_status(
         self,
         task_run_id: str,
-        status: TaskStatus,
+        status: TaskRunStatus,
         message: str | None = None,
         output: Any | None = None,
     ) -> None:
         try:
             logger.info(f"Updating task run status for task run: {task_run_id}")
-            match status:
-                case TaskStatus.PENDING:
-                    platform_status = "pending"
-                case TaskStatus.RUNNING:
-                    platform_status = "running"
-                case TaskStatus.COMPLETED:
-                    platform_status = "completed"
-                case TaskStatus.FAILED:
-                    platform_status = "failed"
-                case TaskStatus.CANCELLED:
-                    platform_status = "cancelled"
-                case _:
-                    raise PlatformServiceError(message=f"Invalid task status: {status}")
 
             sanitized_output: str | None = None
             if isinstance(output, dict):
@@ -118,7 +105,7 @@ class PlatformService:
                 sanitized_output = str(output)
 
             update = UpdateTaskRunStatusRequest(
-                status=platform_status,
+                status=status,
                 message=message,
                 output=sanitized_output,
             )

@@ -49,13 +49,13 @@ from minitap.mobile_use.sdk.types.exceptions import (
     PlatformServiceUninitializedError,
     ServerStartupError,
 )
+from minitap.mobile_use.sdk.types.platform import TaskRunStatus
 from minitap.mobile_use.sdk.types.task import (
     AgentProfile,
     PlatformTaskInfo,
     PlatformTaskRequest,
     Task,
     TaskRequest,
-    TaskStatus,
 )
 from minitap.mobile_use.servers.device_hardware_bridge import BridgeStatus
 from minitap.mobile_use.servers.start_servers import (
@@ -276,7 +276,7 @@ class Agent:
         task = Task(
             id=task_id,
             device=self._device_context,
-            status=TaskStatus.PENDING,
+            status="pending",
             request=request,
             created_at=datetime.now(),
             on_status_changed=on_status_changed,
@@ -313,7 +313,7 @@ class Agent:
         output = None
         try:
             logger.info(f"[{task_name}] Invoking graph with input: {graph_input}")
-            await task.set_status(status=TaskStatus.RUNNING, message="Invoking graph...")
+            await task.set_status(status="running", message="Invoking graph...")
             async for chunk in (await get_graph(context)).astream(
                 input=graph_input,
                 config={
@@ -417,7 +417,7 @@ class Agent:
             return
 
         task_name = task.get_name()
-        status = "_PASS" if task.status == TaskStatus.COMPLETED else "_FAIL"
+        status = "_PASS" if task.status == "completed" else "_FAIL"
         ts = task.created_at.strftime("%Y-%m-%dT%H-%M-%S")
         new_name = f"{exec_setup_ctx.trace_name}{status}_{ts}"
 
@@ -585,9 +585,9 @@ class Agent:
     def _get_task_status_change_callback(
         self,
         task_info: PlatformTaskInfo,
-    ) -> Callable[[TaskStatus, str | None, Any | None], Coroutine]:
+    ) -> Callable[[TaskRunStatus, str | None, Any | None], Coroutine]:
         async def change_status(
-            status: TaskStatus,
+            status: TaskRunStatus,
             message: str | None = None,
             output: Any | None = None,
         ):

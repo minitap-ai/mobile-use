@@ -3,7 +3,6 @@ Task-related type definitions for the Mobile-use SDK.
 """
 
 from datetime import datetime
-from enum import Enum
 from pathlib import Path
 from typing import Any, TypeVar, overload
 from collections.abc import Callable, Coroutine
@@ -13,7 +12,7 @@ from pydantic import BaseModel, Field
 from minitap.mobile_use.config import LLMConfig, get_default_llm_config
 from minitap.mobile_use.constants import RECURSION_LIMIT
 from minitap.mobile_use.context import DeviceContext
-from minitap.mobile_use.sdk.types.platform import TaskRunResponse
+from minitap.mobile_use.sdk.types.platform import TaskRunResponse, TaskRunStatus
 from minitap.mobile_use.sdk.utils import load_llm_config_override
 
 
@@ -54,16 +53,6 @@ class AgentProfile(BaseModel):
 
     def __str__(self):
         return f"Profile {self.name}:\n{self.llm_config}"
-
-
-class TaskStatus(str, Enum):
-    """Task execution status enumeration."""
-
-    PENDING = "PENDING"
-    RUNNING = "RUNNING"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
-    CANCELLED = "CANCELLED"
 
 
 T = TypeVar("T", bound=BaseModel)
@@ -180,9 +169,9 @@ class Task(BaseModel):
 
     id: str
     device: DeviceContext
-    status: TaskStatus
+    status: TaskRunStatus
     status_message: str | None = None
-    on_status_changed: Callable[[TaskStatus, str | None, Any | None], Coroutine] | None = None
+    on_status_changed: Callable[[TaskRunStatus, str | None, Any | None], Coroutine] | None = None
     request: TaskRequest
     created_at: datetime
     ended_at: datetime | None = None
@@ -195,13 +184,13 @@ class Task(BaseModel):
         error: str | None = None,
         cancelled: bool = False,
     ):
-        new_status = TaskStatus.COMPLETED if error is None else TaskStatus.FAILED
-        if new_status == TaskStatus.FAILED and cancelled:
-            new_status = TaskStatus.CANCELLED
+        new_status: TaskRunStatus = "completed" if error is None else "failed"
+        if new_status == "failed" and cancelled:
+            new_status = "cancelled"
         message = "Task completed successfully"
-        if new_status == TaskStatus.FAILED:
+        if new_status == "failed":
             message = "Task failed" + (f": {error}" if error else "")
-        elif new_status == TaskStatus.CANCELLED:
+        elif new_status == "cancelled":
             message = "Task cancelled" + (f": {error}" if error else "")
         await self.set_status(status=new_status, message=message, output=content or error)
         self.ended_at = datetime.now()
@@ -227,7 +216,7 @@ class Task(BaseModel):
 
     async def set_status(
         self,
-        status: TaskStatus,
+        status: TaskRunStatus,
         message: str | None = None,
         output: Any | None = None,
     ):
