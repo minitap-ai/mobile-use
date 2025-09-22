@@ -28,14 +28,13 @@ async def main() -> None:
 
     Visit https://platform.minitap.ai to create a task, customize your profiles,
     and get your API key.
+    Set MINITAP_API_KEY and MINITAP_API_BASE_URL environment variables.
     """
-    agent = Agent(
-        minitap_api_key="your-api-key"
-    )  # Optional, can be set with MINITAP_API_KEY environment variable
+    agent = Agent()
     agent.init()
     result = await agent.run_task(
         request=PlatformTaskRequest(
-            task_id="your-task-id",
+            task="your-task-name",
             profile="your-profile-name",
         )
     )
