@@ -31,6 +31,7 @@ async def generate_graph_docs():
 
     print("Loading graph structure...")
     ctx = MobileUseContext(
+        trace_id="trace_id",
         device=DeviceContext(
             host_platform="LINUX",
             mobile_platform=DevicePlatform.ANDROID,
