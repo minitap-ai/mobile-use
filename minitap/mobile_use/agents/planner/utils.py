@@ -58,6 +58,7 @@ def start_next_subgoal(subgoals: list[Subgoal]) -> list[Subgoal]:
     next_subgoal.status = SubgoalStatus.PENDING
     return subgoals
 
+
 def generate_id(length: int = 6) -> str:
     """Generates a small and distinct random string ID."""
     chars = string.ascii_lowercase + string.digits
