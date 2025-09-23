@@ -29,7 +29,7 @@ class ExecutorNode:
         structured_decisions = state.structured_decisions
         if not structured_decisions:
             logger.warning("No structured decisions found.")
-            return state.sanitize_update(
+            return await state.asanitize_update(
                 ctx=self.ctx,
                 update={
                     "agents_thoughts": [

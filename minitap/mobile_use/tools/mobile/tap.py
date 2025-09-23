@@ -25,7 +25,7 @@ logger = get_logger(__name__)
 
 def get_tap_tool(ctx: MobileUseContext):
     @tool
-    def tap(
+    async def tap(
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
         agent_thought: str,
@@ -123,7 +123,7 @@ def get_tap_tool(ctx: MobileUseContext):
             status="error" if has_failed else "success",
         )
         return Command(
-            update=state.sanitize_update(
+            update=await state.asanitize_update(
                 ctx=ctx,
                 update={
                     "agents_thoughts": [agent_thought, agent_outcome],

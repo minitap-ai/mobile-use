@@ -18,11 +18,11 @@ from minitap.mobile_use.utils.media import compress_base64_jpeg
 
 def get_glimpse_screen_tool(ctx: MobileUseContext):
     @tool
-    def glimpse_screen(
+    async def glimpse_screen(
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
         agent_thought: str,
-    ):
+    ) -> Command:
         """
         Captures the current screen as an image.
         The resulting screenshot is added to the context for the next reasoning step.
@@ -56,7 +56,7 @@ def get_glimpse_screen_tool(ctx: MobileUseContext):
         if compressed_image_base64:
             updates["latest_screenshot_base64"] = compressed_image_base64
         return Command(
-            update=state.sanitize_update(
+            update=await state.asanitize_update(
                 ctx=ctx,
                 update=updates,
                 agent="executor",

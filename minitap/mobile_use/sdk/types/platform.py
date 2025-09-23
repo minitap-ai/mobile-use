@@ -1,10 +1,19 @@
-from typing import Any, Literal
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Annotated, Any, Literal
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer
 from pydantic.v1.utils import to_lower_camel
 from datetime import datetime
 
 
 TaskRunStatus = Literal["pending", "running", "completed", "failed", "cancelled"]
+
+IsoDatetime = Annotated[
+    datetime,
+    PlainSerializer(
+        func=lambda v: v.isoformat() if v else None,
+        return_type=str,
+        when_used="unless-none",
+    ),
+]
 
 
 class BaseApiModel(BaseModel):
@@ -76,3 +85,41 @@ class TaskRunResponse(BaseApiModel):
     created_at: datetime = Field(..., description="When the task run was created")
     started_at: datetime | None = Field(None, description="When the task run started")
     finished_at: datetime | None = Field(None, description="When the task run finished")
+
+
+SubgoalState = Literal["pending", "started", "completed", "failed"]
+
+
+class MobileUseSubgoal(BaseModel):
+    """Upsert MobileUseSubgoal API model."""
+
+    name: str = Field(..., description="Name of the subgoal")
+    state: SubgoalState = Field(default="pending", description="Current state of the subgoal")
+    started_at: IsoDatetime | None = Field(default=None, description="When the subgoal started")
+    ended_at: IsoDatetime | None = Field(default=None, description="When the subgoal ended")
+
+
+class UpsertTaskRunPlanRequest(BaseApiModel):
+    """Upsert MobileUseSubgoal API model."""
+
+    started_at: IsoDatetime = Field(..., description="When the plan started")
+    subgoals: list[MobileUseSubgoal] = Field(..., description="Subgoals of the plan")
+    ended_at: IsoDatetime | None = Field(
+        default=None,
+        description="When the plan ended (replanned or completed)",
+    )
+
+
+class TaskRunPlanResponse(UpsertTaskRunPlanRequest):
+    """Response model for a task run plan."""
+
+    id: str = Field(..., description="Unique identifier for the task run plan")
+    task_run_id: str = Field(..., description="ID of the task run this plan is for")
+
+
+class UpsertTaskRunAgentThoughtRequest(BaseApiModel):
+    """Upsert MobileUseAgentThought request model."""
+
+    agent: str = Field(..., description="Agent that produced the thought")
+    content: str = Field(..., description="Content of the thought")
+    timestamp: IsoDatetime = Field(..., description="Timestamp of the thought (UTC)")

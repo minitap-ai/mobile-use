@@ -15,12 +15,12 @@ from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 
 def get_stop_app_tool(ctx: MobileUseContext):
     @tool
-    def stop_app(
+    async def stop_app(
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
         agent_thought: str,
         package_name: str | None = None,
-    ):
+    ) -> Command:
         """
         Stops current application if it is running.
         You can also specify the package name of the app to be stopped.
@@ -40,7 +40,7 @@ def get_stop_app_tool(ctx: MobileUseContext):
             status="error" if has_failed else "success",
         )
         return Command(
-            update=state.sanitize_update(
+            update=await state.asanitize_update(
                 ctx=ctx,
                 update={
                     "agents_thoughts": [agent_thought, agent_outcome],

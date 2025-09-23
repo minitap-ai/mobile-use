@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import Enum
 from typing import Annotated
 
@@ -26,6 +27,8 @@ class Subgoal(BaseModel):
         str | None, "Reason why the subgoal was completed (failure or success)"
     ] = None
     status: SubgoalStatus
+    started_at: Annotated[datetime | None, "When the subgoal started"] = None
+    ended_at: Annotated[datetime | None, "When the subgoal ended"] = None
 
     def __str__(self):
         status_emoji = "❓"

@@ -45,14 +45,18 @@ class OrchestratorNode:
                     else f"Starting the next subgoal: {new_subgoal}"
                 )
             ]
-            return _get_state_update(ctx=self.ctx, state=state, thoughts=thoughts, update_plan=True)
+            return await _get_state_update(
+                ctx=self.ctx, state=state, thoughts=thoughts, update_plan=True
+            )
 
         subgoals_to_examine = get_subgoals_by_ids(
             subgoals=state.subgoal_plan,
             ids=state.complete_subgoals_by_ids,
         )
         if len(subgoals_to_examine) <= 0:
-            return _get_state_update(ctx=self.ctx, state=state, thoughts=["No subgoal to examine."])
+            return await _get_state_update(
+                ctx=self.ctx, state=state, thoughts=["No subgoal to examine."]
+            )
 
         system_message = Template(
             Path(__file__).parent.joinpath("orchestrator.md").read_text(encoding="utf-8")
@@ -79,7 +83,9 @@ class OrchestratorNode:
             thoughts = [response.reason]
             state.subgoal_plan = fail_current_subgoal(state.subgoal_plan)
             thoughts.append("==== END OF PLAN, REPLANNING ====")
-            return _get_state_update(ctx=self.ctx, state=state, thoughts=thoughts, update_plan=True)
+            return await _get_state_update(
+                ctx=self.ctx, state=state, thoughts=thoughts, update_plan=True
+            )
 
         state.subgoal_plan = complete_subgoals_by_ids(
             subgoals=state.subgoal_plan,
@@ -88,19 +94,25 @@ class OrchestratorNode:
         thoughts = [response.reason]
         if all_completed(state.subgoal_plan):
             logger.success("All the subgoals have been completed successfully.")
-            return _get_state_update(ctx=self.ctx, state=state, thoughts=thoughts, update_plan=True)
+            return await _get_state_update(
+                ctx=self.ctx, state=state, thoughts=thoughts, update_plan=True
+            )
 
         if current_subgoal.id not in response.completed_subgoal_ids:
             # The current subgoal is not yet complete.
-            return _get_state_update(ctx=self.ctx, state=state, thoughts=thoughts, update_plan=True)
+            return await _get_state_update(
+                ctx=self.ctx, state=state, thoughts=thoughts, update_plan=True
+            )
 
         state.subgoal_plan = start_next_subgoal(state.subgoal_plan)
         new_subgoal = get_current_subgoal(state.subgoal_plan)
         thoughts.append(f"==== NEXT SUBGOAL: {new_subgoal} ====")
-        return _get_state_update(ctx=self.ctx, state=state, thoughts=thoughts, update_plan=True)
+        return await _get_state_update(
+            ctx=self.ctx, state=state, thoughts=thoughts, update_plan=True
+        )
 
 
-def _get_state_update(
+async def _get_state_update(
     ctx: MobileUseContext,
     state: State,
     thoughts: list[str],
@@ -112,4 +124,6 @@ def _get_state_update(
     }
     if update_plan:
         update["subgoal_plan"] = state.subgoal_plan
-    return state.sanitize_update(ctx=ctx, update=update, agent="orchestrator")
+        if ctx.on_plan_changes:
+            await ctx.on_plan_changes(state.subgoal_plan, False)
+    return await state.asanitize_update(ctx=ctx, update=update, agent="orchestrator")

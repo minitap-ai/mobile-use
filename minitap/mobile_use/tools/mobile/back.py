@@ -13,11 +13,11 @@ from langgraph.prebuilt import InjectedState
 
 def get_back_tool(ctx: MobileUseContext):
     @tool
-    def back(
+    async def back(
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
         agent_thought: str,
-    ):
+    ) -> Command:
         """Navigates to the previous screen. (Only works on Android for the moment)"""
         output = back_controller(ctx=ctx)
         has_failed = output is not None
@@ -28,7 +28,7 @@ def get_back_tool(ctx: MobileUseContext):
             status="error" if has_failed else "success",
         )
         return Command(
-            update=state.sanitize_update(
+            update=await state.asanitize_update(
                 ctx=ctx,
                 update={
                     "agents_thoughts": [agent_thought],

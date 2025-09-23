@@ -11,9 +11,7 @@ from pydantic import BaseModel
 
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
-from minitap.mobile_use.controllers.mobile_command_controller import (
-    get_screen_data,
-)
+from minitap.mobile_use.controllers.mobile_command_controller import get_screen_data
 from minitap.mobile_use.controllers.mobile_command_controller import (
     input_text as input_text_controller,
 )
@@ -22,10 +20,7 @@ from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 from minitap.mobile_use.tools.types import Target
 from minitap.mobile_use.tools.utils import focus_element_if_needed, move_cursor_to_end_if_bounds
 from minitap.mobile_use.utils.logger import get_logger
-from minitap.mobile_use.utils.ui_hierarchy import (
-    find_element_by_resource_id,
-    get_element_text,
-)
+from minitap.mobile_use.utils.ui_hierarchy import find_element_by_resource_id, get_element_text
 
 logger = get_logger(__name__)
 
@@ -49,7 +44,7 @@ def _controller_input_text(ctx: MobileUseContext, text: str) -> InputResult:
 
 def get_input_text_tool(ctx: MobileUseContext):
     @tool
-    def input_text(
+    async def input_text(
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
         agent_thought: str,
@@ -80,7 +75,7 @@ def get_input_text_tool(ctx: MobileUseContext):
                 status="error",
             )
             return Command(
-                update=state.sanitize_update(
+                update=await state.asanitize_update(
                     ctx=ctx,
                     update={
                         "agents_thoughts": [agent_thought, error_message],
@@ -121,7 +116,7 @@ def get_input_text_tool(ctx: MobileUseContext):
         )
 
         return Command(
-            update=state.sanitize_update(
+            update=await state.asanitize_update(
                 ctx=ctx,
                 update={
                     "agents_thoughts": [agent_thought, agent_outcome],

@@ -12,16 +12,11 @@ from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.mobile_command_controller import (
     erase_text as erase_text_controller,
 )
-from minitap.mobile_use.controllers.mobile_command_controller import (
-    get_screen_data,
-)
+from minitap.mobile_use.controllers.mobile_command_controller import get_screen_data
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 from minitap.mobile_use.tools.types import Target
-from minitap.mobile_use.tools.utils import (
-    focus_element_if_needed,
-    move_cursor_to_end_if_bounds,
-)
+from minitap.mobile_use.tools.utils import focus_element_if_needed, move_cursor_to_end_if_bounds
 from minitap.mobile_use.utils.logger import get_logger
 from minitap.mobile_use.utils.ui_hierarchy import (
     find_element_by_resource_id,
@@ -245,7 +240,7 @@ class TextClearer:
 
 def get_clear_text_tool(ctx: MobileUseContext):
     @tool
-    def clear_text(
+    async def clear_text(
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
         agent_thought: str,
@@ -275,7 +270,7 @@ def get_clear_text_tool(ctx: MobileUseContext):
         )
 
         return Command(
-            update=state.sanitize_update(
+            update=await state.asanitize_update(
                 ctx=ctx,
                 update={
                     "agents_thoughts": [agent_thought, agent_outcome],

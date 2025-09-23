@@ -21,7 +21,7 @@ class ContextorNode:
         on_success=lambda _: logger.success("Contextor Agent"),
         on_failure=lambda _: logger.error("Contextor Agent"),
     )
-    def __call__(self, state: State):
+    async def __call__(self, state: State):
         device_data = get_screen_data(self.ctx.screen_api_client)
         focused_app_info = get_focused_app_info(self.ctx)
         device_date = get_device_date(self.ctx)
@@ -30,7 +30,7 @@ class ContextorNode:
             list(state.executor_messages)
         )
 
-        return state.sanitize_update(
+        return await state.asanitize_update(
             ctx=self.ctx,
             update={
                 "latest_screenshot_base64": device_data.base64

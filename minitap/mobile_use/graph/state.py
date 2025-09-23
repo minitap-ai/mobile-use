@@ -54,7 +54,7 @@ class State(AgentStatePydantic):
         take_last,
     ]
 
-    def sanitize_update(
+    async def asanitize_update(
         self,
         ctx: MobileUseContext,
         update: dict,
@@ -72,7 +72,7 @@ class State(AgentStatePydantic):
                 raise ValueError("agents_thoughts must be a str or list[str]")
             if agent is None:
                 raise ValueError("Agent is required when updating the 'agents_thoughts' key")
-            update["agents_thoughts"] = _add_agent_thoughts(
+            update["agents_thoughts"] = await _add_agent_thoughts(
                 ctx=ctx,
                 old=self.agents_thoughts,
                 new=updated_agents_thoughts,
@@ -81,12 +81,16 @@ class State(AgentStatePydantic):
         return update
 
 
-def _add_agent_thoughts(
+async def _add_agent_thoughts(
     ctx: MobileUseContext,
     old: list[str],
     new: list[str],
     agent: AgentNode,
 ) -> list[str]:
+    if ctx.on_agent_thought:
+        for thought in new:
+            await ctx.on_agent_thought(agent, thought)
+
     named_thoughts = [f"[{agent}] {thought}" for thought in new]
     if ctx.execution_setup:
         record_interaction(ctx, response=AIMessage(content=str(named_thoughts)))
