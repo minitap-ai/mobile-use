@@ -2,6 +2,7 @@ from enum import Enum
 
 from pydantic import BaseModel
 from typing import Annotated
+from datetime import datetime
 
 
 class PlannerSubgoalOutput(BaseModel):
@@ -27,6 +28,8 @@ class Subgoal(BaseModel):
         str | None, "Reason why the subgoal was completed (failure or success)"
     ] = None
     status: SubgoalStatus
+    started_at: Annotated[datetime | None, "When the subgoal started"] = None
+    ended_at: Annotated[datetime | None, "When the subgoal ended"] = None
 
     def __str__(self):
         status_emoji = "❓"

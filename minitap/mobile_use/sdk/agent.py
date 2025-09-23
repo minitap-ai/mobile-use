@@ -3,7 +3,7 @@ import sys
 import tempfile
 import time
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from shutil import which
 from types import NoneType
@@ -16,13 +16,15 @@ from langchain_core.messages import AIMessage
 from pydantic import BaseModel
 
 from minitap.mobile_use.agents.outputter.outputter import outputter
+from minitap.mobile_use.agents.planner.types import Subgoal
 from minitap.mobile_use.clients.device_hardware_client import DeviceHardwareClient
 from minitap.mobile_use.clients.screen_api_client import ScreenApiClient
-from minitap.mobile_use.config import OutputConfig, record_events, settings
+from minitap.mobile_use.config import AgentNode, OutputConfig, record_events, settings
 from minitap.mobile_use.context import (
     DeviceContext,
     DevicePlatform,
     ExecutionSetup,
+    IsReplan,
     MobileUseContext,
 )
 from minitap.mobile_use.controllers.mobile_command_controller import (
@@ -49,7 +51,7 @@ from minitap.mobile_use.sdk.types.exceptions import (
     PlatformServiceUninitializedError,
     ServerStartupError,
 )
-from minitap.mobile_use.sdk.types.platform import TaskRunStatus
+from minitap.mobile_use.sdk.types.platform import TaskRunPlanResponse, TaskRunStatus
 from minitap.mobile_use.sdk.types.task import (
     AgentProfile,
     PlatformTaskInfo,
@@ -268,9 +270,13 @@ class Agent:
         logger.info(str(agent_profile))
 
         on_status_changed = None
+        on_agent_thought = None
+        on_plan_changes = None
         task_id = str(uuid.uuid4())
         if task_info:
             on_status_changed = self._get_task_status_change_callback(task_info=task_info)
+            on_agent_thought = self._get_new_agent_thought_callback(task_info=task_info)
+            on_plan_changes = self._get_plan_changes_callback(task_info=task_info)
             task_id = task_info.task_run.id
 
         task = Task(
@@ -291,6 +297,8 @@ class Agent:
             screen_api_client=self._screen_api_client,
             adb_client=self._adb_client,
             llm_config=agent_profile.llm_config,
+            on_agent_thought=on_agent_thought,
+            on_plan_changes=on_plan_changes,
         )
 
         self._prepare_tracing(task=task, context=context)
@@ -593,14 +601,70 @@ class Agent:
         ):
             if not self._platform_service:
                 raise PlatformServiceUninitializedError()
-            await self._platform_service.update_task_run_status(
-                task_run_id=task_info.task_run.id,
-                status=status,
-                message=message,
-                output=output,
-            )
+            try:
+                await self._platform_service.update_task_run_status(
+                    task_run_id=task_info.task_run.id,
+                    status=status,
+                    message=message,
+                    output=output,
+                )
+            except Exception as e:
+                logger.error(f"Failed to update task run status: {e}")
 
         return change_status
+
+    def _get_plan_changes_callback(
+        self,
+        task_info: PlatformTaskInfo,
+    ) -> Callable[[list[Subgoal], IsReplan], Coroutine]:
+        current_plan: TaskRunPlanResponse | None = None
+
+        async def update_plan(plan: list[Subgoal], is_replan: IsReplan):
+            nonlocal current_plan
+
+            if not self._platform_service:
+                raise PlatformServiceUninitializedError()
+            try:
+                if is_replan and current_plan:
+                    # End previous plan
+                    await self._platform_service.upsert_task_run_plan(
+                        task_run_id=task_info.task_run.id,
+                        started_at=current_plan.started_at,
+                        plan=plan,
+                        ended_at=datetime.now(UTC),
+                        plan_id=current_plan.id,
+                    )
+                    current_plan = None
+
+                current_plan = await self._platform_service.upsert_task_run_plan(
+                    task_run_id=task_info.task_run.id,
+                    started_at=current_plan.started_at if current_plan else datetime.now(UTC),
+                    plan=plan,
+                    ended_at=current_plan.ended_at if current_plan else None,
+                    plan_id=current_plan.id if current_plan else None,
+                )
+            except Exception as e:
+                logger.error(f"Failed to update plan: {e}")
+
+        return update_plan
+
+    def _get_new_agent_thought_callback(
+        self,
+        task_info: PlatformTaskInfo,
+    ) -> Callable[[AgentNode, str], Coroutine]:
+        async def add_agent_thought(agent: AgentNode, thought: str):
+            if not self._platform_service:
+                raise PlatformServiceUninitializedError()
+            try:
+                await self._platform_service.add_agent_thought(
+                    task_run_id=task_info.task_run.id,
+                    agent=agent,
+                    thought=thought,
+                )
+            except Exception as e:
+                logger.error(f"Failed to add agent thought: {e}")
+
+        return add_agent_thought
 
 
 def _validate_and_prepare_file(file_path: Path):

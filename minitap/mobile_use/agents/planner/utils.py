@@ -1,4 +1,5 @@
 from minitap.mobile_use.agents.planner.types import Subgoal, SubgoalStatus
+from datetime import datetime, UTC
 
 
 def get_current_subgoal(subgoals: list[Subgoal]) -> Subgoal | None:
@@ -22,6 +23,7 @@ def complete_current_subgoal(subgoals: list[Subgoal]) -> list[Subgoal]:
     if not current_subgoal:
         return subgoals
     current_subgoal.status = SubgoalStatus.SUCCESS
+    current_subgoal.ended_at = datetime.now(UTC)
     return subgoals
 
 
@@ -29,6 +31,7 @@ def complete_subgoals_by_ids(subgoals: list[Subgoal], ids: list[str]) -> list[Su
     for subgoal in subgoals:
         if subgoal.id in ids:
             subgoal.status = SubgoalStatus.SUCCESS
+            subgoal.ended_at = datetime.now(UTC)
     return subgoals
 
 
@@ -37,6 +40,7 @@ def fail_current_subgoal(subgoals: list[Subgoal]) -> list[Subgoal]:
     if not current_subgoal:
         return subgoals
     current_subgoal.status = SubgoalStatus.FAILURE
+    current_subgoal.ended_at = datetime.now(UTC)
     return subgoals
 
 
@@ -53,4 +57,5 @@ def start_next_subgoal(subgoals: list[Subgoal]) -> list[Subgoal]:
     if not next_subgoal:
         return subgoals
     next_subgoal.status = SubgoalStatus.PENDING
+    next_subgoal.started_at = datetime.now(UTC)
     return subgoals

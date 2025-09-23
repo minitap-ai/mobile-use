@@ -16,12 +16,12 @@ from typing import Annotated
 
 def get_wait_for_animation_to_end_tool(ctx: MobileUseContext):
     @tool
-    def wait_for_animation_to_end(
+    async def wait_for_animation_to_end(
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
         agent_thought: str,
         timeout: WaitTimeout | None,
-    ):
+    ) -> Command:
         """
         Waits for ongoing animations or videos to finish before continuing.
 
@@ -44,7 +44,7 @@ def get_wait_for_animation_to_end_tool(ctx: MobileUseContext):
             status="error" if has_failed else "success",
         )
         return Command(
-            update=state.sanitize_update(
+            update=await state.asanitize_update(
                 ctx=ctx,
                 update={
                     "agents_thoughts": [agent_thought],

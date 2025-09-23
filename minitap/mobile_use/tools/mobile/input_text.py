@@ -49,7 +49,7 @@ def _controller_input_text(ctx: MobileUseContext, text: str) -> InputResult:
 
 def get_input_text_tool(ctx: MobileUseContext):
     @tool
-    def input_text(
+    async def input_text(
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
         agent_thought: str,
@@ -57,7 +57,7 @@ def get_input_text_tool(ctx: MobileUseContext):
         text_input_resource_id: str | None,
         text_input_coordinates: ElementBounds | None,
         text_input_text: str | None,
-    ):
+    ) -> Command:
         """
         Focus a text field and type text into it.
 
@@ -90,7 +90,7 @@ def get_input_text_tool(ctx: MobileUseContext):
                 status="error",
             )
             return Command(
-                update=state.sanitize_update(
+                update=await state.asanitize_update(
                     ctx=ctx,
                     update={
                         "agents_thoughts": [agent_thought, error_message],
@@ -146,7 +146,7 @@ def get_input_text_tool(ctx: MobileUseContext):
         )
 
         return Command(
-            update=state.sanitize_update(
+            update=await state.asanitize_update(
                 ctx=ctx,
                 update={
                     "agents_thoughts": [agent_thought, agent_outcome],

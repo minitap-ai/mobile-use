@@ -14,13 +14,13 @@ from typing import Annotated
 
 def get_tap_tool(ctx: MobileUseContext):
     @tool
-    def tap(
+    async def tap(
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
         agent_thought: str,
         selector_request: SelectorRequest,
         index: int | None = None,
-    ):
+    ) -> Command:
         """
         Taps on a selector.
         Index is optional and is used when you have multiple views matching the same selector.
@@ -36,7 +36,7 @@ def get_tap_tool(ctx: MobileUseContext):
             status="error" if has_failed else "success",
         )
         return Command(
-            update=state.sanitize_update(
+            update=await state.asanitize_update(
                 ctx=ctx,
                 update={
                     "agents_thoughts": [agent_thought],

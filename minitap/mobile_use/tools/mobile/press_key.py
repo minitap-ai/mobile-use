@@ -16,12 +16,12 @@ from typing import Annotated
 
 def get_press_key_tool(ctx: MobileUseContext):
     @tool
-    def press_key(
+    async def press_key(
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
         agent_thought: str,
         key: Key,
-    ):
+    ) -> Command:
         """Press a key on the device."""
         output = press_key_controller(ctx=ctx, key=key)
         has_failed = output is not None
@@ -34,7 +34,7 @@ def get_press_key_tool(ctx: MobileUseContext):
             status="error" if has_failed else "success",
         )
         return Command(
-            update=state.sanitize_update(
+            update=await state.asanitize_update(
                 ctx=ctx,
                 update={
                     "agents_thoughts": [agent_thought],

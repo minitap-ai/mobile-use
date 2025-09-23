@@ -21,12 +21,12 @@ from minitap.mobile_use.utils.ui_hierarchy import find_element_by_resource_id, g
 
 def get_paste_text_tool(ctx: MobileUseContext):
     @tool
-    def paste_text(
+    async def paste_text(
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
         agent_thought: str,
         focused_element_resource_id: str,
-    ):
+    ) -> Command:
         """
         Pastes text previously copied via `copyTextFrom` into the currently focused field.
 
@@ -66,7 +66,7 @@ def get_paste_text_tool(ctx: MobileUseContext):
             status="error" if has_failed else "success",
         )
         return Command(
-            update=state.sanitize_update(
+            update=await state.asanitize_update(
                 ctx=ctx,
                 update={
                     "agents_thoughts": [agent_thought, agent_outcome],
