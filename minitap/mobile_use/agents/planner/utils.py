@@ -1,3 +1,6 @@
+import random
+import string
+
 from minitap.mobile_use.agents.planner.types import Subgoal, SubgoalStatus
 
 
@@ -54,3 +57,8 @@ def start_next_subgoal(subgoals: list[Subgoal]) -> list[Subgoal]:
         return subgoals
     next_subgoal.status = SubgoalStatus.PENDING
     return subgoals
+
+def generate_id(length: int = 6) -> str:
+    """Generates a small and distinct random string ID."""
+    chars = string.ascii_lowercase + string.digits
+    return "".join(random.choice(chars) for _ in range(length))
