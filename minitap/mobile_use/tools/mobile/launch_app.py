@@ -15,12 +15,12 @@ from langgraph.prebuilt import InjectedState
 
 def get_launch_app_tool(ctx: MobileUseContext):
     @tool
-    def launch_app(
+    async def launch_app(
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
         agent_thought: str,
         package_name: str,
-    ):
+    ) -> Command:
         """
         Launch an application on the device using the package name on Android, bundle id on iOS.
         """
@@ -35,7 +35,7 @@ def get_launch_app_tool(ctx: MobileUseContext):
             status="error" if has_failed else "success",
         )
         return Command(
-            update=state.sanitize_update(
+            update=await state.asanitize_update(
                 ctx=ctx,
                 update={
                     "agents_thoughts": [agent_thought],

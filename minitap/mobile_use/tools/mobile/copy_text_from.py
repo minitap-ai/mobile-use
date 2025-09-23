@@ -19,14 +19,14 @@ from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 
 def get_copy_text_from_tool(ctx: MobileUseContext):
     @tool
-    def copy_text_from(
+    async def copy_text_from(
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
         agent_thought: str,
         selector_request: SelectorRequest = Field(
             ..., description="The selector to copy text from"
         ),
-    ):
+    ) -> Command:
         """
         Copies text from a UI element identified by the given selector and stores it in memory.
 
@@ -53,7 +53,7 @@ def get_copy_text_from_tool(ctx: MobileUseContext):
             status="error" if has_failed else "success",
         )
         return Command(
-            update=state.sanitize_update(
+            update=await state.asanitize_update(
                 ctx=ctx,
                 update={
                     "agents_thoughts": [agent_thought],

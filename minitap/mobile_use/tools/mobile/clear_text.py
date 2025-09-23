@@ -257,14 +257,14 @@ class TextClearer:
 
 def get_clear_text_tool(ctx: MobileUseContext):
     @tool
-    def clear_text(
+    async def clear_text(
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
         agent_thought: str,
         text_input_resource_id: str,
         text_input_coordinates: ElementBounds | None,
         text_input_text: str | None,
-    ):
+    ) -> Command:
         """
         Clears all the text from the text field, by focusing it if needed.
         """
@@ -289,7 +289,7 @@ def get_clear_text_tool(ctx: MobileUseContext):
         )
 
         return Command(
-            update=state.sanitize_update(
+            update=await state.asanitize_update(
                 ctx=ctx,
                 update={
                     "agents_thoughts": [agent_thought],

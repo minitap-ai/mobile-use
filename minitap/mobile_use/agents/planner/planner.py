@@ -63,7 +63,10 @@ class PlannerNode:
         logger.info("📜 Generated plan:")
         logger.info("\n".join(str(s) for s in subgoals_plan))
 
-        return state.sanitize_update(
+        if self.ctx.on_plan_changes:
+            await self.ctx.on_plan_changes(subgoals_plan, needs_replan)
+
+        return await state.asanitize_update(
             ctx=self.ctx,
             update={
                 "subgoal_plan": subgoals_plan,

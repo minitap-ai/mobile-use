@@ -24,12 +24,12 @@ from minitap.mobile_use.tools.tool_wrapper import CompositeToolWrapper
 
 def get_swipe_tool(ctx: MobileUseContext) -> BaseTool:
     @tool
-    def swipe(
+    async def swipe(
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
         agent_thought: str,
         swipe_request: SwipeRequest,
-    ):
+    ) -> Command:
         """Swipes on the screen."""
         output = swipe_controller(ctx=ctx, swipe_request=swipe_request)
         has_failed = output is not None
@@ -40,7 +40,7 @@ def get_swipe_tool(ctx: MobileUseContext) -> BaseTool:
             status="error" if has_failed else "success",
         )
         return Command(
-            update=state.sanitize_update(
+            update=await state.asanitize_update(
                 ctx=ctx,
                 update={
                     "agents_thoughts": [agent_thought],

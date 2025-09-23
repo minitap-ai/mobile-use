@@ -90,7 +90,7 @@ class CortexNode:
         if not is_subgoal_completed:
             response.complete_subgoals_by_ids = []
 
-        return state.sanitize_update(
+        return await state.asanitize_update(
             ctx=self.ctx,
             update={
                 "agents_thoughts": [response.agent_thought],

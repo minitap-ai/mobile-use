@@ -16,13 +16,13 @@ from typing import Annotated
 
 def get_long_press_on_tool(ctx: MobileUseContext):
     @tool
-    def long_press_on(
+    async def long_press_on(
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
         agent_thought: str,
         selector_request: SelectorRequest,
         index: int | None = None,
-    ):
+    ) -> Command:
         """
         Long press on a UI element identified by the given selector.
         An index can be specified to select a specific element if multiple are found.
@@ -38,7 +38,7 @@ def get_long_press_on_tool(ctx: MobileUseContext):
             status="error" if has_failed else "success",
         )
         return Command(
-            update=state.sanitize_update(
+            update=await state.asanitize_update(
                 ctx=ctx,
                 update={
                     "agents_thoughts": [agent_thought],

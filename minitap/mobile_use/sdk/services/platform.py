@@ -2,13 +2,19 @@ import json
 from typing import Any
 import httpx
 from pydantic import BaseModel, ValidationError
+from minitap.mobile_use.agents.planner.types import Subgoal, SubgoalStatus
 from minitap.mobile_use.sdk.types.platform import (
     CreateTaskRunRequest,
     LLMProfileResponse,
+    MobileUseSubgoal,
+    SubgoalState,
     TaskResponse,
+    TaskRunPlanResponse,
     TaskRunResponse,
     TaskRunStatus,
     UpdateTaskRunStatusRequest,
+    UpsertTaskRunAgentThoughtRequest,
+    UpsertTaskRunPlanRequest,
 )
 from minitap.mobile_use.utils.logger import get_logger
 
@@ -20,6 +26,8 @@ from minitap.mobile_use.sdk.types.task import (
     PlatformTaskRequest,
     TaskRequest,
 )
+
+from datetime import datetime, UTC
 
 logger = get_logger(__name__)
 
@@ -116,6 +124,88 @@ class PlatformService:
             response.raise_for_status()
         except httpx.HTTPStatusError as e:
             raise PlatformServiceError(message=f"Failed to update task run status: {e}")
+
+    async def upsert_task_run_plan(
+        self,
+        task_run_id: str,
+        started_at: datetime,
+        plan: list[Subgoal],
+        ended_at: datetime | None = None,
+        plan_id: str | None = None,
+    ) -> TaskRunPlanResponse:
+        try:
+            logger.info(f"Upserting task run plan for task run: {task_run_id}")
+            ended, subgoals = self._to_api_subgoals(plan)
+            if not ended_at and ended:
+                ended_at = datetime.now(UTC)
+            update = UpsertTaskRunPlanRequest(
+                started_at=started_at,
+                subgoals=subgoals,
+                ended_at=ended_at,
+            )
+            if plan_id:
+                response = await self._client.put(
+                    url=f"/task-runs/{task_run_id}/plans/{plan_id}",
+                    json=update.model_dump(),
+                )
+            else:
+                response = await self._client.post(
+                    url=f"/task-runs/{task_run_id}/plans",
+                    json=update.model_dump(),
+                )
+            response.raise_for_status()
+            return TaskRunPlanResponse(**response.json())
+
+        except ValidationError as e:
+            raise PlatformServiceError(message=f"API response validation error: {e}")
+        except httpx.HTTPStatusError as e:
+            raise PlatformServiceError(message=f"Failed to upsert task run plan: {e}")
+
+    async def add_agent_thought(self, task_run_id: str, agent: str, thought: str) -> None:
+        try:
+            logger.info(f"Adding agent thought for task run: {task_run_id}")
+            update = UpsertTaskRunAgentThoughtRequest(
+                agent=agent,
+                content=thought,
+                timestamp=datetime.now(UTC),
+            )
+            response = await self._client.post(
+                url=f"/task-runs/{task_run_id}/agent-thoughts",
+                json=update.model_dump(),
+            )
+            response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            raise PlatformServiceError(message=f"Failed to add agent thought: {e}")
+
+    def _to_api_subgoals(self, subgoals: list[Subgoal]) -> tuple[bool, list[MobileUseSubgoal]]:
+        """
+        Returns a tuple of (plan_ended, subgoal_models)
+        """
+        subgoal_models: list[MobileUseSubgoal] = []
+        plan_ended = True
+        for subgoal in subgoals:
+            if subgoal.status != SubgoalStatus.SUCCESS:
+                plan_ended = False
+            subgoal_models.append(self._to_api_subgoal(subgoal))
+        return plan_ended, subgoal_models
+
+    def _to_api_subgoal(self, subgoal: Subgoal) -> MobileUseSubgoal:
+        state: SubgoalState = "pending"
+        match subgoal.status:
+            case SubgoalStatus.SUCCESS:
+                state = "completed"
+            case SubgoalStatus.FAILURE:
+                state = "failed"
+            case SubgoalStatus.PENDING:
+                state = "started"
+            case SubgoalStatus.NOT_STARTED:
+                state = "pending"
+        return MobileUseSubgoal(
+            name=subgoal.description,
+            state=state,
+            started_at=subgoal.started_at,
+            ended_at=subgoal.ended_at,
+        )
 
     async def _create_task_run(
         self,
