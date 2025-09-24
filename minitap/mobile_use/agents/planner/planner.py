@@ -1,11 +1,10 @@
-import uuid
 from pathlib import Path
 
 from jinja2 import Template
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from minitap.mobile_use.agents.planner.types import PlannerOutput, Subgoal, SubgoalStatus
-from minitap.mobile_use.agents.planner.utils import one_of_them_is_failure
+from minitap.mobile_use.agents.planner.utils import generate_id, one_of_them_is_failure
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.services.llm import get_llm
@@ -53,7 +52,7 @@ class PlannerNode:
 
         subgoals_plan = [
             Subgoal(
-                id=subgoal.id or str(uuid.uuid4()),
+                id=generate_id(),
                 description=subgoal.description,
                 status=SubgoalStatus.NOT_STARTED,
                 completion_reason=None,

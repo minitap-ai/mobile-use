@@ -1,11 +1,10 @@
 from enum import Enum
+from typing import Annotated
 
 from pydantic import BaseModel
-from typing import Annotated
 
 
 class PlannerSubgoalOutput(BaseModel):
-    id: Annotated[str | None, "If not provided, it will be generated"] = None
     description: str
 
 

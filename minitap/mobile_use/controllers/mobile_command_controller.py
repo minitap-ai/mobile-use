@@ -243,20 +243,6 @@ def input_text(ctx: MobileUseContext, text: str, dry_run: bool = False):
     return run_flow(ctx, [{"inputText": text}], dry_run=dry_run)
 
 
-def copy_text_from(ctx: MobileUseContext, selector_request: SelectorRequest, dry_run: bool = False):
-    copy_text_from_body = selector_request.to_dict()
-    if not copy_text_from_body:
-        error = "Invalid copyTextFrom selector request, could not format yaml"
-        logger.error(error)
-        raise ControllerErrors(error)
-    flow_input = [{"copyTextFrom": copy_text_from_body}]
-    return run_flow(ctx, flow_input, dry_run=dry_run)
-
-
-def paste_text(ctx: MobileUseContext, dry_run: bool = False):
-    return run_flow(ctx, ["pasteText"], dry_run=dry_run)
-
-
 def erase_text(ctx: MobileUseContext, nb_chars: int | None = None, dry_run: bool = False):
     """
     Removes characters from the currently selected textfield (if any)
