@@ -17,13 +17,13 @@ from minitap.mobile_use.controllers.mobile_command_controller import (
 )
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
+from minitap.mobile_use.tools.types import Target
 from minitap.mobile_use.tools.utils import (
     focus_element_if_needed,
     move_cursor_to_end_if_bounds,
 )
 from minitap.mobile_use.utils.logger import get_logger
 from minitap.mobile_use.utils.ui_hierarchy import (
-    ElementBounds,
     find_element_by_resource_id,
     get_element_text,
     text_input_is_empty,
@@ -90,24 +90,18 @@ class TextClearer:
 
     def _prepare_element_for_clearing(
         self,
-        text_input_resource_id: str | None,
-        text_input_coordinates: ElementBounds | None,
-        text_input_text: str | None,
+        target: Target,
     ) -> bool:
         if not focus_element_if_needed(
             ctx=self.ctx,
-            input_resource_id=text_input_resource_id,
-            input_coordinates=text_input_coordinates,
-            input_text=text_input_text,
+            target=target,
         ):
             return False
 
         move_cursor_to_end_if_bounds(
             ctx=self.ctx,
             state=self.state,
-            text_input_resource_id=text_input_resource_id,
-            text_input_coordinates=text_input_coordinates,
-            text_input_text=text_input_text,
+            target=target,
         )
         return True
 
@@ -124,9 +118,7 @@ class TextClearer:
 
     def _clear_with_retries(
         self,
-        text_input_resource_id: str | None,
-        text_input_coordinates: ElementBounds | None,
-        text_input_text: str | None,
+        target: Target,
         initial_text: str,
         hint_text: str | None,
     ) -> tuple[bool, str | None, int]:
@@ -145,10 +137,10 @@ class TextClearer:
 
             self._refresh_ui_hierarchy()
             elt = None
-            if text_input_resource_id:
+            if target.resource_id:
                 elt = find_element_by_resource_id(
                     ui_hierarchy=self.state.latest_ui_hierarchy or [],
-                    resource_id=text_input_resource_id,
+                    resource_id=target.resource_id,
                 )
                 if elt:
                     current_text = get_element_text(elt)
@@ -159,9 +151,7 @@ class TextClearer:
             move_cursor_to_end_if_bounds(
                 ctx=self.ctx,
                 state=self.state,
-                text_input_resource_id=text_input_resource_id,
-                text_input_coordinates=text_input_coordinates,
-                text_input_text=text_input_text,
+                target=target,
                 elt=elt,
             )
 
@@ -213,20 +203,20 @@ class TextClearer:
 
     def clear_input_text(
         self,
-        text_input_resource_id: str | None,
-        text_input_coordinates: ElementBounds | None,
-        text_input_text: str | None,
+        target: Target,
     ) -> ClearTextResult:
-        element, current_text, hint_text = self._get_element_info(text_input_resource_id)
+        element, current_text, hint_text = self._get_element_info(
+            resource_id=target.resource_id,
+        )
 
         if not element:
-            return self._handle_element_not_found(text_input_resource_id, hint_text)
+            return self._handle_element_not_found(target.resource_id, hint_text)
 
         if not self._should_clear_text(current_text, hint_text):
             return self._handle_no_clearing_needed(current_text, hint_text)
 
         if not self._prepare_element_for_clearing(
-            text_input_resource_id, text_input_coordinates, text_input_text
+            target=target,
         ):
             return self._create_result(
                 success=False,
@@ -237,9 +227,7 @@ class TextClearer:
             )
 
         success, final_text, chars_erased = self._clear_with_retries(
-            text_input_resource_id=text_input_resource_id,
-            text_input_coordinates=text_input_coordinates,
-            text_input_text=text_input_text,
+            target=target,
             initial_text=current_text or "",
             hint_text=hint_text,
         )
@@ -261,19 +249,17 @@ def get_clear_text_tool(ctx: MobileUseContext):
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
         agent_thought: str,
-        text_input_resource_id: str,
-        text_input_coordinates: ElementBounds | None,
-        text_input_text: str | None,
+        target: Target,
     ):
         """
         Clears all the text from the text field, by focusing it if needed.
         """
         clearer = TextClearer(ctx, state)
         result = clearer.clear_input_text(
-            text_input_resource_id, text_input_coordinates, text_input_text
+            target=target,
         )
 
-        content = (
+        agent_outcome = (
             clear_text_wrapper.on_failure_fn(result.error_message)
             if not result.success
             else clear_text_wrapper.on_success_fn(
@@ -283,7 +269,7 @@ def get_clear_text_tool(ctx: MobileUseContext):
 
         tool_message = ToolMessage(
             tool_call_id=tool_call_id,
-            content=content,
+            content=agent_outcome,
             additional_kwargs={"error": result.error_message} if not result.success else {},
             status="error" if not result.success else "success",
         )
@@ -292,7 +278,7 @@ def get_clear_text_tool(ctx: MobileUseContext):
             update=state.sanitize_update(
                 ctx=ctx,
                 update={
-                    "agents_thoughts": [agent_thought],
+                    "agents_thoughts": [agent_thought, agent_outcome],
                     EXECUTOR_MESSAGES_KEY: [tool_message],
                 },
                 agent="executor",
