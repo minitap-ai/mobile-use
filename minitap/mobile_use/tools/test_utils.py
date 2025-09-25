@@ -12,6 +12,7 @@ from minitap.mobile_use.controllers.mobile_command_controller import (  # noqa: 
     IdSelectorRequest,
     SelectorRequestWithCoordinates,
 )
+from minitap.mobile_use.tools.types import Target  # noqa: E402
 from minitap.mobile_use.tools.utils import (  # noqa: E402
     focus_element_if_needed,
     move_cursor_to_end_if_bounds,
@@ -54,6 +55,7 @@ def sample_rich_element():
             "resource-id": "com.example:id/text_input",
             "focused": "false",
             "text": "Sample text",
+            "bounds": {"x": 100, "y": 200, "width": 300, "height": 50},
         },
         "children": [],
     }
@@ -71,16 +73,19 @@ class TestMoveCursorToEndIfBounds:
         mock_state.latest_ui_hierarchy = [sample_element]
         mock_find_element.return_value = sample_element
 
-        result = move_cursor_to_end_if_bounds(
-            ctx=mock_context,
-            state=mock_state,
-            text_input_resource_id="com.example:id/text_input",
-            text_input_coordinates=None,
-            text_input_text=None,
+        target = Target(
+            resource_id="com.example:id/text_input",
+            resource_id_index=None,
+            text=None,
+            text_index=None,
+            coordinates=None,
         )
+        result = move_cursor_to_end_if_bounds(ctx=mock_context, state=mock_state, target=target)
 
         mock_find_element.assert_called_once_with(
-            ui_hierarchy=[sample_element], resource_id="com.example:id/text_input"
+            ui_hierarchy=[sample_element],
+            resource_id="com.example:id/text_input",
+            index=0,
         )
         mock_tap.assert_called_once()
         call_args = mock_tap.call_args[1]
@@ -98,14 +103,15 @@ class TestMoveCursorToEndIfBounds:
     ):
         """Test moving cursor when only coordinates are provided."""
         bounds = ElementBounds(x=50, y=150, width=200, height=40)
-
-        result = move_cursor_to_end_if_bounds(
-            ctx=mock_context,
-            state=mock_state,
-            text_input_resource_id=None,
-            text_input_coordinates=bounds,
-            text_input_text=None,
+        target = Target(
+            resource_id=None,
+            resource_id_index=None,
+            text=None,
+            text_index=None,
+            coordinates=bounds,
         )
+
+        result = move_cursor_to_end_if_bounds(ctx=mock_context, state=mock_state, target=target)
 
         mock_find_element.assert_not_called()
         mock_tap.assert_called_once()
@@ -125,15 +131,16 @@ class TestMoveCursorToEndIfBounds:
         mock_state.latest_ui_hierarchy = [sample_element]
         mock_find_text.return_value = sample_element
 
-        result = move_cursor_to_end_if_bounds(
-            ctx=mock_context,
-            state=mock_state,
-            text_input_resource_id=None,
-            text_input_coordinates=None,
-            text_input_text="Sample text",
+        target = Target(
+            resource_id=None,
+            resource_id_index=None,
+            text="Sample text",
+            text_index=0,
+            coordinates=None,
         )
+        result = move_cursor_to_end_if_bounds(ctx=mock_context, state=mock_state, target=target)
 
-        mock_find_text.assert_called_once_with([sample_element], "Sample text")
+        mock_find_text.assert_called_once_with([sample_element], "Sample text", index=0)
         mock_tap.assert_called_once()
         assert result == sample_element
 
@@ -146,13 +153,14 @@ class TestMoveCursorToEndIfBounds:
         mock_state.latest_ui_hierarchy = []
         mock_find_text.return_value = None
 
-        result = move_cursor_to_end_if_bounds(
-            ctx=mock_context,
-            state=mock_state,
-            text_input_resource_id=None,
-            text_input_coordinates=None,
-            text_input_text="Nonexistent text",
+        target = Target(
+            resource_id=None,
+            resource_id_index=None,
+            text="Nonexistent text",
+            text_index=None,
+            coordinates=None,
         )
+        result = move_cursor_to_end_if_bounds(ctx=mock_context, state=mock_state, target=target)
 
         mock_tap.assert_not_called()
         assert result is None
@@ -167,13 +175,14 @@ class TestMoveCursorToEndIfBounds:
         mock_state.latest_ui_hierarchy = [element_no_bounds]
         mock_find_text.return_value = element_no_bounds
 
-        result = move_cursor_to_end_if_bounds(
-            ctx=mock_context,
-            state=mock_state,
-            text_input_resource_id=None,
-            text_input_coordinates=None,
-            text_input_text="Text without bounds",
+        target = Target(
+            resource_id=None,
+            resource_id_index=None,
+            text="Text without bounds",
+            text_index=None,
+            coordinates=None,
         )
+        result = move_cursor_to_end_if_bounds(ctx=mock_context, state=mock_state, target=target)
 
         mock_tap.assert_not_called()
         assert result is None  # Should return None as no action was taken
@@ -183,13 +192,14 @@ class TestMoveCursorToEndIfBounds:
         """Test when element is not found by resource_id."""
         mock_find_element.return_value = None
 
-        result = move_cursor_to_end_if_bounds(
-            ctx=mock_context,
-            state=mock_state,
-            text_input_resource_id="com.example:id/nonexistent",
-            text_input_coordinates=None,
-            text_input_text=None,
+        target = Target(
+            resource_id="com.example:id/nonexistent",
+            resource_id_index=None,
+            text=None,
+            text_index=None,
+            coordinates=None,
         )
+        result = move_cursor_to_end_if_bounds(ctx=mock_context, state=mock_state, target=target)
 
         assert result is None
 
@@ -209,12 +219,14 @@ class TestFocusElementIfNeeded:
         mock_context.hw_bridge_client.get_rich_hierarchy.return_value = [focused_element]
         mock_find_element.return_value = focused_element["attributes"]
 
-        result = focus_element_if_needed(
-            ctx=mock_context,
-            input_resource_id="com.example:id/text_input",
-            input_coordinates=None,
-            input_text=None,
+        target = Target(
+            resource_id="com.example:id/text_input",
+            resource_id_index=None,
+            text=None,
+            text_index=None,
+            coordinates=None,
         )
+        result = focus_element_if_needed(ctx=mock_context, target=target)
 
         mock_tap.assert_not_called()
         assert result is True
@@ -244,16 +256,19 @@ class TestFocusElementIfNeeded:
             focused_element["attributes"],
         ]
 
-        result = focus_element_if_needed(
-            ctx=mock_context,
-            input_resource_id="com.example:id/text_input",
-            input_coordinates=None,
-            input_text=None,
+        target = Target(
+            resource_id="com.example:id/text_input",
+            resource_id_index=None,
+            text=None,
+            text_index=None,
+            coordinates=None,
         )
+        result = focus_element_if_needed(ctx=mock_context, target=target)
 
         mock_tap.assert_called_once_with(
             ctx=mock_context,
             selector_request=IdSelectorRequest(id="com.example:id/text_input"),
+            index=0,
         )
         assert mock_context.hw_bridge_client.get_rich_hierarchy.call_count == 2
         assert result is True
@@ -268,25 +283,30 @@ class TestFocusElementIfNeeded:
         element_from_id = sample_rich_element["attributes"].copy()
         element_from_id["text"] = "Different text"
 
-        # L'élément qui sera trouvé par le texte doit avoir des "bounds"
         element_from_text = sample_rich_element.copy()
-        element_from_text["bounds"] = {"x": 10, "y": 20, "width": 100, "height": 30}
+        element_from_text["attributes"]["bounds"] = {
+            "x": 10,
+            "y": 20,
+            "width": 100,
+            "height": 30,
+        }
 
         mock_context.hw_bridge_client.get_rich_hierarchy.return_value = [element_from_text]
         mock_find_id.return_value = element_from_id
 
         with patch("minitap.mobile_use.tools.utils.find_element_by_text") as mock_find_text:
-            mock_find_text.return_value = element_from_text  # Trouvé par le texte
+            mock_find_text.return_value = element_from_text["attributes"]
 
-            result = focus_element_if_needed(
-                ctx=mock_context,
-                input_resource_id="com.example:id/text_input",
-                input_coordinates=None,
-                input_text="Sample text",  # Le texte correct à rechercher
+            target = Target(
+                resource_id="com.example:id/text_input",
+                resource_id_index=None,
+                text="Sample text",
+                text_index=None,
+                coordinates=None,
             )
+            result = focus_element_if_needed(ctx=mock_context, target=target)
 
             mock_logger.warning.assert_called_once()
-            # Maintenant, tap devrait être appelé car l'élément trouvé a des "bounds"
             mock_tap.assert_called_once()
             assert result is True
 
@@ -296,26 +316,31 @@ class TestFocusElementIfNeeded:
         self, mock_find_text, mock_tap, mock_context, sample_rich_element
     ):
         """Test fallback to focusing using text."""
-        # L'élément doit avoir des "bounds" au premier niveau pour
-        # que get_bounds_for_element fonctionne
         element_with_bounds = sample_rich_element.copy()
-        element_with_bounds["bounds"] = {"x": 10, "y": 20, "width": 100, "height": 30}
+        element_with_bounds["attributes"]["bounds"] = {
+            "x": 10,
+            "y": 20,
+            "width": 100,
+            "height": 30,
+        }
 
         mock_context.hw_bridge_client.get_rich_hierarchy.return_value = [element_with_bounds]
-        mock_find_text.return_value = element_with_bounds
+        mock_find_text.return_value = element_with_bounds["attributes"]
 
-        result = focus_element_if_needed(
-            ctx=mock_context,
-            input_resource_id=None,
-            input_coordinates=None,
-            input_text="Sample text",
+        target = Target(
+            resource_id=None,
+            resource_id_index=None,
+            text="Sample text",
+            text_index=None,
+            coordinates=None,
         )
+        result = focus_element_if_needed(ctx=mock_context, target=target)
 
         mock_find_text.assert_called_once()
         mock_tap.assert_called_once()
         call_args = mock_tap.call_args[1]
         selector = call_args["selector_request"]
-        # Vérifie que le tap se fait bien au centre des "bounds"
+        assert isinstance(selector, SelectorRequestWithCoordinates)
         assert selector.coordinates.x == 60  # 10 + 100/2
         assert selector.coordinates.y == 35  # 20 + 30/2
         assert result is True
@@ -325,7 +350,6 @@ class TestFocusElementIfNeeded:
         """Test failure when no locator can find an element."""
         mock_context.hw_bridge_client.get_rich_hierarchy.return_value = []
 
-        # Mock find_element functions to return None
         with (
             patch("minitap.mobile_use.tools.utils.find_element_by_resource_id") as mock_find_id,
             patch("minitap.mobile_use.tools.utils.find_element_by_text") as mock_find_text,
@@ -333,16 +357,18 @@ class TestFocusElementIfNeeded:
             mock_find_id.return_value = None
             mock_find_text.return_value = None
 
-            result = focus_element_if_needed(
-                ctx=mock_context,
-                input_resource_id="nonexistent",
-                input_coordinates=None,
-                input_text="nonexistent",
+            target = Target(
+                resource_id="nonexistent",
+                resource_id_index=None,
+                text="nonexistent",
+                text_index=None,
+                coordinates=None,
             )
+            result = focus_element_if_needed(ctx=mock_context, target=target)
 
         mock_logger.error.assert_called_once_with(
-            "Failed to focus element. No valid locator"
-            + "(resource_id, coordinates, or text) succeeded."
+            "Failed to focus element."
+            + " No valid locator (resource_id, coordinates, or text) succeeded."
         )
         assert result is False
 

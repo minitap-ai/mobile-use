@@ -19,10 +19,10 @@ from minitap.mobile_use.controllers.mobile_command_controller import (
 )
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
+from minitap.mobile_use.tools.types import Target
 from minitap.mobile_use.tools.utils import focus_element_if_needed, move_cursor_to_end_if_bounds
 from minitap.mobile_use.utils.logger import get_logger
 from minitap.mobile_use.utils.ui_hierarchy import (
-    ElementBounds,
     find_element_by_resource_id,
     get_element_text,
 )
@@ -54,9 +54,7 @@ def get_input_text_tool(ctx: MobileUseContext):
         state: Annotated[State, InjectedState],
         agent_thought: str,
         text: str,
-        text_input_resource_id: str | None,
-        text_input_coordinates: ElementBounds | None,
-        text_input_text: str | None,
+        target: Target,
     ):
         """
         Focus a text field and type text into it.
@@ -70,17 +68,9 @@ def get_input_text_tool(ctx: MobileUseContext):
             state: The state of the agent.
             agent_thought: The thought of the agent.
             text: The text to type.
-            text_input_resource_id: The resource ID of the text input (if available).
-            text_input_coordinates: The bounds (ElementBounds) of the text input (if available).
-            text_input_text: The current text content of the text input (if available).
+            target: The target of the text input (if available).
         """
-
-        focused = focus_element_if_needed(
-            ctx=ctx,
-            input_resource_id=text_input_resource_id,
-            input_coordinates=text_input_coordinates,
-            input_text=text_input_text,
-        )
+        focused = focus_element_if_needed(ctx=ctx, target=target)
         if not focused:
             error_message = "Failed to focus the text input element before typing."
             tool_message = ToolMessage(
@@ -100,40 +90,25 @@ def get_input_text_tool(ctx: MobileUseContext):
                 ),
             )
 
-        move_cursor_to_end_if_bounds(
-            ctx=ctx,
-            state=state,
-            text_input_resource_id=text_input_resource_id,
-            text_input_coordinates=text_input_coordinates,
-            text_input_text=text_input_text,
-        )
+        move_cursor_to_end_if_bounds(ctx=ctx, state=state, target=target)
 
         result = _controller_input_text(ctx=ctx, text=text)
-
         status: Literal["success", "error"] = "success" if result.ok else "error"
 
         text_input_content = ""
-        if status == "success":
-            if text_input_resource_id is not None:
-                # Verification phase for elements with resource_id
-                screen_data = get_screen_data(screen_api_client=ctx.screen_api_client)
-                state.latest_ui_hierarchy = screen_data.elements
-
-                element = find_element_by_resource_id(
-                    ui_hierarchy=state.latest_ui_hierarchy, resource_id=text_input_resource_id
-                )
-
-                if not element:
-                    result = InputResult(ok=False, error="Element not found")
-
-                if element:
-                    text_input_content = get_element_text(element)
-            else:
-                # For elements without resource_id, skip verification and use direct message
-                pass
+        if status == "success" and target.resource_id:
+            screen_data = get_screen_data(screen_api_client=ctx.screen_api_client)
+            state.latest_ui_hierarchy = screen_data.elements
+            element = find_element_by_resource_id(
+                ui_hierarchy=state.latest_ui_hierarchy,
+                resource_id=target.resource_id,
+                index=target.resource_id_index,
+            )
+            if element:
+                text_input_content = get_element_text(element)
 
         agent_outcome = (
-            input_text_wrapper.on_success_fn(text, text_input_content, text_input_resource_id)
+            input_text_wrapper.on_success_fn(text, text_input_content, target.resource_id)
             if result.ok
             else input_text_wrapper.on_failure_fn(text, result.error)
         )
