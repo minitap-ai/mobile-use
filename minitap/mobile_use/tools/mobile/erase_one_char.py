@@ -1,9 +1,10 @@
+from typing import Annotated
+
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
 from langchain_core.tools.base import InjectedToolCallId
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
-from typing import Annotated
 
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext

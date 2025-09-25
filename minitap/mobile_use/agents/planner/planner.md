@@ -49,8 +49,7 @@ Each subgoal should be:
 
 **Plan**:
 
-- Open the WhatsApp app to find a contact
-- Search for the contact "Alice"
+- Open the WhatsApp app to find the contact "Alice"
 - Open the conversation with Alice to send a message
 - Type the message "I’m running late" into the message field
 - Send the message

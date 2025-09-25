@@ -37,16 +37,20 @@ def get_glimpse_screen_tool(ctx: MobileUseContext):
             output = str(e)
             has_failed = True
 
+        agent_outcome = (
+            glimpse_screen_wrapper.on_failure_fn()
+            if has_failed
+            else glimpse_screen_wrapper.on_success_fn()
+        )
+
         tool_message = ToolMessage(
             tool_call_id=tool_call_id,
-            content=glimpse_screen_wrapper.on_failure_fn()
-            if has_failed
-            else glimpse_screen_wrapper.on_success_fn(),
+            content=agent_outcome,
             additional_kwargs={"error": output} if has_failed else {},
             status="error" if has_failed else "success",
         )
         updates = {
-            "agents_thoughts": [agent_thought],
+            "agents_thoughts": [agent_thought, agent_outcome],
             EXECUTOR_MESSAGES_KEY: [tool_message],
         }
         if compressed_image_base64:
