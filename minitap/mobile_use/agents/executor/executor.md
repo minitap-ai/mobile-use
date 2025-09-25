@@ -25,12 +25,7 @@ and your previous actions, you must:
 "I'm tapping on the chat item labeled 'Alice' to open the conversation."
 
 ```json
-{
-  "action": "tap",
-  "target": {
-    "resource_id": "com.whatsapp:id/conversation_item"
-  }
-}
+  "[{\"tool_name\": \"tap\", \"arguments\": {\"target\": {\"resource_id\": \"com.whatsapp:id/conversation_item\", \"resource_id_index\": 0, \"text\": \"Alice\", \"text_index\": 0, \"coordinates\": {\"x\": 0, \"y\": 350, \"width\": 1080, \"height\": 80}}}}]"
 ```
 
 **→ Executor Action**:
@@ -38,6 +33,10 @@ and your previous actions, you must:
 Call the `tap_on_element` tool with:
 
 - `resource_id = "com.whatsapp:id/conversation_item"`
+- `resource_id_index = 0`
+- `text = "Alice"`
+- `text_index = 0`
+- `coordinates = {"x": 0, "y": 350, "width": 1080, "height": 80}`
 - `agent_thought = "I'm tapping on the chat item labeled 'Alice' to open the conversation."`
 
 ---
@@ -53,16 +52,20 @@ Call the `tap_on_element` tool with:
 
 When using the `input_text` tool:
 
-- **Provide all available information** from the following optional parameters to identify the text input element:
-  - `text_input_resource_id`: The resource ID of the text input element (when available)
-  - `text_input_coordinates`: The bounds (ElementBounds) of the text input element (when available)
-  - `text_input_text`: The current text content of the text input element (when available)
+- **Provide all available information** in the target object to identify text input element
+  - `resource_id`: The resource ID of the text input element (when available)
+  - `resource_id_index`: The zero-based index of the specific resource ID you are targeting (when available)
+  - `text`: The current text content of the text input element (when available)
+  - `text_index`: The zero-based index of the specific text you are targeting (when available)
+  - `coordinates`: The bounds (ElementBounds) of the text input element (when available)
 
 - The tool will automatically:
 
   1. **Focus the element** using the provided identification parameters
   2. **Move the cursor to the end** of the existing text
   3. **Then type the new text**
+
+- **Important**: Special characters and markdown-like escape sequences (e.g., \n, \t, *, _) are not interpreted. For example, typing \n will insert the literal characters \ and n, not a line break.
 
 #### 🔄 Text Clearing Best Practice
 

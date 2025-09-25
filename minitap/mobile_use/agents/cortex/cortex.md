@@ -75,13 +75,32 @@ Focus on the **current PENDING subgoal and the next subgoals not yet started**.
 
 **You MUST follow it for every element interaction.**
 
-When you target a UI element (for a `tap`, `input_text`, `clear_text`, etc.), you **MUST** provide a comprehensive target object containing every piece of information you can find about it.
+When you target a UI element (for a `tap`, `input_text`, `clear_text`, etc.), you **MUST** provide a comprehensive `target` object containing every piece of information you can find about **that single element**.
 
 *   **1. `resource_id`**: Include this if it is present in the UI hierarchy.
-*   **2. `coordinates`**: Include the full bounds (`x`, `y`, `width`, `height`) if they are available.
-*   **3. `text`**: Include the *current text* content of the element (e.g., "Sign In", "Search...", "First Name").
+*   **2. `resource_id_index`**: If there are multiple elements with the same `resource_id`, provide the zero-based index of the specific one you are targeting.
+*   **3. `coordinates`**: Include the full bounds (`x`, `y`, `width`, `height`) if they are available.
+*   **4. `text`**: Include the *current text* content of the element (e.g., placeholder text for an input).
+*   **5. `text_index`**: If there are multiple elements with the same `text`, provide the zero-based index of the specific one you are targeting.
 
-**This is NOT optional.** Providing all three locators if we have, it is the foundation of the system's reliability. It allows next steps to use a fallback mechanism: if the ID fails, it tries the coordinates, etc. Failing to provide this complete context will lead to action failures.
+**CRITICAL: The index must correspond to its identifier.** `resource_id_index` is only used when targeting by `resource_id`. `text_index` is only used when targeting by `text`. This ensures the fallback logic targets the correct element.
+
+**This is NOT optional.** Providing all locators if we have, it is the foundation of the system's reliability. It allows next steps to use a fallback mechanism: if the ID fails, it tries the coordinates, etc. Failing to provide this complete context will lead to action failures.
+
+### The Rule of Unpredictable Actions
+
+Certain actions have outcomes that can significantly and sometimes unpredictably change the UI. These include:
+- `back`
+- `launch_app`
+- `stop_app`
+- `open_link`
+- `tap` on an element that is clearly for navigation (e.g., a "Back" button, a menu item, a link to another screen).
+
+**CRITICAL RULE: If your decision includes one of these unpredictable actions, it MUST be the only action in your `Structured Decisions` for this turn. Else, use flows to group actions together.**
+
+This is not optional. Failing to isolate these actions will cause the system to act on an outdated understanding of the screen, leading to catastrophic errors. For example, after a `back` command, you MUST wait to see the new screen before deciding what to tap next.
+
+You may only group simple, predictable actions together, such as tapping a text field and then immediately typing into it (`tap` followed by `input_text`).
 
 ### Outputting Your Decisions
 
@@ -125,7 +144,7 @@ If you decide to act, output a **valid JSON stringified structured set of instru
 #### Structured Decisions:
 
 ```text
-"{\"action\": \"tap\", \"target\": {\"text_input_resource_id\": \"com.whatsapp:id/menuitem_search\", \"text_input_coordinates\": {\"x\": 880, \"y\": 150, \"width\": 120, \"height\": 120}, \"text_input_text\": \"Search\"}}"
+"[{\"action\": \"tap\", \"target\": {\"resource_id\": \"com.whatsapp:id/menuitem_search\", \"resource_id_index\": 1, \"text\": \"Search\", \"text_index\": 0, \"coordinates\": {\"x\": 880, \"y\": 150, \"width\": 120, \"height\": 120}}}]"
 ```
 
 #### Agent Thought:

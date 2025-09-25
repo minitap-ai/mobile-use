@@ -40,7 +40,10 @@ def text_input_is_empty(text: str | None, hint_text: str | None) -> bool:
 
 
 def find_element_by_resource_id(
-    ui_hierarchy: list[dict], resource_id: str, is_rich_hierarchy: bool = False
+    ui_hierarchy: list[dict],
+    resource_id: str,
+    index: int | None = None,
+    is_rich_hierarchy: bool = False,
 ) -> dict | None:
     """
     Find a UI element by its resource-id in the UI hierarchy.
@@ -60,7 +63,11 @@ def find_element_by_resource_id(
         for element in elements:
             if isinstance(element, dict):
                 if element.get("resourceId") == resource_id:
-                    return element
+                    idx = index or 0
+                    if idx == 0:
+                        return element
+                    idx -= 1
+                    continue
 
                 children = element.get("children", [])
                 if children:
