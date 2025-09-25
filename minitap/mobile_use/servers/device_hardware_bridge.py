@@ -38,7 +38,7 @@ class DeviceHardwareBridge:
         try:
             creation_flags = 0
             if hasattr(subprocess, "CREATE_NO_WINDOW"):
-                creation_flags = subprocess.CREATE_NO_WINDOW
+                creation_flags = subprocess.CREATE_NO_WINDOW  # pyright: ignore[reportAttributeAccessIssue]
 
             maestro_platform = "android" if self.platform == DevicePlatform.ANDROID else "ios"
             cmd = ["maestro", "--device", self.device_id, "--platform", maestro_platform]
