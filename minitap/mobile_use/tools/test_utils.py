@@ -268,7 +268,7 @@ class TestFocusElementIfNeeded:
         mock_tap.assert_called_once_with(
             ctx=mock_context,
             selector_request=IdSelectorRequest(id="com.example:id/text_input"),
-            index=None,
+            index=0,
         )
         assert mock_context.hw_bridge_client.get_rich_hierarchy.call_count == 2
         assert result is True
