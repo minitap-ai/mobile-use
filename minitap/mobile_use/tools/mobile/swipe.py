@@ -33,17 +33,23 @@ def get_swipe_tool(ctx: MobileUseContext) -> BaseTool:
         """Swipes on the screen."""
         output = swipe_controller(ctx=ctx, swipe_request=swipe_request)
         has_failed = output is not None
+
+        agent_outcome = (
+            swipe_wrapper.on_success_fn() if not has_failed else swipe_wrapper.on_failure_fn()
+        )
+
         tool_message = ToolMessage(
             tool_call_id=tool_call_id,
-            content=swipe_wrapper.on_failure_fn() if has_failed else swipe_wrapper.on_success_fn(),
+            content=agent_outcome,
             additional_kwargs={"error": output} if has_failed else {},
             status="error" if has_failed else "success",
         )
+
         return Command(
             update=state.sanitize_update(
                 ctx=ctx,
                 update={
-                    "agents_thoughts": [agent_thought],
+                    "agents_thoughts": [agent_thought, agent_outcome],
                     EXECUTOR_MESSAGES_KEY: [tool_message],
                 },
                 agent="executor",
