@@ -2,9 +2,9 @@ name: Feature Integration 🧩
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   ruff:
@@ -19,6 +19,18 @@ jobs:
         uses: astral-sh/ruff-action@v3
         with:
           args: "check"
+  pyright:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --dev
+      - name: Run pyright
+        run: uv run pyright
 
   test:
     runs-on: ubuntu-latest
