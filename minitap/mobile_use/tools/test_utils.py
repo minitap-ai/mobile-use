@@ -75,7 +75,7 @@ class TestMoveCursorToEndIfBounds:
 
         target = Target(
             resource_id="com.example:id/text_input",
-            resource_id_index=0,
+            resource_id_index=None,
             text=None,
             text_index=None,
             coordinates=None,
