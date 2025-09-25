@@ -368,7 +368,7 @@ class TestFocusElementIfNeeded:
 
         mock_logger.error.assert_called_once_with(
             "Failed to focus element."
-            + "No valid locator (resource_id, coordinates, or text) succeeded."
+            + " No valid locator (resource_id, coordinates, or text) succeeded."
         )
         assert result is False
 
