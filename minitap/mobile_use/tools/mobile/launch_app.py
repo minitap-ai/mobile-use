@@ -1,16 +1,18 @@
+from typing import Annotated
+
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
 from langchain_core.tools.base import InjectedToolCallId
+from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
+
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
+from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.mobile_command_controller import (
     launch_app as launch_app_controller,
 )
-from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
-from typing import Annotated
-from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.graph.state import State
-from langgraph.prebuilt import InjectedState
+from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 
 
 def get_launch_app_tool(ctx: MobileUseContext):
@@ -26,11 +28,16 @@ def get_launch_app_tool(ctx: MobileUseContext):
         """
         output = launch_app_controller(ctx=ctx, package_name=package_name)
         has_failed = output is not None
+
+        agent_outcome = (
+            launch_app_wrapper.on_failure_fn(package_name)
+            if has_failed
+            else launch_app_wrapper.on_success_fn(package_name)
+        )
+
         tool_message = ToolMessage(
             tool_call_id=tool_call_id,
-            content=launch_app_wrapper.on_failure_fn(package_name)
-            if has_failed
-            else launch_app_wrapper.on_success_fn(package_name),
+            content=agent_outcome,
             additional_kwargs={"error": output} if has_failed else {},
             status="error" if has_failed else "success",
         )
@@ -38,7 +45,7 @@ def get_launch_app_tool(ctx: MobileUseContext):
             update=state.sanitize_update(
                 ctx=ctx,
                 update={
-                    "agents_thoughts": [agent_thought],
+                    "agents_thoughts": [agent_thought, agent_outcome],
                     EXECUTOR_MESSAGES_KEY: [tool_message],
                 },
                 agent="executor",
