@@ -110,7 +110,7 @@ def get_tap_tool(ctx: MobileUseContext):
                 output = {"error": str(e)}
 
         has_failed = output is not None
-        content = (
+        agent_outcome = (
             tap_wrapper.on_failure_fn(final_selector_info)
             if has_failed
             else tap_wrapper.on_success_fn(final_selector_info)
@@ -118,7 +118,7 @@ def get_tap_tool(ctx: MobileUseContext):
 
         tool_message = ToolMessage(
             tool_call_id=tool_call_id,
-            content=content,
+            content=agent_outcome,
             additional_kwargs={"error": output} if has_failed else {},
             status="error" if has_failed else "success",
         )
@@ -126,7 +126,7 @@ def get_tap_tool(ctx: MobileUseContext):
             update=state.sanitize_update(
                 ctx=ctx,
                 update={
-                    "agents_thoughts": [agent_thought],
+                    "agents_thoughts": [agent_thought, agent_outcome],
                     EXECUTOR_MESSAGES_KEY: [tool_message],
                 },
                 agent="executor",
