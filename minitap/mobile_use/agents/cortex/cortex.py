@@ -16,7 +16,7 @@ from minitap.mobile_use.agents.planner.utils import get_current_subgoal
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.graph.state import State
-from minitap.mobile_use.services.llm import get_llm, with_fallback
+from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message, with_fallback
 from minitap.mobile_use.tools.index import EXECUTOR_WRAPPERS_TOOLS, format_tools_list
 from minitap.mobile_use.utils.conversations import get_screenshot_message_for_llm
 from minitap.mobile_use.utils.decorators import wrap_with_callbacks
@@ -78,8 +78,12 @@ class CortexNode:
             ctx=self.ctx, name="cortex", use_fallback=True, temperature=1
         ).with_structured_output(CortexOutput)
         response: CortexOutput = await with_fallback(
-            main_call=lambda: llm.ainvoke(messages),
-            fallback_call=lambda: llm_fallback.ainvoke(messages),
+            main_call=lambda: invoke_llm_with_timeout_message(
+                llm.ainvoke(messages), agent_name="Cortex"
+            ),
+            fallback_call=lambda: invoke_llm_with_timeout_message(
+                llm_fallback.ainvoke(messages), agent_name="Cortex (Fallback)"
+            ),
         )  # type: ignore
 
         is_subgoal_completed = (

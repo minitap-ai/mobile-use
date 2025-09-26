@@ -15,7 +15,7 @@ from minitap.mobile_use.agents.planner.utils import (
 )
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.graph.state import State
-from minitap.mobile_use.services.llm import get_llm
+from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message
 from minitap.mobile_use.utils.decorators import wrap_with_callbacks
 from minitap.mobile_use.utils.logger import get_logger
 
@@ -72,8 +72,9 @@ class OrchestratorNode:
 
         llm = get_llm(ctx=self.ctx, name="orchestrator", temperature=1)
         llm = llm.with_structured_output(OrchestratorOutput)
-        response: OrchestratorOutput = await llm.ainvoke(messages)  # type: ignore
-
+        response: OrchestratorOutput = await invoke_llm_with_timeout_message(
+            llm.ainvoke(messages), agent_name="Orchestrator"
+        )  # type: ignore
         if response.needs_replaning:
             thoughts = [response.reason]
             state.subgoal_plan = fail_current_subgoal(state.subgoal_plan)

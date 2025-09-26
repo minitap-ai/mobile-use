@@ -3,13 +3,14 @@ from pathlib import Path
 
 from jinja2 import Template
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
+from pydantic import BaseModel
+
 from minitap.mobile_use.config import OutputConfig
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.graph.state import State
-from minitap.mobile_use.services.llm import get_llm
+from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message
 from minitap.mobile_use.utils.conversations import is_ai_message
 from minitap.mobile_use.utils.logger import get_logger
-from pydantic import BaseModel
 
 logger = get_logger(__name__)
 
@@ -61,7 +62,9 @@ async def outputter(
         if schema is not None:
             structured_llm = llm.with_structured_output(schema)
 
-    response = await structured_llm.ainvoke(messages)  # type: ignore
+    response = await invoke_llm_with_timeout_message(
+        structured_llm.ainvoke(messages), agent_name="Outputter"
+    )  # type: ignore
     if isinstance(response, BaseModel):
         if output_config.output_description and hasattr(response, "content"):
             response = json.loads(response.content)  # type: ignore

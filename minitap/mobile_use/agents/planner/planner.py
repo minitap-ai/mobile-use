@@ -7,7 +7,7 @@ from minitap.mobile_use.agents.planner.types import PlannerOutput, Subgoal, Subg
 from minitap.mobile_use.agents.planner.utils import generate_id, one_of_them_is_failure
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.graph.state import State
-from minitap.mobile_use.services.llm import get_llm
+from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message
 from minitap.mobile_use.tools.index import EXECUTOR_WRAPPERS_TOOLS, format_tools_list
 from minitap.mobile_use.utils.decorators import wrap_with_callbacks
 from minitap.mobile_use.utils.logger import get_logger
@@ -48,8 +48,9 @@ class PlannerNode:
 
         llm = get_llm(ctx=self.ctx, name="planner")
         llm = llm.with_structured_output(PlannerOutput)
-        response: PlannerOutput = await llm.ainvoke(messages)  # type: ignore
-
+        response: PlannerOutput = await invoke_llm_with_timeout_message(
+            llm.ainvoke(messages), agent_name="Planner"
+        )  # type: ignore
         subgoals_plan = [
             Subgoal(
                 id=generate_id(),
