@@ -1,6 +1,7 @@
+import asyncio
 import logging
-from collections.abc import Awaitable, Callable
-from typing import Literal, TypeVar, overload
+from collections.abc import Awaitable, Callable, Coroutine
+from typing import Any, Literal, TypeVar, overload
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -15,8 +16,43 @@ from minitap.mobile_use.config import (
     settings,
 )
 from minitap.mobile_use.context import MobileUseContext
+from minitap.mobile_use.utils.logger import get_logger
 
-logger = logging.getLogger(__name__)
+# Logger for internal messages (ex: fallback)
+llm_logger = logging.getLogger(__name__)
+# Logger for user messages
+user_messages_logger = get_logger(__name__)
+
+
+async def invoke_llm_with_timeout_message[T](
+    llm_call: Coroutine[Any, Any, T],
+    agent_name: str,
+    timeout_seconds: int = 10,
+) -> T:
+    """
+    Send a LLM call and display a timeout message if it takes too long.
+
+    Args:
+        llm_call: The coroutine of the LLM call to execute.
+        agent_name: The name of the agent making the call (for the message).
+        timeout_seconds: The delay in seconds before displaying the message.
+
+    Returns:
+        The result of the LLM call.
+    """
+    llm_task = asyncio.create_task(llm_call)
+    waiter_task = asyncio.create_task(asyncio.sleep(timeout_seconds))
+
+    done, _ = await asyncio.wait({llm_task, waiter_task}, return_when=asyncio.FIRST_COMPLETED)
+
+    if llm_task in done:
+        # The LLM call has finished before the timeout, cancel the timer
+        waiter_task.cancel()
+        return llm_task.result()
+    else:
+        # The timeout has been reached, display the message and wait for the call to finish
+        user_messages_logger.info("Waiting for LLM call response...")
+        return await llm_task
 
 
 def get_google_llm(
@@ -154,9 +190,9 @@ async def with_fallback(
     try:
         result = await main_call()
         if result is None and none_should_fallback:
-            logger.warning("Main LLM inference returned None. Falling back...")
+            llm_logger.warning("Main LLM inference returned None. Falling back...")
             return await fallback_call()
         return result
     except Exception as e:
-        logger.warning(f"❗ Main LLM inference failed: {e}. Falling back...")
+        llm_logger.warning(f"❗ Main LLM inference failed: {e}. Falling back...")
         return await fallback_call()

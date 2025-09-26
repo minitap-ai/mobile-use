@@ -8,7 +8,7 @@ from langchain_google_vertexai.chat_models import ChatVertexAI
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.graph.state import State
-from minitap.mobile_use.services.llm import get_llm
+from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message
 from minitap.mobile_use.tools.index import EXECUTOR_WRAPPERS_TOOLS, get_tools_from_wrappers
 from minitap.mobile_use.utils.decorators import wrap_with_callbacks
 from minitap.mobile_use.utils.logger import get_logger
@@ -62,8 +62,9 @@ class ExecutorNode:
             llm_bind_tools_kwargs["parallel_tool_calls"] = True
 
         llm = llm.bind_tools(**llm_bind_tools_kwargs)
-        response = await llm.ainvoke(messages)
-
+        response = await invoke_llm_with_timeout_message(
+            llm.ainvoke(messages), agent_name="Executor"
+        )
         return state.sanitize_update(
             ctx=self.ctx,
             update={

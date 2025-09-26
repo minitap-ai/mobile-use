@@ -2,9 +2,10 @@ from pathlib import Path
 
 from jinja2 import Template
 from langchain_core.messages import HumanMessage, SystemMessage
-from minitap.mobile_use.context import MobileUseContext
-from minitap.mobile_use.services.llm import get_llm
 from pydantic import BaseModel, Field
+
+from minitap.mobile_use.context import MobileUseContext
+from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message
 
 
 class HopperOutput(BaseModel):
@@ -33,7 +34,9 @@ async def hopper(
 
     llm = get_llm(ctx=ctx, name="hopper", is_utils=True, temperature=0)
     structured_llm = llm.with_structured_output(HopperOutput)
-    response: HopperOutput = await structured_llm.ainvoke(messages)  # type: ignore
+    response: HopperOutput = await invoke_llm_with_timeout_message(
+        structured_llm.ainvoke(messages), agent_name="Hopper"
+    )  # type: ignore
     return HopperOutput(
         step=response.step,
         output=response.output,
