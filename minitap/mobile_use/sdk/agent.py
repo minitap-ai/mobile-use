@@ -104,6 +104,8 @@ class Agent:
         self._is_default_screen_api = (
             self._config.servers.screen_api_base_url == DEFAULT_SCREEN_API_BASE_URL
         )
+        # Initialize platform service if API key is available in environment
+        # Note: Can also be initialized later with API key from request
         if settings.MINITAP_API_KEY:
             self._platform_service = PlatformService()
         else:
@@ -232,13 +234,21 @@ class Agent:
     ) -> str | dict | TOutput | None:
         if request is not None:
             task_info = None
+            platform_service = None
             if isinstance(request, PlatformTaskRequest):
-                if not self._platform_service:
+                # Initialize platform service with API key from request if provided
+                if request.api_key:
+                    platform_service = PlatformService(api_key=request.api_key)
+                elif self._platform_service:
+                    platform_service = self._platform_service
+                else:
                     raise PlatformServiceUninitializedError()
-                task_info = await self._platform_service.create_task_run(request=request)
+                task_info = await platform_service.create_task_run(request=request)
                 self._config.agent_profiles[task_info.llm_profile.name] = task_info.llm_profile
                 request = task_info.task_request
-            return await self._run_task(request=request, task_info=task_info)
+            return await self._run_task(
+                request=request, task_info=task_info, platform_service=platform_service
+            )
         if goal is None:
             raise AgentTaskRequestError("Goal is required")
         task_request = self.new_task(goal=goal)
@@ -257,6 +267,7 @@ class Agent:
         self,
         request: TaskRequest[TOutput],
         task_info: PlatformTaskInfo | None = None,
+        platform_service: PlatformService | None = None,
     ) -> str | dict | TOutput | None:
         if not self._initialized:
             raise AgentNotInitializedError()
@@ -274,9 +285,15 @@ class Agent:
         on_plan_changes = None
         task_id = str(uuid.uuid4())
         if task_info:
-            on_status_changed = self._get_task_status_change_callback(task_info=task_info)
-            on_agent_thought = self._get_new_agent_thought_callback(task_info=task_info)
-            on_plan_changes = self._get_plan_changes_callback(task_info=task_info)
+            on_status_changed = self._get_task_status_change_callback(
+                task_info=task_info, platform_service=platform_service
+            )
+            on_agent_thought = self._get_new_agent_thought_callback(
+                task_info=task_info, platform_service=platform_service
+            )
+            on_plan_changes = self._get_plan_changes_callback(
+                task_info=task_info, platform_service=platform_service
+            )
             task_id = task_info.task_run.id
 
         task = Task(
@@ -290,6 +307,11 @@ class Agent:
         self._tasks.append(task)
         task_name = task.get_name()
 
+        # Extract API key from platform service if available
+        api_key = None
+        if platform_service:
+            api_key = platform_service._api_key
+        
         context = MobileUseContext(
             trace_id=task.id,
             device=self._device_context,
@@ -299,6 +321,7 @@ class Agent:
             llm_config=agent_profile.llm_config,
             on_agent_thought=on_agent_thought,
             on_plan_changes=on_plan_changes,
+            minitap_api_key=api_key,
         )
 
         self._prepare_tracing(task=task, context=context)
@@ -593,16 +616,18 @@ class Agent:
     def _get_task_status_change_callback(
         self,
         task_info: PlatformTaskInfo,
+        platform_service: PlatformService | None = None,
     ) -> Callable[[TaskRunStatus, str | None, Any | None], Coroutine]:
+        service = platform_service or self._platform_service
         async def change_status(
             status: TaskRunStatus,
             message: str | None = None,
             output: Any | None = None,
         ):
-            if not self._platform_service:
+            if not service:
                 raise PlatformServiceUninitializedError()
             try:
-                await self._platform_service.update_task_run_status(
+                await service.update_task_run_status(
                     task_run_id=task_info.task_run.id,
                     status=status,
                     message=message,
@@ -616,18 +641,20 @@ class Agent:
     def _get_plan_changes_callback(
         self,
         task_info: PlatformTaskInfo,
+        platform_service: PlatformService | None = None,
     ) -> Callable[[list[Subgoal], IsReplan], Coroutine]:
+        service = platform_service or self._platform_service
         current_plan: TaskRunPlanResponse | None = None
 
         async def update_plan(plan: list[Subgoal], is_replan: IsReplan):
             nonlocal current_plan
 
-            if not self._platform_service:
+            if not service:
                 raise PlatformServiceUninitializedError()
             try:
                 if is_replan and current_plan:
                     # End previous plan
-                    await self._platform_service.upsert_task_run_plan(
+                    await service.upsert_task_run_plan(
                         task_run_id=task_info.task_run.id,
                         started_at=current_plan.started_at,
                         plan=plan,
@@ -636,7 +663,7 @@ class Agent:
                     )
                     current_plan = None
 
-                current_plan = await self._platform_service.upsert_task_run_plan(
+                current_plan = await service.upsert_task_run_plan(
                     task_run_id=task_info.task_run.id,
                     started_at=current_plan.started_at if current_plan else datetime.now(UTC),
                     plan=plan,
@@ -651,12 +678,14 @@ class Agent:
     def _get_new_agent_thought_callback(
         self,
         task_info: PlatformTaskInfo,
+        platform_service: PlatformService | None = None,
     ) -> Callable[[AgentNode, str], Coroutine]:
+        service = platform_service or self._platform_service
         async def add_agent_thought(agent: AgentNode, thought: str):
-            if not self._platform_service:
+            if not service:
                 raise PlatformServiceUninitializedError()
             try:
-                await self._platform_service.add_agent_thought(
+                await service.add_agent_thought(
                     task_run_id=task_info.task_run.id,
                     agent=agent,
                     thought=thought,
