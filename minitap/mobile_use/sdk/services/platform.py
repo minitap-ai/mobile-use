@@ -50,7 +50,7 @@ class PlatformService:
 
         self._timeout = httpx.Timeout(timeout=120)
         self._client = httpx.AsyncClient(
-            base_url=self._base_url,
+            base_url=f"{self._base_url}/api",
             timeout=self._timeout,
             headers={
                 "Authorization": f"Bearer {self._api_key}",
@@ -61,7 +61,7 @@ class PlatformService:
     async def create_task_run(self, request: PlatformTaskRequest) -> PlatformTaskInfo:
         try:
             logger.info(f"Getting task: {request.task}")
-            response = await self._client.get(url=f"/tasks/{request.task}")
+            response = await self._client.get(url=f"v1/tasks/{request.task}")
             response.raise_for_status()
             task_data = response.json()
             task = TaskResponse(**task_data)
@@ -118,7 +118,7 @@ class PlatformService:
                 output=sanitized_output,
             )
             response = await self._client.patch(
-                url=f"/task-runs/{task_run_id}/status",
+                url=f"v1/task-runs/{task_run_id}/status",
                 json=update.model_dump(),
             )
             response.raise_for_status()
@@ -145,12 +145,12 @@ class PlatformService:
             )
             if plan_id:
                 response = await self._client.put(
-                    url=f"/task-runs/{task_run_id}/plans/{plan_id}",
+                    url=f"v1/task-runs/{task_run_id}/plans/{plan_id}",
                     json=update.model_dump(),
                 )
             else:
                 response = await self._client.post(
-                    url=f"/task-runs/{task_run_id}/plans",
+                    url=f"v1/task-runs/{task_run_id}/plans",
                     json=update.model_dump(),
                 )
             response.raise_for_status()
@@ -170,7 +170,7 @@ class PlatformService:
                 timestamp=datetime.now(UTC),
             )
             response = await self._client.post(
-                url=f"/task-runs/{task_run_id}/agent-thoughts",
+                url=f"v1/task-runs/{task_run_id}/agent-thoughts",
                 json=update.model_dump(),
             )
             response.raise_for_status()
@@ -218,7 +218,7 @@ class PlatformService:
                 task_id=task.id,
                 llm_profile_id=profile.id,
             )
-            response = await self._client.post(url="/task-runs", json=task_run.model_dump())
+            response = await self._client.post(url="v1/task-runs", json=task_run.model_dump())
             response.raise_for_status()
             task_run_data = response.json()
             return TaskRunResponse(**task_run_data)
@@ -230,7 +230,7 @@ class PlatformService:
     async def _get_profile(self, profile_name: str) -> tuple[LLMProfileResponse, AgentProfile]:
         try:
             logger.info(f"Getting agent profile: {profile_name}")
-            response = await self._client.get(url=f"/llm-profiles/{profile_name}")
+            response = await self._client.get(url=f"v1/llm-profiles/{profile_name}")
             response.raise_for_status()
             profile_data = response.json()
             profile = LLMProfileResponse(**profile_data)
