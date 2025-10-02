@@ -67,6 +67,7 @@ class MobileUseContext(BaseModel):
     execution_setup: ExecutionSetup | None = None
     on_agent_thought: Callable[[AgentNode, str], Coroutine] | None = None
     on_plan_changes: Callable[[list[Subgoal], IsReplan], Coroutine] | None = None
+    minitap_api_key: str | None = None
 
     def get_adb_client(self) -> AdbClient:
         if self.adb_client is None:
