@@ -7,6 +7,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_google_vertexai import ChatVertexAI
 from langchain_openai import ChatOpenAI
+from pydantic import SecretStr
 
 from minitap.mobile_use.config import (
     AgentNode,
@@ -61,17 +62,28 @@ def get_minitap_llm(
     model: str = "google/gemini-2.5-pro",
     temperature: float | None = None,
     max_retries: int | None = None,
+    api_key: str | None = None,
 ) -> ChatOpenAI:
-    assert settings.MINITAP_API_KEY is not None
-    assert settings.MINITAP_API_BASE_URL is not None
+    if api_key:
+        effective_api_key = SecretStr(api_key)
+    elif settings.MINITAP_API_KEY:
+        effective_api_key = settings.MINITAP_API_KEY
+    else:
+        raise ValueError("MINITAP_API_KEY must be provided or set in environment")
+
+    if settings.MINITAP_API_BASE_URL is None:
+        raise ValueError("MINITAP_API_BASE_URL must be set in environment")
+
+    llm_base_url = f"{settings.MINITAP_API_BASE_URL}/api/v1"
+
     if max_retries is None and model.startswith("google/"):
         max_retries = 2
     client = ChatOpenAI(
         model=model,
         temperature=temperature,
         max_retries=max_retries,
-        api_key=settings.MINITAP_API_KEY,
-        base_url=settings.MINITAP_API_BASE_URL,
+        api_key=effective_api_key,
+        base_url=llm_base_url,
         default_query={
             "sessionId": trace_id,
             "traceOnlyUsage": remote_tracing,
@@ -209,6 +221,7 @@ def get_llm(
             remote_tracing=remote_tracing,
             model=llm.model,
             temperature=temperature,
+            api_key=ctx.minitap_api_key,
         )
     else:
         raise ValueError(f"Unsupported provider: {llm.provider}")
