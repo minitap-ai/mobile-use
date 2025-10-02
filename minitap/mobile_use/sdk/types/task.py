@@ -112,10 +112,13 @@ class PlatformTaskRequest[TOutput](TaskRequestBase):
     Attributes:
         task: Required task name specified by the user on the platform
         profile: Optional profile name specified by the user on the platform
+        api_key: Optional API key to authenticate with the platform
+                 (overrides MINITAP_API_KEY env variable)
     """
 
     task: str
     profile: str | None = None
+    api_key: str | None = None
 
 
 class TaskResult(BaseModel):

@@ -1,8 +1,13 @@
 import json
+from datetime import UTC, datetime
 from typing import Any
+
 import httpx
 from pydantic import BaseModel, ValidationError
+
 from minitap.mobile_use.agents.planner.types import Subgoal, SubgoalStatus
+from minitap.mobile_use.config import LLMConfig, settings
+from minitap.mobile_use.sdk.types.exceptions import PlatformServiceError
 from minitap.mobile_use.sdk.types.platform import (
     CreateTaskRunRequest,
     LLMProfileResponse,
@@ -16,18 +21,13 @@ from minitap.mobile_use.sdk.types.platform import (
     UpsertTaskRunAgentThoughtRequest,
     UpsertTaskRunPlanRequest,
 )
-from minitap.mobile_use.utils.logger import get_logger
-
-from minitap.mobile_use.config import LLMConfig, settings
-from minitap.mobile_use.sdk.types.exceptions import PlatformServiceError
 from minitap.mobile_use.sdk.types.task import (
     AgentProfile,
     PlatformTaskInfo,
     PlatformTaskRequest,
     TaskRequest,
 )
-
-from datetime import datetime, UTC
+from minitap.mobile_use.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -35,18 +35,17 @@ DEFAULT_PROFILE = "default"
 
 
 class PlatformService:
-    def __init__(self):
-        if not settings.MINITAP_API_BASE_URL:
-            raise PlatformServiceError(
-                message="Please set MINITAP_API_BASE_URL environment variable.",
-            )
+    def __init__(self, api_key: str | None = None):
         self._base_url = settings.MINITAP_API_BASE_URL
 
-        if not settings.MINITAP_API_KEY:
+        if api_key:
+            self._api_key = api_key
+        elif settings.MINITAP_API_KEY:
+            self._api_key = settings.MINITAP_API_KEY.get_secret_value()
+        else:
             raise PlatformServiceError(
-                message="Please set MINITAP_API_KEY environment variable.",
+                message="Please provide an API key or set MINITAP_API_KEY environment variable.",
             )
-        self._api_key = settings.MINITAP_API_KEY.get_secret_value()
 
         self._timeout = httpx.Timeout(timeout=120)
         self._client = httpx.AsyncClient(
