@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     MINITAP_API_KEY: SecretStr | None = None
 
     OPENAI_BASE_URL: str | None = None
-    MINITAP_API_BASE_URL: str | None = None
+    MINITAP_API_BASE_URL: str = "https://platform.minitap.ai"
 
     DEVICE_SCREEN_API_BASE_URL: str | None = None
     DEVICE_HARDWARE_BRIDGE_BASE_URL: str | None = None
