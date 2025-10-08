@@ -2,8 +2,8 @@
 Task-related type definitions for the Mobile-use SDK.
 """
 
+from collections.abc import Callable, Coroutine
 from datetime import datetime
-from enum import Enum
 from pathlib import Path
 from typing import Any, TypeVar, overload
 
@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from minitap.mobile_use.config import LLMConfig, get_default_llm_config
 from minitap.mobile_use.constants import RECURSION_LIMIT
 from minitap.mobile_use.context import DeviceContext
+from minitap.mobile_use.sdk.types.platform import TaskRunResponse, TaskRunStatus
 from minitap.mobile_use.sdk.utils import load_llm_config_override
 
 
@@ -54,21 +55,11 @@ class AgentProfile(BaseModel):
         return f"Profile {self.name}:\n{self.llm_config}"
 
 
-class TaskStatus(str, Enum):
-    """Task execution status enumeration."""
-
-    PENDING = "PENDING"
-    RUNNING = "RUNNING"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
-    CANCELLED = "CANCELLED"
-
-
 T = TypeVar("T", bound=BaseModel)
 TOutput = TypeVar("TOutput", bound=BaseModel | None)
 
 
-class TaskRequestCommon(BaseModel):
+class TaskRequestBase(BaseModel):
     """
     Defines common parameters of a mobile automation task request.
     """
@@ -78,6 +69,14 @@ class TaskRequestCommon(BaseModel):
     trace_path: Path = Path("mobile-use-traces")
     llm_output_path: Path | None = None
     thoughts_output_path: Path | None = None
+
+
+class TaskRequestCommon(TaskRequestBase):
+    """
+    Defines common parameters for any task request.
+    """
+
+    max_steps: int = RECURSION_LIMIT
 
 
 class TaskRequest[TOutput](TaskRequestCommon):
@@ -103,6 +102,23 @@ class TaskRequest[TOutput](TaskRequestCommon):
     task_name: str | None = None
     output_description: str | None = None
     output_format: type[TOutput] | None = None
+    enable_remote_tracing: bool = False
+
+
+class PlatformTaskRequest[TOutput](TaskRequestBase):
+    """
+    Minitap-specific task request for SDK usage via the gateway platform.
+
+    Attributes:
+        task: Required task name specified by the user on the platform
+        profile: Optional profile name specified by the user on the platform
+        api_key: Optional API key to authenticate with the platform
+                 (overrides MINITAP_API_KEY env variable)
+    """
+
+    task: str
+    profile: str | None = None
+    api_key: str | None = None
 
 
 class TaskResult(BaseModel):
@@ -156,22 +172,30 @@ class Task(BaseModel):
 
     id: str
     device: DeviceContext
-    status: TaskStatus
+    status: TaskRunStatus
+    status_message: str | None = None
+    on_status_changed: Callable[[TaskRunStatus, str | None, Any | None], Coroutine] | None = None
     request: TaskRequest
     created_at: datetime
     ended_at: datetime | None = None
     result: TaskResult | None = None
 
-    def finalize(
+    async def finalize(
         self,
         content: Any | None = None,
         state: dict | None = None,
         error: str | None = None,
         cancelled: bool = False,
     ):
-        self.status = TaskStatus.COMPLETED if error is None else TaskStatus.FAILED
-        if self.status == TaskStatus.FAILED and cancelled:
-            self.status = TaskStatus.CANCELLED
+        new_status: TaskRunStatus = "completed" if error is None else "failed"
+        if new_status == "failed" and cancelled:
+            new_status = "cancelled"
+        message = "Task completed successfully"
+        if new_status == "failed":
+            message = "Task failed" + (f": {error}" if error else "")
+        elif new_status == "cancelled":
+            message = "Task cancelled" + (f": {error}" if error else "")
+        await self.set_status(status=new_status, message=message, output=content or error)
         self.ended_at = datetime.now()
 
         duration = self.ended_at - self.created_at
@@ -189,4 +213,23 @@ class Task(BaseModel):
         )
 
     def get_name(self) -> str:
+        if isinstance(self.request, PlatformTaskRequest):
+            return self.request.task
         return self.request.task_name or self.id
+
+    async def set_status(
+        self,
+        status: TaskRunStatus,
+        message: str | None = None,
+        output: Any | None = None,
+    ):
+        self.status = status
+        self.status_message = message
+        if self.on_status_changed:
+            await self.on_status_changed(status, message, output)
+
+
+class PlatformTaskInfo(BaseModel):
+    task_request: TaskRequest = Field(..., description="Task request")
+    llm_profile: AgentProfile = Field(..., description="LLM profile")
+    task_run: TaskRunResponse = Field(..., description="Task run instance on the platform")

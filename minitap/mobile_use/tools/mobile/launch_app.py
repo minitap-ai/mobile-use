@@ -67,7 +67,7 @@ def get_launch_app_tool(ctx: MobileUseContext):
             )
 
         return Command(
-            update=state.sanitize_update(
+            update=await state.asanitize_update(
                 ctx=ctx,
                 update={
                     "agents_thoughts": [agent_thought, tool_message.content],

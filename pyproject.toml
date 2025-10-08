@@ -33,6 +33,7 @@ dependencies = [
     "colorama>=0.4.6",
     "psutil>=5.9.0",
     "langchain-google-vertexai>=2.0.28",
+    "httpx>=0.28.1",
 ]
 
 [project.optional-dependencies]

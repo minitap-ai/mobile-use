@@ -7,6 +7,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_google_vertexai import ChatVertexAI
 from langchain_openai import ChatOpenAI
+from pydantic import SecretStr
 
 from minitap.mobile_use.config import (
     AgentNode,
@@ -53,6 +54,42 @@ async def invoke_llm_with_timeout_message[T](
         # The timeout has been reached, display the message and wait for the call to finish
         user_messages_logger.info("Waiting for LLM call response...")
         return await llm_task
+
+
+def get_minitap_llm(
+    trace_id: str,
+    remote_tracing: bool = False,
+    model: str = "google/gemini-2.5-pro",
+    temperature: float | None = None,
+    max_retries: int | None = None,
+    api_key: str | None = None,
+) -> ChatOpenAI:
+    if api_key:
+        effective_api_key = SecretStr(api_key)
+    elif settings.MINITAP_API_KEY:
+        effective_api_key = settings.MINITAP_API_KEY
+    else:
+        raise ValueError("MINITAP_API_KEY must be provided or set in environment")
+
+    if settings.MINITAP_API_BASE_URL is None:
+        raise ValueError("MINITAP_API_BASE_URL must be set in environment")
+
+    llm_base_url = f"{settings.MINITAP_API_BASE_URL}/api/v1"
+
+    if max_retries is None and model.startswith("google/"):
+        max_retries = 2
+    client = ChatOpenAI(
+        model=model,
+        temperature=temperature,
+        max_retries=max_retries,
+        api_key=effective_api_key,
+        base_url=llm_base_url,
+        default_query={
+            "sessionId": trace_id,
+            "traceOnlyUsage": remote_tracing,
+        },
+    )
+    return client
 
 
 def get_google_llm(
@@ -175,6 +212,17 @@ def get_llm(
         return get_openrouter_llm(llm.model, temperature)
     elif llm.provider == "xai":
         return get_grok_llm(llm.model, temperature)
+    elif llm.provider == "minitap":
+        remote_tracing = False
+        if ctx.execution_setup:
+            remote_tracing = ctx.execution_setup.enable_remote_tracing
+        return get_minitap_llm(
+            trace_id=ctx.trace_id,
+            remote_tracing=remote_tracing,
+            model=llm.model,
+            temperature=temperature,
+            api_key=ctx.minitap_api_key,
+        )
     else:
         raise ValueError(f"Unsupported provider: {llm.provider}")
 

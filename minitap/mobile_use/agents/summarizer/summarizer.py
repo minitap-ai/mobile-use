@@ -13,7 +13,7 @@ class SummarizerNode:
     def __init__(self, ctx: MobileUseContext):
         self.ctx = ctx
 
-    def __call__(self, state: State):
+    async def __call__(self, state: State):
         if len(state.messages) <= MAX_MESSAGES_IN_HISTORY:
             return {}
 
@@ -27,7 +27,7 @@ class SummarizerNode:
                 start_removal = True
             if start_removal and msg.id:
                 remove_messages.append(RemoveMessage(id=msg.id))
-            return state.sanitize_update(
+            return await state.asanitize_update(
                 ctx=self.ctx,
                 update={
                     "messages": remove_messages,

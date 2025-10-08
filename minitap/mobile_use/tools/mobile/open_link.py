@@ -17,12 +17,12 @@ from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 
 def get_open_link_tool(ctx: MobileUseContext):
     @tool
-    def open_link(
+    async def open_link(
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
         agent_thought: str,
         url: str,
-    ):
+    ) -> Command:
         """
         Open a link on a device (i.e. a deep link).
         """
@@ -42,7 +42,7 @@ def get_open_link_tool(ctx: MobileUseContext):
             status="error" if has_failed else "success",
         )
         return Command(
-            update=state.sanitize_update(
+            update=await state.asanitize_update(
                 ctx=ctx,
                 update={
                     "agents_thoughts": [agent_thought, agent_outcome],

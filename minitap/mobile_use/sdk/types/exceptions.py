@@ -102,3 +102,30 @@ class ExecutableNotFoundError(MobileUseError):
             if executable_name in install_instructions:
                 message += f"\nTo install it, please visit: {install_instructions[executable_name]}"
         super().__init__(message)
+
+
+class AgentInvalidApiKeyError(AgentTaskRequestError):
+    """Exception raise when the API key could not have been found"""
+
+    def __init__(self):
+        super().__init__(
+            "Minitap API key is incorrect. Visit https://platform.minitap.ai/api-keys "
+            "to get your API key."
+        )
+
+
+class PlatformServiceUninitializedError(MobileUseError):
+    """Exception raised when a platform service call fails."""
+
+    def __init__(self):
+        super().__init__(
+            "Platform service is not initialized. "
+            "To use Minitap platform service, visit https://platform.minitap.ai.",
+        )
+
+
+class PlatformServiceError(MobileUseError):
+    """Exception raised when a platform service call fails."""
+
+    def __init__(self, message="A platform service-related error occurred"):
+        super().__init__(message)

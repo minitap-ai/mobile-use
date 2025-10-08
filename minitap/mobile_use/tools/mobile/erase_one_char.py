@@ -17,11 +17,11 @@ from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 
 def get_erase_one_char_tool(ctx: MobileUseContext):
     @tool
-    def erase_one_char(
+    async def erase_one_char(
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
         agent_thought: str,
-    ):
+    ) -> Command:
         """
         Erase one character from a text area.
         It acts the same as pressing backspace a single time.
@@ -37,7 +37,7 @@ def get_erase_one_char_tool(ctx: MobileUseContext):
             status="error" if has_failed else "success",
         )
         return Command(
-            update=state.sanitize_update(
+            update=await state.asanitize_update(
                 ctx=ctx,
                 update={
                     "agents_thoughts": [agent_thought],

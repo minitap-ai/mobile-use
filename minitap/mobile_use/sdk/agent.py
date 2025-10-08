@@ -3,24 +3,28 @@ import sys
 import tempfile
 import time
 import uuid
-from datetime import datetime
+from collections.abc import Callable, Coroutine
+from datetime import UTC, datetime
 from pathlib import Path
 from shutil import which
 from types import NoneType
-from typing import TypeVar, overload
+from typing import Any, TypeVar, overload
 
 from adbutils import AdbClient
+from dotenv import load_dotenv
 from langchain_core.messages import AIMessage
 from pydantic import BaseModel
 
 from minitap.mobile_use.agents.outputter.outputter import outputter
+from minitap.mobile_use.agents.planner.types import Subgoal
 from minitap.mobile_use.clients.device_hardware_client import DeviceHardwareClient
 from minitap.mobile_use.clients.screen_api_client import ScreenApiClient
-from minitap.mobile_use.config import OutputConfig, record_events
+from minitap.mobile_use.config import AgentNode, OutputConfig, record_events, settings
 from minitap.mobile_use.context import (
     DeviceContext,
     DevicePlatform,
     ExecutionSetup,
+    IsReplan,
     MobileUseContext,
 )
 from minitap.mobile_use.controllers.mobile_command_controller import (
@@ -32,10 +36,8 @@ from minitap.mobile_use.graph.graph import get_graph
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.sdk.builders.agent_config_builder import get_default_agent_config
 from minitap.mobile_use.sdk.builders.task_request_builder import TaskRequestBuilder
-from minitap.mobile_use.sdk.constants import (
-    DEFAULT_HW_BRIDGE_BASE_URL,
-    DEFAULT_SCREEN_API_BASE_URL,
-)
+from minitap.mobile_use.sdk.constants import DEFAULT_HW_BRIDGE_BASE_URL, DEFAULT_SCREEN_API_BASE_URL
+from minitap.mobile_use.sdk.services.platform import PlatformService
 from minitap.mobile_use.sdk.types.agent import AgentConfig
 from minitap.mobile_use.sdk.types.exceptions import (
     AgentNotInitializedError,
@@ -43,9 +45,17 @@ from minitap.mobile_use.sdk.types.exceptions import (
     AgentTaskRequestError,
     DeviceNotFoundError,
     ExecutableNotFoundError,
+    PlatformServiceUninitializedError,
     ServerStartupError,
 )
-from minitap.mobile_use.sdk.types.task import AgentProfile, Task, TaskRequest, TaskStatus
+from minitap.mobile_use.sdk.types.platform import TaskRunPlanResponse, TaskRunStatus
+from minitap.mobile_use.sdk.types.task import (
+    AgentProfile,
+    PlatformTaskInfo,
+    PlatformTaskRequest,
+    Task,
+    TaskRequest,
+)
 from minitap.mobile_use.servers.device_hardware_bridge import BridgeStatus
 from minitap.mobile_use.servers.start_servers import (
     start_device_hardware_bridge,
@@ -65,6 +75,8 @@ logger = get_logger(__name__)
 
 TOutput = TypeVar("TOutput", bound=BaseModel | None)
 
+load_dotenv()
+
 
 class Agent:
     _config: AgentConfig
@@ -78,7 +90,7 @@ class Agent:
     _hw_bridge_client: DeviceHardwareClient
     _adb_client: AdbClient | None
 
-    def __init__(self, config: AgentConfig | None = None):
+    def __init__(self, *, config: AgentConfig | None = None):
         self._config = config or get_default_agent_config()
         self._tasks = []
         self._tmp_traces_dir = Path(tempfile.gettempdir()) / "mobile-use-traces"
@@ -89,6 +101,12 @@ class Agent:
         self._is_default_screen_api = (
             self._config.servers.screen_api_base_url == DEFAULT_SCREEN_API_BASE_URL
         )
+        # Initialize platform service if API key is available in environment
+        # Note: Can also be initialized later with API key from request
+        if settings.MINITAP_API_KEY:
+            self._platform_service = PlatformService()
+        else:
+            self._platform_service = None
 
     def init(
         self,
@@ -196,6 +214,12 @@ class Agent:
     @overload
     async def run_task(self, *, request: TaskRequest[TOutput]) -> TOutput | None: ...
 
+    @overload
+    async def run_task(self, *, request: PlatformTaskRequest[None]) -> str | dict | None: ...
+
+    @overload
+    async def run_task(self, *, request: PlatformTaskRequest[TOutput]) -> TOutput | None: ...
+
     async def run_task(
         self,
         *,
@@ -203,10 +227,25 @@ class Agent:
         output: type[TOutput] | str | None = None,
         profile: str | AgentProfile | None = None,
         name: str | None = None,
-        request: TaskRequest[TOutput] | None = None,
+        request: TaskRequest[TOutput] | PlatformTaskRequest[TOutput] | None = None,
     ) -> str | dict | TOutput | None:
         if request is not None:
-            return await self._run_task(request)
+            task_info = None
+            platform_service = None
+            if isinstance(request, PlatformTaskRequest):
+                # Initialize platform service with API key from request if provided
+                if request.api_key:
+                    platform_service = PlatformService(api_key=request.api_key)
+                elif self._platform_service:
+                    platform_service = self._platform_service
+                else:
+                    raise PlatformServiceUninitializedError()
+                task_info = await platform_service.create_task_run(request=request)
+                self._config.agent_profiles[task_info.llm_profile.name] = task_info.llm_profile
+                request = task_info.task_request
+            return await self._run_task(
+                request=request, task_info=task_info, platform_service=platform_service
+            )
         if goal is None:
             raise AgentTaskRequestError("Goal is required")
         task_request = self.new_task(goal=goal)
@@ -221,7 +260,12 @@ class Agent:
             task_request.with_name(name=name)
         return await self._run_task(task_request.build())
 
-    async def _run_task(self, request: TaskRequest[TOutput]) -> str | dict | TOutput | None:
+    async def _run_task(
+        self,
+        request: TaskRequest[TOutput],
+        task_info: PlatformTaskInfo | None = None,
+        platform_service: PlatformService | None = None,
+    ) -> str | dict | TOutput | None:
         if not self._initialized:
             raise AgentNotInitializedError()
 
@@ -233,22 +277,48 @@ class Agent:
             agent_profile = self._config.default_profile
         logger.info(str(agent_profile))
 
+        on_status_changed = None
+        on_agent_thought = None
+        on_plan_changes = None
+        task_id = str(uuid.uuid4())
+        if task_info:
+            on_status_changed = self._get_task_status_change_callback(
+                task_info=task_info, platform_service=platform_service
+            )
+            on_agent_thought = self._get_new_agent_thought_callback(
+                task_info=task_info, platform_service=platform_service
+            )
+            on_plan_changes = self._get_plan_changes_callback(
+                task_info=task_info, platform_service=platform_service
+            )
+            task_id = task_info.task_run.id
+
         task = Task(
-            id=str(uuid.uuid4()),
+            id=task_id,
             device=self._device_context,
-            status=TaskStatus.PENDING,
+            status="pending",
             request=request,
             created_at=datetime.now(),
+            on_status_changed=on_status_changed,
         )
         self._tasks.append(task)
         task_name = task.get_name()
 
+        # Extract API key from platform service if available
+        api_key = None
+        if platform_service:
+            api_key = platform_service._api_key
+
         context = MobileUseContext(
+            trace_id=task.id,
             device=self._device_context,
             hw_bridge_client=self._hw_bridge_client,
             screen_api_client=self._screen_api_client,
             adb_client=self._adb_client,
             llm_config=agent_profile.llm_config,
+            on_agent_thought=on_agent_thought,
+            on_plan_changes=on_plan_changes,
+            minitap_api_key=api_key,
         )
 
         self._prepare_tracing(task=task, context=context)
@@ -271,7 +341,7 @@ class Agent:
         output = None
         try:
             logger.info(f"[{task_name}] Invoking graph with input: {graph_input}")
-            task.status = TaskStatus.RUNNING
+            await task.set_status(status="running", message="Invoking graph...")
             async for chunk in (await get_graph(context)).astream(
                 input=graph_input,
                 config={
@@ -303,7 +373,7 @@ class Agent:
             if not last_state:
                 err = f"[{task_name}] No result received from graph"
                 logger.warning(err)
-                task.finalize(content=output, state=last_state_snapshot, error=err)
+                await task.finalize(content=output, state=last_state_snapshot, error=err)
                 return None
 
             print_ai_response_to_stderr(graph_result=last_state)
@@ -315,16 +385,25 @@ class Agent:
                 state=last_state,
             )
             logger.info(f"✅ Automation '{task_name}' is success ✅")
-            task.finalize(content=output, state=last_state_snapshot)
+            await task.finalize(content=output, state=last_state_snapshot)
         except asyncio.CancelledError:
             err = f"[{task_name}] Task cancelled"
             logger.warning(err)
-            task.finalize(content=output, state=last_state_snapshot, error=err, cancelled=True)
+            await task.finalize(
+                content=output,
+                state=last_state_snapshot,
+                error=err,
+                cancelled=True,
+            )
             raise
         except Exception as e:
             err = f"[{task_name}] Error running automation: {e}"
             logger.error(err)
-            task.finalize(content=output, state=last_state_snapshot, error=err)
+            await task.finalize(
+                content=output,
+                state=last_state_snapshot,
+                error=err,
+            )
             raise
         finally:
             self._finalize_tracing(task=task, context=context)
@@ -355,7 +434,9 @@ class Agent:
         traces_output_path.mkdir(parents=True, exist_ok=True)
         temp_trace_path.mkdir(parents=True, exist_ok=True)
         context.execution_setup = ExecutionSetup(
-            traces_path=self._tmp_traces_dir, trace_id=task_name
+            traces_path=self._tmp_traces_dir,
+            trace_name=task_name,
+            enable_remote_tracing=task.request.enable_remote_tracing,
         )
 
     def _finalize_tracing(self, task: Task, context: MobileUseContext):
@@ -364,11 +445,11 @@ class Agent:
             return
 
         task_name = task.get_name()
-        status = "_PASS" if task.status == TaskStatus.COMPLETED else "_FAIL"
+        status = "_PASS" if task.status == "completed" else "_FAIL"
         ts = task.created_at.strftime("%Y-%m-%dT%H-%M-%S")
-        new_name = f"{exec_setup_ctx.trace_id}{status}_{ts}"
+        new_name = f"{exec_setup_ctx.trace_name}{status}_{ts}"
 
-        temp_trace_path = (self._tmp_traces_dir / exec_setup_ctx.trace_id).resolve()
+        temp_trace_path = (self._tmp_traces_dir / exec_setup_ctx.trace_name).resolve()
         traces_output_path = Path(task.request.trace_path).resolve()
 
         logger.info(f"[{task_name}] Compiling trace FROM FOLDER: " + str(temp_trace_path))
@@ -528,6 +609,90 @@ class Agent:
             device_width=screen_data.width,
             device_height=screen_data.height,
         )
+
+    def _get_task_status_change_callback(
+        self,
+        task_info: PlatformTaskInfo,
+        platform_service: PlatformService | None = None,
+    ) -> Callable[[TaskRunStatus, str | None, Any | None], Coroutine]:
+        service = platform_service or self._platform_service
+
+        async def change_status(
+            status: TaskRunStatus,
+            message: str | None = None,
+            output: Any | None = None,
+        ):
+            if not service:
+                raise PlatformServiceUninitializedError()
+            try:
+                await service.update_task_run_status(
+                    task_run_id=task_info.task_run.id,
+                    status=status,
+                    message=message,
+                    output=output,
+                )
+            except Exception as e:
+                logger.error(f"Failed to update task run status: {e}")
+
+        return change_status
+
+    def _get_plan_changes_callback(
+        self,
+        task_info: PlatformTaskInfo,
+        platform_service: PlatformService | None = None,
+    ) -> Callable[[list[Subgoal], IsReplan], Coroutine]:
+        service = platform_service or self._platform_service
+        current_plan: TaskRunPlanResponse | None = None
+
+        async def update_plan(plan: list[Subgoal], is_replan: IsReplan):
+            nonlocal current_plan
+
+            if not service:
+                raise PlatformServiceUninitializedError()
+            try:
+                if is_replan and current_plan:
+                    # End previous plan
+                    await service.upsert_task_run_plan(
+                        task_run_id=task_info.task_run.id,
+                        started_at=current_plan.started_at,
+                        plan=plan,
+                        ended_at=datetime.now(UTC),
+                        plan_id=current_plan.id,
+                    )
+                    current_plan = None
+
+                current_plan = await service.upsert_task_run_plan(
+                    task_run_id=task_info.task_run.id,
+                    started_at=current_plan.started_at if current_plan else datetime.now(UTC),
+                    plan=plan,
+                    ended_at=current_plan.ended_at if current_plan else None,
+                    plan_id=current_plan.id if current_plan else None,
+                )
+            except Exception as e:
+                logger.error(f"Failed to update plan: {e}")
+
+        return update_plan
+
+    def _get_new_agent_thought_callback(
+        self,
+        task_info: PlatformTaskInfo,
+        platform_service: PlatformService | None = None,
+    ) -> Callable[[AgentNode, str], Coroutine]:
+        service = platform_service or self._platform_service
+
+        async def add_agent_thought(agent: AgentNode, thought: str):
+            if not service:
+                raise PlatformServiceUninitializedError()
+            try:
+                await service.add_agent_thought(
+                    task_run_id=task_info.task_run.id,
+                    agent=agent,
+                    thought=thought,
+                )
+            except Exception as e:
+                logger.error(f"Failed to add agent thought: {e}")
+
+        return add_agent_thought
 
 
 def _validate_and_prepare_file(file_path: Path):

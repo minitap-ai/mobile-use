@@ -29,7 +29,7 @@ class ExecutorNode:
         structured_decisions = state.structured_decisions
         if not structured_decisions:
             logger.warning("No structured decisions found.")
-            return state.sanitize_update(
+            return await state.asanitize_update(
                 ctx=self.ctx,
                 update={
                     "agents_thoughts": [
@@ -65,7 +65,7 @@ class ExecutorNode:
         response = await invoke_llm_with_timeout_message(
             llm.ainvoke(messages), agent_name="Executor"
         )
-        return state.sanitize_update(
+        return await state.asanitize_update(
             ctx=self.ctx,
             update={
                 "cortex_last_thought": cortex_last_thought,

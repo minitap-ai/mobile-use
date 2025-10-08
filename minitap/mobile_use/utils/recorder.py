@@ -25,7 +25,7 @@ def record_interaction(ctx: MobileUseContext, response: BaseMessage):
         logger.error(f"Error compressing screenshot: {e}")
         return "Could not record this interaction"
     timestamp = time.time()
-    folder = ctx.execution_setup.traces_path.joinpath(ctx.execution_setup.trace_id).resolve()
+    folder = ctx.execution_setup.traces_path.joinpath(ctx.execution_setup.trace_name).resolve()
     folder.mkdir(parents=True, exist_ok=True)
     try:
         with open(
