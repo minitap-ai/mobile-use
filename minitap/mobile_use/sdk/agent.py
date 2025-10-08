@@ -311,7 +311,7 @@ class Agent:
         api_key = None
         if platform_service:
             api_key = platform_service._api_key
-        
+
         context = MobileUseContext(
             trace_id=task.id,
             device=self._device_context,
@@ -619,6 +619,7 @@ class Agent:
         platform_service: PlatformService | None = None,
     ) -> Callable[[TaskRunStatus, str | None, Any | None], Coroutine]:
         service = platform_service or self._platform_service
+
         async def change_status(
             status: TaskRunStatus,
             message: str | None = None,
@@ -681,6 +682,7 @@ class Agent:
         platform_service: PlatformService | None = None,
     ) -> Callable[[AgentNode, str], Coroutine]:
         service = platform_service or self._platform_service
+
         async def add_agent_thought(agent: AgentNode, thought: str):
             if not service:
                 raise PlatformServiceUninitializedError()
