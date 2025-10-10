@@ -110,9 +110,6 @@ class PlatformService:
                     thoughts_output_path=request.thoughts_output_path,
                 )
 
-                # Create a mock TaskResponse for manual task (not persisted on platform)
-                # We still need to create a task_run, but without a real task_id
-                # This will require creating the task on the platform first
                 task_run = await self._create_manual_task_run(
                     manual_config=request.task,
                     profile=profile,
