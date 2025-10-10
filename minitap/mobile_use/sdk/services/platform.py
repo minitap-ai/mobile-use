@@ -68,11 +68,11 @@ class PlatformService:
                 response.raise_for_status()
                 task_data = response.json()
                 task = TaskResponse(**task_data)
-                
+
                 profile, agent_profile = await self._get_profile(
                     profile_name=request.profile or DEFAULT_PROFILE,
                 )
-                
+
                 task_request = TaskRequest(
                     # Remote configuration
                     max_steps=task.options.max_steps,
@@ -86,16 +86,16 @@ class PlatformService:
                     llm_output_path=request.llm_output_path,
                     thoughts_output_path=request.thoughts_output_path,
                 )
-                
+
                 task_run = await self._create_task_run(task=task, profile=profile)
             else:
                 # Create task manually from ManualTaskConfig
                 logger.info(f"Creating manual task with goal: {request.task.goal}")
-                
+
                 profile, agent_profile = await self._get_profile(
                     profile_name=request.profile or DEFAULT_PROFILE,
                 )
-                
+
                 task_request = TaskRequest(
                     # Manual configuration
                     max_steps=400,
@@ -109,7 +109,7 @@ class PlatformService:
                     llm_output_path=request.llm_output_path,
                     thoughts_output_path=request.thoughts_output_path,
                 )
-                
+
                 # Create a mock TaskResponse for manual task (not persisted on platform)
                 # We still need to create a task_run, but without a real task_id
                 # This will require creating the task on the platform first
@@ -117,7 +117,7 @@ class PlatformService:
                     manual_config=request.task,
                     profile=profile,
                 )
-            
+
             return PlatformTaskInfo(
                 task_request=task_request,
                 llm_profile=agent_profile,
@@ -274,19 +274,19 @@ class PlatformService:
         """
         try:
             logger.info(f"Creating orphan task run with goal: {manual_config.goal}")
-            
+
             # Create an orphan task run directly
             orphan_payload = {
                 "inputPrompt": manual_config.goal,
                 "outputDescription": manual_config.output_description,
                 "llmProfileId": profile.id,
             }
-            
+
             response = await self._client.post(url="v1/task-runs/orphan", json=orphan_payload)
             response.raise_for_status()
             task_run_data = response.json()
             return TaskRunResponse(**task_run_data)
-            
+
         except ValidationError as e:
             raise PlatformServiceError(message=f"API response validation error: {e}")
         except httpx.HTTPStatusError as e:

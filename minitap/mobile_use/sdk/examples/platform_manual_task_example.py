@@ -35,7 +35,7 @@ async def main() -> None:
     """
     agent = Agent()
     agent.init()
-    
+
     # Example 1: Simple manual task
     result = await agent.run_task(
         request=PlatformTaskRequest(
@@ -46,7 +46,7 @@ async def main() -> None:
         )
     )
     print("Result 1:", result)
-    
+
     # Example 2: Manual task with output description
     result = await agent.run_task(
         request=PlatformTaskRequest(
@@ -57,7 +57,7 @@ async def main() -> None:
         )
     )
     print("Result 2:", result)
-    
+
     agent.clean()
 
 
