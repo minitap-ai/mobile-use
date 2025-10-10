@@ -72,7 +72,7 @@ def get_minitap_llm(
         raise ValueError("MINITAP_API_KEY must be provided or set in environment")
 
     if settings.MINITAP_BASE_URL is None:
-        raise ValueError("MINITAP_API_BASE_URL must be set in environment")
+        raise ValueError("MINITAP_BASE_URL must be set in environment")
 
     llm_base_url = f"{settings.MINITAP_BASE_URL}/api/v1"
 

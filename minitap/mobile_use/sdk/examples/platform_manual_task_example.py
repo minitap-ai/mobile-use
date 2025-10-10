@@ -31,7 +31,7 @@ async def main() -> None:
     Main execution function demonstrating manual task creation pattern.
 
     Visit https://platform.minitap.ai to get your API key.
-    Set MINITAP_API_KEY and MINITAP_API_BASE_URL environment variables.
+    Set MINITAP_API_KEY and MINITAP_BASE_URL environment variables.
     """
     agent = Agent()
     agent.init()
