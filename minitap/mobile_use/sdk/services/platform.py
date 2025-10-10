@@ -37,7 +37,7 @@ DEFAULT_PROFILE = "default"
 
 class PlatformService:
     def __init__(self, api_key: str | None = None):
-        self._base_url = settings.MINITAP_API_BASE_URL
+        self._base_url = settings.MINITAP_BASE_URL
 
         if api_key:
             self._api_key = api_key
