@@ -6,7 +6,7 @@ import copy
 
 from langchain_core.callbacks.base import Callbacks
 
-from minitap.mobile_use.config import get_default_llm_config
+from minitap.mobile_use.config import get_default_llm_config, get_default_minitap_llm_config
 from minitap.mobile_use.context import DevicePlatform
 from minitap.mobile_use.sdk.constants import (
     DEFAULT_HW_BRIDGE_BASE_URL,
@@ -187,9 +187,10 @@ class AgentConfigBuilder:
             if default_profile.name not in self._agent_profiles:
                 self.add_profile(default_profile)
         elif nb_profiles <= 0:
+            llm_config = get_default_minitap_llm_config() or get_default_llm_config()
             default_profile = AgentProfile(
                 name=DEFAULT_PROFILE_NAME,
-                llm_config=get_default_llm_config(),
+                llm_config=llm_config,
             )
             self.add_profile(default_profile)
         elif nb_profiles == 1:
