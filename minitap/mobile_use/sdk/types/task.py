@@ -105,18 +105,32 @@ class TaskRequest[TOutput](TaskRequestCommon):
     enable_remote_tracing: bool = False
 
 
+class ManualTaskConfig(BaseModel):
+    """
+    Configuration for manually creating a task without fetching from the platform.
+
+    Attributes:
+        goal: Natural language description of the goal to achieve
+        output_description: Optional natural language description of expected output format
+    """
+
+    goal: str
+    output_description: str | None = None
+
+
 class PlatformTaskRequest[TOutput](TaskRequestBase):
     """
     Minitap-specific task request for SDK usage via the gateway platform.
 
     Attributes:
-        task: Required task name specified by the user on the platform
+        task: Either a task name to fetch from the platform, or a
+              ManualTaskConfig to create manually
         profile: Optional profile name specified by the user on the platform
         api_key: Optional API key to authenticate with the platform
                  (overrides MINITAP_API_KEY env variable)
     """
 
-    task: str
+    task: str | ManualTaskConfig
     profile: str | None = None
     api_key: str | None = None
 
@@ -214,7 +228,11 @@ class Task(BaseModel):
 
     def get_name(self) -> str:
         if isinstance(self.request, PlatformTaskRequest):
-            return self.request.task
+            if isinstance(self.request.task, str):
+                return self.request.task
+            else:
+                # ManualTaskConfig - use first 50 chars of goal
+                return f"Manual: {self.request.task.goal[:50]}"
         return self.request.task_name or self.id
 
     async def set_status(

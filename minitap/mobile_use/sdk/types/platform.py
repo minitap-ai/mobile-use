@@ -1,8 +1,8 @@
+from datetime import datetime
 from typing import Annotated, Any, Literal
+
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer
 from pydantic.v1.utils import to_lower_camel
-from datetime import datetime
-
 
 TaskRunStatus = Literal["pending", "running", "completed", "failed", "cancelled"]
 
@@ -77,7 +77,9 @@ class TaskRunResponse(BaseApiModel):
     """Response model for a single task run."""
 
     id: str = Field(..., description="Unique identifier for the task run")
-    task: TaskResponse = Field(..., description="ID of the task this run is for")
+    task: TaskResponse | None = Field(
+        ..., description="ID of the task this run is for or None if manually created"
+    )
     llm_profile: LLMProfileResponse = Field(..., description="LLM profile ID used for this run")
     status: TaskRunStatus = Field(..., description="Current status of the task run")
     input_prompt: str = Field(..., description="Input prompt for this task run")

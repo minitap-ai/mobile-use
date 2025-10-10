@@ -23,6 +23,7 @@ from minitap.mobile_use.sdk.types.platform import (
 )
 from minitap.mobile_use.sdk.types.task import (
     AgentProfile,
+    ManualTaskConfig,
     PlatformTaskInfo,
     PlatformTaskRequest,
     TaskRequest,
@@ -59,28 +60,64 @@ class PlatformService:
 
     async def create_task_run(self, request: PlatformTaskRequest) -> PlatformTaskInfo:
         try:
-            logger.info(f"Getting task: {request.task}")
-            response = await self._client.get(url=f"v1/tasks/{request.task}")
-            response.raise_for_status()
-            task_data = response.json()
-            task = TaskResponse(**task_data)
-            profile, agent_profile = await self._get_profile(
-                profile_name=request.profile or DEFAULT_PROFILE,
-            )
-            task_request = TaskRequest(
-                # Remote configuration
-                max_steps=task.options.max_steps,
-                goal=task.input_prompt,
-                output_description=task.output_description,
-                enable_remote_tracing=task.options.enable_tracing,
-                profile=profile.name,
-                # Local configuration
-                record_trace=request.record_trace,
-                trace_path=request.trace_path,
-                llm_output_path=request.llm_output_path,
-                thoughts_output_path=request.thoughts_output_path,
-            )
-            task_run = await self._create_task_run(task=task, profile=profile)
+            # Check if task is a string (fetch from platform) or ManualTaskConfig (create manually)
+            if isinstance(request.task, str):
+                # Fetch task from platform
+                logger.info(f"Getting task: {request.task}")
+                response = await self._client.get(url=f"v1/tasks/{request.task}")
+                response.raise_for_status()
+                task_data = response.json()
+                task = TaskResponse(**task_data)
+                
+                profile, agent_profile = await self._get_profile(
+                    profile_name=request.profile or DEFAULT_PROFILE,
+                )
+                
+                task_request = TaskRequest(
+                    # Remote configuration
+                    max_steps=task.options.max_steps,
+                    goal=task.input_prompt,
+                    output_description=task.output_description,
+                    enable_remote_tracing=task.options.enable_tracing,
+                    profile=profile.name,
+                    # Local configuration
+                    record_trace=request.record_trace,
+                    trace_path=request.trace_path,
+                    llm_output_path=request.llm_output_path,
+                    thoughts_output_path=request.thoughts_output_path,
+                )
+                
+                task_run = await self._create_task_run(task=task, profile=profile)
+            else:
+                # Create task manually from ManualTaskConfig
+                logger.info(f"Creating manual task with goal: {request.task.goal}")
+                
+                profile, agent_profile = await self._get_profile(
+                    profile_name=request.profile or DEFAULT_PROFILE,
+                )
+                
+                task_request = TaskRequest(
+                    # Manual configuration
+                    max_steps=400,
+                    goal=request.task.goal,
+                    output_description=request.task.output_description,
+                    enable_remote_tracing=True,
+                    profile=DEFAULT_PROFILE,
+                    # Local configuration
+                    record_trace=request.record_trace,
+                    trace_path=request.trace_path,
+                    llm_output_path=request.llm_output_path,
+                    thoughts_output_path=request.thoughts_output_path,
+                )
+                
+                # Create a mock TaskResponse for manual task (not persisted on platform)
+                # We still need to create a task_run, but without a real task_id
+                # This will require creating the task on the platform first
+                task_run = await self._create_manual_task_run(
+                    manual_config=request.task,
+                    profile=profile,
+                )
+            
             return PlatformTaskInfo(
                 task_request=task_request,
                 llm_profile=agent_profile,
@@ -225,6 +262,35 @@ class PlatformService:
             raise PlatformServiceError(message=f"API response validation error: {e}")
         except httpx.HTTPStatusError as e:
             raise PlatformServiceError(message=f"Failed to create task run: {e}")
+
+    async def _create_manual_task_run(
+        self,
+        manual_config: ManualTaskConfig,
+        profile: LLMProfileResponse,
+    ) -> TaskRunResponse:
+        """
+        Create an orphan task run from a manual task configuration.
+        This creates a task run without a pre-existing task using the /orphan endpoint.
+        """
+        try:
+            logger.info(f"Creating orphan task run with goal: {manual_config.goal}")
+            
+            # Create an orphan task run directly
+            orphan_payload = {
+                "inputPrompt": manual_config.goal,
+                "outputDescription": manual_config.output_description,
+                "llmProfileId": profile.id,
+            }
+            
+            response = await self._client.post(url="v1/task-runs/orphan", json=orphan_payload)
+            response.raise_for_status()
+            task_run_data = response.json()
+            return TaskRunResponse(**task_run_data)
+            
+        except ValidationError as e:
+            raise PlatformServiceError(message=f"API response validation error: {e}")
+        except httpx.HTTPStatusError as e:
+            raise PlatformServiceError(message=f"Failed to create orphan task run: {e}")
 
     async def _get_profile(self, profile_name: str) -> tuple[LLMProfileResponse, AgentProfile]:
         try:

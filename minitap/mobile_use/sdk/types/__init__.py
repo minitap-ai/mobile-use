@@ -19,6 +19,7 @@ from minitap.mobile_use.sdk.types.exceptions import (
 )
 from minitap.mobile_use.sdk.types.task import (
     AgentProfile,
+    ManualTaskConfig,
     PlatformTaskRequest,
     Task,
     TaskRequest,
@@ -33,6 +34,7 @@ __all__ = [
     "AgentProfile",
     "ServerConfig",
     "TaskRequest",
+    "ManualTaskConfig",
     "PlatformTaskRequest",
     "TaskResult",
     "TaskRequestCommon",
