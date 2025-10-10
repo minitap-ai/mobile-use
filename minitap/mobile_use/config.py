@@ -211,6 +211,33 @@ def get_default_llm_config() -> LLMConfig:
         )
 
 
+def get_default_minitap_llm_config() -> LLMConfig | None:
+    """
+    Returns a default LLM config using the Minitap provider.
+    Only returns a config if MINITAP_API_KEY is available.
+
+    Returns:
+        LLMConfig with minitap provider if API key is available, None otherwise
+    """
+    if not settings.MINITAP_API_KEY:
+        return None
+
+    return LLMConfig(
+        planner=LLM(provider="minitap", model="meta-llama/llama-4-scout"),
+        orchestrator=LLM(provider="minitap", model="openai/gpt-oss-120b"),
+        cortex=LLMWithFallback(
+            provider="minitap",
+            model="google/gemini-2.5-pro",
+            fallback=LLM(provider="minitap", model="openai/gpt-5"),
+        ),
+        executor=LLM(provider="minitap", model="meta-llama/llama-3.3-70b-instruct"),
+        utils=LLMConfigUtils(
+            outputter=LLM(provider="minitap", model="openai/gpt-4.1"),
+            hopper=LLM(provider="minitap", model="openai/gpt-5-nano"),
+        ),
+    )
+
+
 def deep_merge_llm_config(default: LLMConfig, override: dict) -> LLMConfig:
     def _deep_merge_dict(base: dict, extra: dict):
         for key, value in extra.items():
