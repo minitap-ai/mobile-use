@@ -14,7 +14,7 @@ def get_ios_devices() -> tuple[bool, list[str], str]:
         - list[str]: A list of iOS device UDIDs.
         - str: An error message if any.
     """
-    if platform.system() != "Linux":
+    if platform.system() != "Darwin":
         return False, [], "xcrun is only available on macOS."
 
     try:
