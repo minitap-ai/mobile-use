@@ -34,7 +34,8 @@ def _stream_worker():
             with requests.get(sse_url, stream=True, headers=headers) as response:
                 response.raise_for_status()
                 print("--- Stream connected, listening for events... ---")
-                _is_streaming_connected = True
+                with _data_lock:
+                    _is_streaming_connected = True
                 event_source = (chunk for chunk in response.iter_content())
                 client = SSEClient(event_source)
                 for event in client.events():
