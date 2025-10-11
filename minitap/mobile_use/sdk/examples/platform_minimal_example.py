@@ -36,6 +36,7 @@ async def main() -> None:
         request=PlatformTaskRequest(
             task="your-task-name",
             profile="your-profile-name",
+            api_key="<api-key>",  # or set MINITAP_API_KEY env variable
         )
     )
     print(result)
