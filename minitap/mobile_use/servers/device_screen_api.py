@@ -24,7 +24,7 @@ _stream_thread = None
 _stop_event = threading.Event()
 
 
-def get_streaming_status():
+def is_streaming_connected():
     return _is_streaming_connected
 
 
