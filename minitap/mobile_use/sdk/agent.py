@@ -57,7 +57,6 @@ from minitap.mobile_use.sdk.types.task import (
     TaskRequest,
 )
 from minitap.mobile_use.servers.device_hardware_bridge import BridgeStatus
-from minitap.mobile_use.servers.device_screen_api import is_streaming_connected
 from minitap.mobile_use.servers.start_servers import (
     start_device_hardware_bridge,
     start_device_screen_api,
@@ -411,7 +410,19 @@ class Agent:
         return output
 
     def is_healthy(self):
-        return is_streaming_connected()
+        """
+        Check if the agent is healthy by verifying the streaming connection status.
+        Uses the configured Screen API base URL instead of hardcoding localhost.
+        """
+        try:
+            response = self._screen_api_client.get_with_retry("/streaming-status", timeout=2)
+            if response.status_code == 200:
+                data = response.json()
+                is_connected = data.get("is_streaming_connected", False)
+                return is_connected
+            return False
+        except Exception:
+            return False
 
     def clean(self, force: bool = False):
         if not self._initialized and not force:

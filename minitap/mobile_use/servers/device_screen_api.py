@@ -155,24 +155,6 @@ async def streaming_status():
         )
 
 
-def is_streaming_connected():
-    """
-    Check if streaming is connected by querying the running server.
-    This works across process boundaries.
-    """
-    try:
-        response = requests.get(
-            f"http://localhost:{server_settings.DEVICE_SCREEN_API_PORT}/streaming-status", timeout=2
-        )
-        if response.status_code == 200:
-            data = response.json()
-            is_connected = data.get("is_streaming_connected", False)
-            return is_connected
-        return False
-    except Exception:
-        return False
-
-
 def start():
     if not is_port_in_use(server_settings.DEVICE_SCREEN_API_PORT):
         uvicorn.run(app, host="0.0.0.0", port=server_settings.DEVICE_SCREEN_API_PORT)
