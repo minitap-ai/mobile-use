@@ -57,6 +57,7 @@ from minitap.mobile_use.sdk.types.task import (
     TaskRequest,
 )
 from minitap.mobile_use.servers.device_hardware_bridge import BridgeStatus
+from minitap.mobile_use.servers.device_screen_api import get_streaming_status
 from minitap.mobile_use.servers.start_servers import (
     start_device_hardware_bridge,
     start_device_screen_api,
@@ -408,6 +409,9 @@ class Agent:
         finally:
             self._finalize_tracing(task=task, context=context)
         return output
+
+    def is_healthy(self):
+        return get_streaming_status()
 
     def clean(self, force: bool = False):
         if not self._initialized and not force:
