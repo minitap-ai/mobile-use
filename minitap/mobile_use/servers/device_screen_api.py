@@ -24,10 +24,6 @@ _stream_thread = None
 _stop_event = threading.Event()
 
 
-def is_streaming_connected():
-    return _is_streaming_connected
-
-
 def _stream_worker():
     global _latest_screen_data, _is_streaming_connected
     sse_url = f"{DEVICE_HARDWARE_BRIDGE_API_URL}/device-screen/sse"
@@ -68,10 +64,11 @@ def _stream_worker():
                             }
 
         except Exception as e:
-            _is_streaming_connected = False
             print(f"Connection error in stream worker: {e}. Retrying in 2 seconds...")
             with _data_lock:
+                _is_streaming_connected = False
                 _latest_screen_data = None
+
             time.sleep(2)
 
 
@@ -85,9 +82,11 @@ def start_stream():
 
 
 def stop_stream():
-    global _stream_thread
+    global _stream_thread, _is_streaming_connected
     if _stream_thread and _stream_thread.is_alive():
         _stop_event.set()
+        with _data_lock:
+            _is_streaming_connected = False
         _stream_thread.join(timeout=2)
         print("--- Background screen streaming stopped ---")
 
@@ -142,6 +141,36 @@ async def health_check():
         return JSONResponse(content=response.json())
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=503, detail=f"Maestro Studio not available: {e}")
+
+
+@app.get("/streaming-status")
+async def streaming_status():
+    """Check if the SSE streaming connection is active."""
+    with _data_lock:
+        return JSONResponse(
+            content={
+                "is_streaming_connected": _is_streaming_connected,
+                "has_screen_data": _latest_screen_data is not None,
+            }
+        )
+
+
+def is_streaming_connected():
+    """
+    Check if streaming is connected by querying the running server.
+    This works across process boundaries.
+    """
+    try:
+        response = requests.get(
+            f"http://localhost:{server_settings.DEVICE_SCREEN_API_PORT}/streaming-status", timeout=2
+        )
+        if response.status_code == 200:
+            data = response.json()
+            is_connected = data.get("is_streaming_connected", False)
+            return is_connected
+        return False
+    except Exception:
+        return False
 
 
 def start():
