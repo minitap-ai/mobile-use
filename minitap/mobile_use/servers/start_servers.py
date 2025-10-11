@@ -60,7 +60,7 @@ def _start_device_screen_api_process() -> multiprocessing.Process | None:
 
 
 def start_device_hardware_bridge(
-    device_id: str, platform: DevicePlatform
+    device_id: str, platform: DevicePlatform, adb_host: str | None = None
 ) -> DeviceHardwareBridge | None:
     logger.info("Starting Device Hardware Bridge...")
 
@@ -68,7 +68,7 @@ def start_device_hardware_bridge(
         bridge = DeviceHardwareBridge(
             device_id=device_id,
             platform=platform,
-            adb_host=server_settings.ADB_HOST,
+            adb_host=adb_host or server_settings.ADB_HOST,
         )
         success = bridge.start()
 

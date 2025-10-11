@@ -550,7 +550,11 @@ class Agent:
 
     def _run_servers(self, device_id: str, platform: DevicePlatform) -> bool:
         if self._is_default_hw_bridge:
-            bridge_instance = start_device_hardware_bridge(device_id=device_id, platform=platform)
+            bridge_instance = start_device_hardware_bridge(
+                device_id=device_id,
+                platform=platform,
+                adb_host=self._config.servers.adb_host,
+            )
             if not bridge_instance:
                 logger.warning("Failed to start Device Hardware Bridge.")
                 return False
