@@ -157,7 +157,7 @@ If you decide to act, output a **valid JSON stringified structured set of instru
 
 > I need to launch the WhatsApp app. I will use the `launch_app` tool to open it.
 
-### Exemple 2
+### Example 2
 
 #### Current Subgoal:
 
