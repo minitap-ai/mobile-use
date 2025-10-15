@@ -1,8 +1,7 @@
+from collections.abc import Sequence
 from typing import Literal
 
-from langchain_core.messages import (
-    AIMessage,
-)
+from langchain_core.messages import AIMessage
 from langgraph.constants import END, START
 from langgraph.graph import StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -18,6 +17,7 @@ from minitap.mobile_use.agents.planner.utils import (
     get_current_subgoal,
     one_of_them_is_failure,
 )
+from minitap.mobile_use.agents.screen_analyzer.screen_analyzer import ScreenAnalyzerNode
 from minitap.mobile_use.agents.summarizer.summarizer import SummarizerNode
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
@@ -26,6 +26,22 @@ from minitap.mobile_use.tools.index import EXECUTOR_WRAPPERS_TOOLS, get_tools_fr
 from minitap.mobile_use.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+def convergence_node(state: State):
+    """Convergence point for parallel execution paths."""
+    return {}
+
+
+def convergence_gate(
+    state: State,
+) -> Literal["continue", "end"]:
+    """Check if all subgoals are completed at convergence point."""
+    logger.info("Starting convergence_gate")
+    if all_completed(state.subgoal_plan):
+        logger.info("All subgoals are completed, ending the goal")
+        return "end"
+    return "continue"
 
 
 def post_orchestrator_gate(
@@ -50,11 +66,22 @@ def post_orchestrator_gate(
 
 def post_cortex_gate(
     state: State,
-) -> Literal["continue", "end_subgoal"]:
+) -> Sequence[str]:
     logger.info("Starting post_cortex_gate")
-    if len(state.complete_subgoals_by_ids) > 0:
-        return "end_subgoal"
-    return "continue"
+    node_sequence = []
+
+    if len(state.complete_subgoals_by_ids) > 0 or not state.structured_decisions:
+        # If subgoals need to be marked as complete, add the path to the orchestrator.
+        # The 'or not state.structured_decisions' ensures we don't get stuck if Cortex does nothing.
+        node_sequence.append("review_subgoals")
+
+    if state.structured_decisions:
+        node_sequence.append("execute_decisions")
+
+    if state.screen_analysis_prompt:
+        node_sequence.append("analyze_screen")
+
+    return node_sequence
 
 
 def post_executor_gate(
@@ -96,7 +123,11 @@ async def get_graph(ctx: MobileUseContext) -> CompiledStateGraph:
 
     graph_builder.add_node("summarizer", SummarizerNode(ctx))
 
-    # Linking nodes
+    graph_builder.add_node("screen_analyzer", ScreenAnalyzerNode(ctx))
+
+    graph_builder.add_node(node="convergence", action=convergence_node, defer=True)
+
+    ## Linking nodes
     graph_builder.add_edge(START, "planner")
     graph_builder.add_edge("planner", "orchestrator")
     graph_builder.add_conditional_edges(
@@ -113,8 +144,9 @@ async def get_graph(ctx: MobileUseContext) -> CompiledStateGraph:
         "cortex",
         post_cortex_gate,
         {
-            "continue": "executor",
-            "end_subgoal": "orchestrator",
+            "review_subgoals": "orchestrator",
+            "analyze_screen": "screen_analyzer",
+            "execute_decisions": "executor",
         },
     )
     graph_builder.add_conditional_edges(
@@ -123,6 +155,18 @@ async def get_graph(ctx: MobileUseContext) -> CompiledStateGraph:
         {"invoke_tools": "executor_tools", "skip": "summarizer"},
     )
     graph_builder.add_edge("executor_tools", "summarizer")
-    graph_builder.add_edge("summarizer", "contextor")
+
+    graph_builder.add_edge("orchestrator", "convergence")
+    graph_builder.add_edge("screen_analyzer", "convergence")
+    graph_builder.add_edge("summarizer", "convergence")
+
+    graph_builder.add_conditional_edges(
+        source="convergence",
+        path=convergence_gate,
+        path_map={
+            "continue": "contextor",
+            "end": END,
+        },
+    )
 
     return graph_builder.compile()
