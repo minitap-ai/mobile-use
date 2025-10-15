@@ -312,6 +312,13 @@ def open_link(ctx: MobileUseContext, url: str, dry_run: bool = False):
 
 
 def back(ctx: MobileUseContext, dry_run: bool = False):
+    adb_client = ctx.adb_client
+    if adb_client:
+        logger.info("Pressing back with adb")
+        adb_client.shell(command="input keyevent KEYCODE_BACK", serial=ctx.device.device_id)
+        return None
+
+    # Fallback to Maestro
     flow_input = ["back"]
     return run_flow_with_wait_for_animation_to_end(ctx, flow_input, dry_run=dry_run)
 
