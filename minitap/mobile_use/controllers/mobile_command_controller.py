@@ -241,6 +241,15 @@ def swipe(ctx: MobileUseContext, swipe_request: SwipeRequest, dry_run: bool = Fa
 
 
 def input_text(ctx: MobileUseContext, text: str, dry_run: bool = False):
+    adb_client = ctx.adb_client
+    if adb_client:
+        logger.info("Inputting text with adb")
+        # Escape special characters for shell
+        escaped_text = text.replace("\\", "\\\\").replace('"', '\\"').replace(" ", "%s")
+        adb_client.shell(command=f'input text "{escaped_text}"', serial=ctx.device.device_id)
+        return None
+
+    # Fallback to Maestro
     return run_flow(ctx, [{"inputText": text}], dry_run=dry_run)
 
 
