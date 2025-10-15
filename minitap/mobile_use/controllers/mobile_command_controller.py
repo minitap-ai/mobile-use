@@ -1,17 +1,23 @@
 import uuid
 from enum import Enum
-from typing import Annotated, Literal
 
 import yaml
 from adbutils import AdbClient
 from langgraph.types import Command
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
 from requests import JSONDecodeError
 
 from minitap.mobile_use.clients.device_hardware_client import DeviceHardwareClient
 from minitap.mobile_use.clients.screen_api_client import ScreenApiClient
 from minitap.mobile_use.config import initialize_llm_config
 from minitap.mobile_use.context import DeviceContext, DevicePlatform, MobileUseContext
+from minitap.mobile_use.controllers.types import (
+    CoordinatesSelectorRequest,
+    PercentagesSelectorRequest,
+    SwipeRequest,
+    SwipeStartEndCoordinatesRequest,
+    SwipeStartEndPercentagesRequest,
+)
 from minitap.mobile_use.utils.errors import ControllerErrors
 from minitap.mobile_use.utils.logger import get_logger
 
@@ -72,28 +78,6 @@ def run_flow(ctx: MobileUseContext, flow_steps: list, dry_run: bool = False) -> 
     return None
 
 
-class CoordinatesSelectorRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    x: int
-    y: int
-
-    def to_str(self):
-        return f"{self.x}, {self.y}"
-
-
-class PercentagesSelectorRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    """
-    0%,0%        # top-left corner
-    100%,100%    # bottom-right corner
-    50%,50%      # center
-    """
-
-    x_percent: int
-    y_percent: int
-
-    def to_str(self):
-        return f"{self.x_percent}%, {self.y_percent}%"
 
 
 class IdSelectorRequest(BaseModel):
@@ -185,56 +169,54 @@ def long_press_on(
     return run_flow_with_wait_for_animation_to_end(ctx, flow_input, dry_run=dry_run)
 
 
-class SwipeStartEndCoordinatesRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    start: CoordinatesSelectorRequest
-    end: CoordinatesSelectorRequest
-
-    def to_dict(self):
-        return {"start": self.start.to_str(), "end": self.end.to_str()}
 
 
-class SwipeStartEndPercentagesRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    start: PercentagesSelectorRequest
-    end: PercentagesSelectorRequest
+def swipe_android(
+    ctx: MobileUseContext,
+    request: SwipeRequest,
+) -> str | None:
+    """Returns an error_message in case of failure."""
+    if not ctx.adb_client:
+        raise ValueError("ADB client is not initialized")
 
-    def to_dict(self):
-        return {"start": self.start.to_str(), "end": self.end.to_str()}
+    mode = request.swipe_mode
+    if isinstance(mode, SwipeStartEndCoordinatesRequest):
+        swipe_coords = mode
+    elif isinstance(mode, SwipeStartEndPercentagesRequest):
+        swipe_coords = mode.to_coords(
+            width=ctx.device.device_width,
+            height=ctx.device.device_height,
+        )
+    else:
+        return "Unsupported selector type"
 
+    if not request.duration:
+        request.duration = 400  # in ms
 
-SwipeDirection = Annotated[
-    Literal["UP", "DOWN", "LEFT", "RIGHT"],
-    BeforeValidator(lambda v: v.upper() if isinstance(v, str) else v),
-]
-
-
-class SwipeRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    swipe_mode: SwipeStartEndCoordinatesRequest | SwipeStartEndPercentagesRequest | SwipeDirection
-    duration: int | None = None  # in ms, default is 400ms
-
-    def to_dict(self):
-        res = {}
-        if isinstance(self.swipe_mode, SwipeStartEndCoordinatesRequest):
-            res |= self.swipe_mode.to_dict()
-        elif isinstance(self.swipe_mode, SwipeStartEndPercentagesRequest):
-            res |= self.swipe_mode.to_dict()
-        elif self.swipe_mode in ["UP", "DOWN", "LEFT", "RIGHT"]:
-            res |= {"direction": self.swipe_mode}
-        if self.duration:
-            res |= {"duration": self.duration}
-        return res
+    cmd = (
+        "input touchscreen swipe "
+        f"{swipe_coords.start.x} {swipe_coords.start.y} "
+        f"{swipe_coords.end.x} {swipe_coords.end.y} "
+        f"{request.duration}"
+    )
+    ctx.adb_client.shell(
+        serial=ctx.device.device_id,
+        command=cmd,
+    )
+    return None
 
 
 def swipe(ctx: MobileUseContext, swipe_request: SwipeRequest, dry_run: bool = False):
+    if ctx.adb_client:
+        error_msg = swipe_android(ctx=ctx, request=swipe_request)
+        return {"error": error_msg} if error_msg else None
     swipe_body = swipe_request.to_dict()
     if not swipe_body:
         error = "Invalid swipe selector request, could not format yaml"
         logger.error(error)
         raise ControllerErrors(error)
     flow_input = [{"swipe": swipe_body}]
-    return run_flow_with_wait_for_animation_to_end(ctx, flow_input, dry_run=dry_run)
+    return run_flow(ctx, flow_input, dry_run=dry_run)
 
 
 ##### Text related commands #####
