@@ -1,4 +1,26 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class TapOutput(BaseModel):
+    """Output from tap operations."""
+
+    error: str | None = Field(default=None, description="Error message if tap failed")
+
+
+class Bounds(BaseModel):
+    """Represents the bounds of a UI element."""
+
+    x1: int
+    y1: int
+    x2: int
+    y2: int
+
+    def get_center(self) -> "CoordinatesSelectorRequest":
+        """Get the center point of the bounds."""
+        return CoordinatesSelectorRequest(
+            x=(self.x1 + self.x2) // 2,
+            y=(self.y1 + self.y2) // 2,
+        )
 
 
 class CoordinatesSelectorRequest(BaseModel):

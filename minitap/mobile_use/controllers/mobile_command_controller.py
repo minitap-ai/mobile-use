@@ -12,11 +12,13 @@ from minitap.mobile_use.clients.screen_api_client import ScreenApiClient
 from minitap.mobile_use.config import initialize_llm_config
 from minitap.mobile_use.context import DeviceContext, DevicePlatform, MobileUseContext
 from minitap.mobile_use.controllers.types import (
+    Bounds,
     CoordinatesSelectorRequest,
     PercentagesSelectorRequest,
     SwipeRequest,
     SwipeStartEndCoordinatesRequest,
     SwipeStartEndPercentagesRequest,
+    TapOutput,
 )
 from minitap.mobile_use.utils.errors import ControllerErrors
 from minitap.mobile_use.utils.logger import get_logger
@@ -78,8 +80,6 @@ def run_flow(ctx: MobileUseContext, flow_steps: list, dry_run: bool = False) -> 
     return None
 
 
-
-
 class IdSelectorRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     id: str
@@ -131,16 +131,188 @@ SelectorRequest = (
 )
 
 
+##### Tap helper functions #####
+
+
+def get_bounds_for_element(element: dict) -> Bounds | None:
+    """Extract bounds from a UI element."""
+    bounds_str = element.get("bounds")
+    if not bounds_str:
+        return None
+    try:
+        # Parse bounds string like "[x1,y1][x2,y2]"
+        parts = bounds_str.replace("[", "").replace("]", ",").split(",")
+        if len(parts) >= 4:
+            return Bounds(
+                x1=int(parts[0]),
+                y1=int(parts[1]),
+                x2=int(parts[2]),
+                y2=int(parts[3]),
+            )
+    except (ValueError, IndexError):
+        return None
+    return None
+
+
+def _extract_resource_id_and_text_from_selector(
+    selector: SelectorRequest,
+) -> tuple[str | None, str | None]:
+    """Extract resource_id and text from a selector."""
+    resource_id = None
+    text = None
+
+    if isinstance(selector, IdSelectorRequest):
+        resource_id = selector.id
+    elif isinstance(selector, TextSelectorRequest):
+        text = selector.text
+    elif isinstance(selector, IdWithTextSelectorRequest):
+        resource_id = selector.id
+        text = selector.text
+
+    return resource_id, text
+
+
+def _get_ui_element(
+    ui_hierarchy: list[dict],
+    resource_id: str | None = None,
+    text: str | None = None,
+    index: int | None = None,
+) -> tuple[dict | None, str | None]:
+    """Find a UI element in the hierarchy by resource_id or text."""
+    if not resource_id and not text:
+        return None, "No resource_id or text provided"
+
+    matches = []
+    for element in ui_hierarchy:
+        if resource_id and element.get("resource-id") == resource_id:
+            matches.append(element)
+        elif text and element.get("text") == text:
+            matches.append(element)
+
+    if not matches:
+        criteria = f"resource_id='{resource_id}'" if resource_id else f"text='{text}'"
+        return None, f"No element found with {criteria}"
+
+    target_index = index if index is not None else 0
+    if target_index >= len(matches):
+        criteria = f"resource_id='{resource_id}'" if resource_id else f"text='{text}'"
+        return (
+            None,
+            f"Index {target_index} out of range for {criteria} (found {len(matches)} matches)",
+        )
+
+    return matches[target_index], None
+
+
+def _android_tap_by_coordinates(
+    ctx: MobileUseContext,
+    coords: CoordinatesSelectorRequest,
+    long_press: bool = False,
+) -> TapOutput:
+    """Tap at specific coordinates using ADB."""
+    assert ctx.adb_client is not None
+
+    if long_press:
+        # Long press is simulated as a swipe at the same location
+        cmd = f"input swipe {coords.x} {coords.y} {coords.x} {coords.y} 1000"
+    else:
+        cmd = f"input tap {coords.x} {coords.y}"
+
+    try:
+        ctx.adb_client.shell(serial=ctx.device.device_id, command=cmd)
+        return TapOutput(error=None)
+    except Exception as e:
+        return TapOutput(error=f"ADB tap failed: {str(e)}")
+
+
+def _android_tap_by_resource_id_or_text(
+    ctx: MobileUseContext,
+    ui_hierarchy: list[dict],
+    resource_id: str | None = None,
+    text: str | None = None,
+    index: int | None = None,
+    long_press: bool = False,
+) -> TapOutput:
+    """Tap on an element by finding it in the UI hierarchy."""
+    assert ctx.adb_client is not None
+
+    ui_element, error_msg = _get_ui_element(
+        ui_hierarchy=ui_hierarchy,
+        resource_id=resource_id,
+        text=text,
+        index=index,
+    )
+
+    if not ui_element:
+        return TapOutput(error=error_msg)
+
+    bounds = get_bounds_for_element(ui_element)
+    if not bounds:
+        criteria = f"resource_id='{resource_id}'" if resource_id else f"text='{text}'"
+        return TapOutput(error=f"Could not extract bounds for element with {criteria}")
+
+    center = bounds.get_center()
+    return _android_tap_by_coordinates(ctx=ctx, coords=center, long_press=long_press)
+
+
+def tap_android(
+    ctx: MobileUseContext,
+    selector: SelectorRequest,
+    index: int | None = None,
+    ui_hierarchy: list[dict] | None = None,
+    long_press: bool = False,
+) -> TapOutput:
+    """Execute tap using ADB with fallback strategies."""
+    if not ctx.adb_client:
+        raise ValueError("ADB client is not initialized")
+
+    # Direct coordinate tap
+    if isinstance(selector, SelectorRequestWithCoordinates):
+        return _android_tap_by_coordinates(
+            ctx=ctx,
+            coords=selector.coordinates,
+            long_press=long_press,
+        )
+
+    # For other selectors, we need the UI hierarchy
+    resource_id, text = _extract_resource_id_and_text_from_selector(selector)
+
+    if not ui_hierarchy:
+        ui_hierarchy = get_screen_data(screen_api_client=ctx.screen_api_client).elements
+
+    return _android_tap_by_resource_id_or_text(
+        ctx=ctx,
+        ui_hierarchy=ui_hierarchy,
+        resource_id=resource_id,
+        text=text,
+        index=index,
+        long_press=long_press,
+    )
+
+
 def tap(
     ctx: MobileUseContext,
     selector_request: SelectorRequest,
     dry_run: bool = False,
     index: int | None = None,
+    ui_hierarchy: list[dict] | None = None,
 ):
     """
     Tap on a selector.
     Index is optional and is used when you have multiple views matching the same selector.
+    ui_hierarchy is optional and used for ADB taps to find elements.
     """
+    # Prioritize ADB
+    if ctx.adb_client:
+        output = tap_android(
+            ctx=ctx,
+            selector=selector_request,
+            index=index,
+            ui_hierarchy=ui_hierarchy,
+        )
+        return output.error if output.error else None
+
+    # Fallback to Maestro
     tap_body = selector_request.to_dict()
     if not tap_body:
         error = "Invalid tap selector request, could not format yaml"
@@ -149,7 +321,7 @@ def tap(
     if index:
         tap_body["index"] = index
     flow_input = [{"tapOn": tap_body}]
-    return run_flow_with_wait_for_animation_to_end(ctx, flow_input, dry_run=dry_run)
+    return run_flow(ctx, flow_input, dry_run=dry_run)
 
 
 def long_press_on(
@@ -157,7 +329,25 @@ def long_press_on(
     selector_request: SelectorRequest,
     dry_run: bool = False,
     index: int | None = None,
+    ui_hierarchy: list[dict] | None = None,
 ):
+    """
+    Long press on a selector.
+    Index is optional and is used when you have multiple views matching the same selector.
+    ui_hierarchy is optional and used for ADB long press to find elements.
+    """
+    # Prioritize ADB
+    if ctx.adb_client:
+        output = tap_android(
+            ctx=ctx,
+            selector=selector_request,
+            index=index,
+            ui_hierarchy=ui_hierarchy,
+            long_press=True,
+        )
+        return output.error if output.error else None
+
+    # Fallback to Maestro
     long_press_on_body = selector_request.to_dict()
     if not long_press_on_body:
         error = "Invalid longPressOn selector request, could not format yaml"
@@ -167,8 +357,6 @@ def long_press_on(
         long_press_on_body["index"] = index
     flow_input = [{"longPressOn": long_press_on_body}]
     return run_flow_with_wait_for_animation_to_end(ctx, flow_input, dry_run=dry_run)
-
-
 
 
 def swipe_android(

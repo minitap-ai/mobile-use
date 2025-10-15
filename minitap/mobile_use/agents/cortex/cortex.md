@@ -102,11 +102,9 @@ Certain actions have outcomes that can significantly and sometimes unpredictably
 - `open_link`
 - `tap` on an element that is clearly for navigation (e.g., a "Back" button, a menu item, a link to another screen).
 
-**CRITICAL RULE: If your decision includes one of these unpredictable actions, it MUST be the only action in your `Structured Decisions` for this turn. Else, use flows to group actions together.**
+**CRITICAL RULE: If your decision includes one of these unpredictable actions, it MUST be the only action in your `Structured Decisions` for this turn. Else, provide multiple decisions in your `Structured Decisions`, in the right order, to group actions together.**
 
 This is not optional. Failing to isolate these actions will cause the system to act on an outdated understanding of the screen, leading to catastrophic errors. For example, after a `back` command, you MUST wait to see the new screen before deciding what to tap next.
-
-You may only group simple, predictable actions together, such as tapping a text field and then immediately typing into it (`tap` followed by `input_text`).
 
 ### Outputting Your Decisions
 
@@ -173,7 +171,7 @@ If you decide to act, output a **valid JSON stringified structured set of instru
 
 #### Agent Thought:
 
-> Analysis: No previous attempts, this is a fresh approach. I will tap the search icon to begin searching. I am providing its resource_id, coordinates, and text content to ensure the Executor can find it reliably, following the element rule.
+>  I can see the search icon in the UI hierarchy at the specified coordinates. No prior attempts for this subgoal are recorded, so this is the first try. Executor feedback shows no conflicts. I'm targeting the search icon with all available identifiers (resource_id, text, coordinates) to ensure reliable execution following the element rule.
 
 ### Input
 

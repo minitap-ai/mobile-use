@@ -41,35 +41,10 @@ def get_tap_tool(ctx: MobileUseContext):
         output = {
             "error": "No valid selector provided or all selectors failed."
         }  # Default to failure
-        final_selector_info = "N/A"
+        latest_selector_info: str | None = None
 
-        # 1. Try with resource_id
-        if target.resource_id:
-            try:
-                selector = IdSelectorRequest(id=target.resource_id)
-                logger.info(
-                    f"Attempting to tap using resource_id: '{target.resource_id}' "
-                    f"at index {target.resource_id_index}"
-                )
-                result = tap_controller(
-                    ctx=ctx, selector_request=selector, index=target.resource_id_index
-                )
-                if result is None:  # Success
-                    output = None
-                    final_selector_info = (
-                        f"resource_id='{target.resource_id}' (index={target.resource_id_index})"
-                    )
-                else:
-                    logger.warning(
-                        f"Tap with resource_id '{target.resource_id}' failed. Error: {result}"
-                    )
-                    output = result
-            except Exception as e:
-                logger.warning(f"Exception during tap with resource_id '{target.resource_id}': {e}")
-                output = {"error": str(e)}
-
-        # 2. If resource_id failed or wasn't provided, try with coordinates
-        if output is not None and target.coordinates:
+        # 1. Try with COORDINATES FIRST (visual approach)
+        if target.coordinates:
             try:
                 center_point = target.coordinates.get_center()
                 selector = SelectorRequestWithCoordinates(
@@ -78,10 +53,14 @@ def get_tap_tool(ctx: MobileUseContext):
                 logger.info(
                     f"Attempting to tap using coordinates: {center_point.x},{center_point.y}"
                 )
-                result = tap_controller(ctx=ctx, selector_request=selector)
+                latest_selector_info = f"coordinates='{target.coordinates}'"
+                result = tap_controller(
+                    ctx=ctx,
+                    selector_request=selector,
+                    ui_hierarchy=state.latest_ui_hierarchy,
+                )
                 if result is None:  # Success
                     output = None
-                    final_selector_info = f"coordinates='{target.coordinates}'"
                 else:
                     logger.warning(
                         f"Tap with coordinates '{target.coordinates}' failed. Error: {result}"
@@ -91,17 +70,50 @@ def get_tap_tool(ctx: MobileUseContext):
                 logger.warning(f"Exception during tap with coordinates '{target.coordinates}': {e}")
                 output = {"error": str(e)}
 
-        # 3. If coordinates failed or weren't provided, try with text
+        # 2. If coordinates failed or weren't provided, try with resource_id
+        if output is not None and target.resource_id:
+            try:
+                selector = IdSelectorRequest(id=target.resource_id)
+                logger.info(
+                    f"Attempting to tap using resource_id: '{target.resource_id}' "
+                    f"at index {target.resource_id_index}"
+                )
+                latest_selector_info = (
+                    f"resource_id='{target.resource_id}' (index={target.resource_id_index})"
+                )
+                result = tap_controller(
+                    ctx=ctx,
+                    selector_request=selector,
+                    index=target.resource_id_index,
+                    ui_hierarchy=state.latest_ui_hierarchy,
+                )
+                if result is None:  # Success
+                    output = None
+                else:
+                    logger.warning(
+                        f"Tap with resource_id '{target.resource_id}' failed. Error: {result}"
+                    )
+                    output = result
+            except Exception as e:
+                logger.warning(f"Exception during tap with resource_id '{target.resource_id}': {e}")
+                output = {"error": str(e)}
+
+        # 3. If resource_id failed or wasn't provided, try with text (last resort)
         if output is not None and target.text:
             try:
                 selector = TextSelectorRequest(text=target.text)
                 logger.info(
                     f"Attempting to tap using text: '{target.text}' at index {target.text_index}"
                 )
-                result = tap_controller(ctx=ctx, selector_request=selector, index=target.text_index)
+                latest_selector_info = f"text='{target.text}' (index={target.text_index})"
+                result = tap_controller(
+                    ctx=ctx,
+                    selector_request=selector,
+                    index=target.text_index,
+                    ui_hierarchy=state.latest_ui_hierarchy,
+                )
                 if result is None:  # Success
                     output = None
-                    final_selector_info = f"text='{target.text}' (index={target.text_index})"
                 else:
                     logger.warning(f"Tap with text '{target.text}' failed. Error: {result}")
                     output = result
@@ -110,6 +122,7 @@ def get_tap_tool(ctx: MobileUseContext):
                 output = {"error": str(e)}
 
         has_failed = output is not None
+        final_selector_info = latest_selector_info if latest_selector_info else "N/A"
         agent_outcome = (
             tap_wrapper.on_failure_fn(final_selector_info)
             if has_failed
