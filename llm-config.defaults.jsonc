@@ -17,6 +17,10 @@
         "model": "gpt-5"
       }
     },
+    "screen_analyzer": {
+      "provider": "openai",
+      "model": "gpt-4o"
+    },
     "executor": {
       "provider": "openai",
       "model": "gpt-5-nano"
@@ -51,6 +55,10 @@
         "provider": "openai",
         "model": "gpt-5"
       }
+    },
+    "screen_analyzer": {
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.2-90b-vision-instruct"
     },
     "executor": {
       "provider": "openai",
