@@ -258,6 +258,15 @@ def erase_text(ctx: MobileUseContext, nb_chars: int | None = None, dry_run: bool
     Removes characters from the currently selected textfield (if any)
     Removes 50 characters if nb_chars is not specified.
     """
+    adb_client = ctx.adb_client
+    if adb_client:
+        logger.info("Erasing text with adb")
+        chars_to_delete = nb_chars if nb_chars is not None else 50
+        for _ in range(chars_to_delete):
+            adb_client.shell(command="input keyevent KEYCODE_DEL", serial=ctx.device.device_id)
+        return None
+
+    # Fallback to Maestro
     if nb_chars is None:
         return run_flow(ctx, ["eraseText"], dry_run=dry_run)
     return run_flow(ctx, [{"eraseText": nb_chars}], dry_run=dry_run)
