@@ -1,3 +1,4 @@
+import re
 import uuid
 from enum import Enum
 
@@ -140,18 +141,17 @@ def get_bounds_for_element(element: dict) -> Bounds | None:
     if not bounds_str:
         return None
     try:
-        # Parse bounds string like "[x1,y1][x2,y2]"
-        parts = bounds_str.replace("[", "").replace("]", ",").split(",")
-        if len(parts) >= 4:
+        # Parse bounds string like "[x1,y1][x2,y2]" using regex
+        match = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", bounds_str)
+        if match:
             return Bounds(
-                x1=int(parts[0]),
-                y1=int(parts[1]),
-                x2=int(parts[2]),
-                y2=int(parts[3]),
+                x1=int(match.group(1)),
+                y1=int(match.group(2)),
+                x2=int(match.group(3)),
+                y2=int(match.group(4)),
             )
     except (ValueError, IndexError):
         return None
-    return None
 
 
 def _extract_resource_id_and_text_from_selector(
@@ -208,13 +208,15 @@ def _android_tap_by_coordinates(
     ctx: MobileUseContext,
     coords: CoordinatesSelectorRequest,
     long_press: bool = False,
+    long_press_duration: int = 1000,
 ) -> TapOutput:
     """Tap at specific coordinates using ADB."""
-    assert ctx.adb_client is not None
+    if ctx.adb_client is None:
+        return TapOutput(error="ADB client is not initialized")
 
     if long_press:
         # Long press is simulated as a swipe at the same location
-        cmd = f"input swipe {coords.x} {coords.y} {coords.x} {coords.y} 1000"
+        cmd = f"input swipe {coords.x} {coords.y} {coords.x} {coords.y} {long_press_duration}"
     else:
         cmd = f"input tap {coords.x} {coords.y}"
 
@@ -223,8 +225,6 @@ def _android_tap_by_coordinates(
         return TapOutput(error=None)
     except Exception as e:
         return TapOutput(error=f"ADB tap failed: {str(e)}")
-
-
 def _android_tap_by_resource_id_or_text(
     ctx: MobileUseContext,
     ui_hierarchy: list[dict],
@@ -234,7 +234,8 @@ def _android_tap_by_resource_id_or_text(
     long_press: bool = False,
 ) -> TapOutput:
     """Tap on an element by finding it in the UI hierarchy."""
-    assert ctx.adb_client is not None
+    if ctx.adb_client is None:
+        return TapOutput(error="ADB client is not initialized")
 
     ui_element, error_msg = _get_ui_element(
         ui_hierarchy=ui_hierarchy,
@@ -252,6 +253,7 @@ def _android_tap_by_resource_id_or_text(
         return TapOutput(error=f"Could not extract bounds for element with {criteria}")
 
     center = bounds.get_center()
+    return _android_tap_by_coordinates(ctx=ctx, coords=center, long_press=long_press)    center = bounds.get_center()
     return _android_tap_by_coordinates(ctx=ctx, coords=center, long_press=long_press)
 
 
@@ -357,8 +359,6 @@ def long_press_on(
         long_press_on_body["index"] = index
     flow_input = [{"longPressOn": long_press_on_body}]
     return run_flow_with_wait_for_animation_to_end(ctx, flow_input, dry_run=dry_run)
-
-
 def swipe_android(
     ctx: MobileUseContext,
     request: SwipeRequest,
@@ -378,14 +378,13 @@ def swipe_android(
     else:
         return "Unsupported selector type"
 
-    if not request.duration:
-        request.duration = 400  # in ms
+    duration = request.duration if request.duration else 400  # in ms
 
     cmd = (
         "input touchscreen swipe "
         f"{swipe_coords.start.x} {swipe_coords.start.y} "
         f"{swipe_coords.end.x} {swipe_coords.end.y} "
-        f"{request.duration}"
+        f"{duration}"
     )
     ctx.adb_client.shell(
         serial=ctx.device.device_id,

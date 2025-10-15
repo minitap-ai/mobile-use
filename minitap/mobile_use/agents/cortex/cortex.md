@@ -171,8 +171,7 @@ If you decide to act, output a **valid JSON stringified structured set of instru
 
 #### Agent Thought:
 
->  I can see the search icon in the UI hierarchy at the specified coordinates. No prior attempts for this subgoal are recorded, so this is the first try. Executor feedback shows no conflicts. I'm targeting the search icon with all available identifiers (resource_id, text, coordinates) to ensure reliable execution following the element rule.
-
+> I can see the search icon in the UI hierarchy at the specified coordinates. No prior attempts for this subgoal are recorded, so this is the first try. Executor feedback shows no conflicts. I'm targeting the search icon with all available identifiers (resource_id, text, coordinates) to ensure reliable execution following the element rule.
 ### Input
 
 **Initial Goal:**

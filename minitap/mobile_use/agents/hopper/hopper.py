@@ -11,8 +11,8 @@ from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_mes
 class HopperOutput(BaseModel):
     output: str = Field(description="The interesting data extracted from the input data.")
     reason: str = Field(
-        description="A short explanation of what you looked"
-        + "for and how you decided what to extract."
+        description="A short explanation of what you looked for"
+        + " and how you decided what to extract."
     )
 
 
