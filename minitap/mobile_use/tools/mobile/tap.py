@@ -2,7 +2,7 @@ from typing import Annotated
 
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
-from langchain_core.tools.base import InjectedToolCallId
+from langchain_core.tools.base import BaseTool, InjectedToolCallId
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 
@@ -23,7 +23,7 @@ from minitap.mobile_use.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
-def get_tap_tool(ctx: MobileUseContext):
+def get_tap_tool(ctx: MobileUseContext) -> BaseTool:
     @tool
     async def tap(
         tool_call_id: Annotated[str, InjectedToolCallId],
