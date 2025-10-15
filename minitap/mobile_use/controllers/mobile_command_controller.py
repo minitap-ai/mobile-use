@@ -294,6 +294,16 @@ def stop_app(ctx: MobileUseContext, package_name: str | None = None, dry_run: bo
 
 
 def open_link(ctx: MobileUseContext, url: str, dry_run: bool = False):
+    adb_client = ctx.adb_client
+    if adb_client:
+        logger.info("Opening link with adb")
+        adb_client.shell(
+            command=f"am start -a android.intent.action.VIEW -d {url}",
+            serial=ctx.device.device_id,
+        )
+        return None
+
+    # Fallback to Maestro
     flow_input = [{"openLink": url}]
     return run_flow_with_wait_for_animation_to_end(ctx, flow_input, dry_run=dry_run)
 
