@@ -417,7 +417,10 @@ class Agent:
                 "Stopping it before starting the new one."
             )
             self.stop_current_task()
-            await asyncio.sleep(0.5)
+            try:
+                await self._current_task
+            except asyncio.CancelledError:
+                pass
 
         try:
             self._current_task = asyncio.create_task(_execute_task_logic())
