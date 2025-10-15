@@ -89,6 +89,7 @@ class Agent:
     _screen_api_client: ScreenApiClient
     _hw_bridge_client: DeviceHardwareClient
     _adb_client: AdbClient | None
+    _current_task: asyncio.Task | None = None
 
     def __init__(self, *, config: AgentConfig | None = None):
         self._config = config or get_default_agent_config()
@@ -336,78 +337,108 @@ class Agent:
         state = self._get_graph_state(task=task)
         graph_input = state.model_dump()
 
-        last_state: State | None = None
-        last_state_snapshot: dict | None = None
-        output = None
-        try:
-            logger.info(f"[{task_name}] Invoking graph with input: {graph_input}")
-            await task.set_status(status="running", message="Invoking graph...")
-            async for chunk in (await get_graph(context)).astream(
-                input=graph_input,
-                config={
-                    "recursion_limit": task.request.max_steps,
-                    "callbacks": self._config.graph_config_callbacks,
-                },
-                stream_mode=["messages", "custom", "updates", "values"],
-            ):
-                stream_mode, payload = chunk
-                if stream_mode == "values":
-                    last_state_snapshot = payload  # type: ignore
-                    last_state = State(**last_state_snapshot)  # type: ignore
-                    if task.request.thoughts_output_path:
-                        record_events(
-                            output_path=task.request.thoughts_output_path,
-                            events=last_state.agents_thoughts,
-                        )
+        async def _execute_task_logic():
+            last_state: State | None = None
+            last_state_snapshot: dict | None = None
+            output = None
+            try:
+                logger.info(f"[{task_name}] Invoking graph with input: {graph_input}")
+                await task.set_status(status="running", message="Invoking graph...")
+                async for chunk in (await get_graph(context)).astream(
+                    input=graph_input,
+                    config={
+                        "recursion_limit": task.request.max_steps,
+                        "callbacks": self._config.graph_config_callbacks,
+                    },
+                    stream_mode=["messages", "custom", "updates", "values"],
+                ):
+                    stream_mode, payload = chunk
+                    if stream_mode == "values":
+                        last_state_snapshot = payload  # type: ignore
+                        last_state = State(**last_state_snapshot)  # type: ignore
+                        if task.request.thoughts_output_path:
+                            record_events(
+                                output_path=task.request.thoughts_output_path,
+                                events=last_state.agents_thoughts,
+                            )
 
-                if stream_mode == "updates":
-                    for _, value in payload.items():  # type: ignore node name, node output
-                        if value and "agents_thoughts" in value:
-                            new_thoughts = value["agents_thoughts"]
-                            last_item = new_thoughts[-1] if new_thoughts else None
-                            if last_item:
-                                log_agent_thought(
-                                    agent_thought=last_item,
-                                )
+                    if stream_mode == "updates":
+                        for _, value in payload.items():  # type: ignore node name, node output
+                            if value and "agents_thoughts" in value:
+                                new_thoughts = value["agents_thoughts"]
+                                last_item = new_thoughts[-1] if new_thoughts else None
+                                if last_item:
+                                    log_agent_thought(
+                                        agent_thought=last_item,
+                                    )
 
-            if not last_state:
-                err = f"[{task_name}] No result received from graph"
+                if not last_state:
+                    err = f"[{task_name}] No result received from graph"
+                    logger.warning(err)
+                    await task.finalize(content=output, state=last_state_snapshot, error=err)
+                    return None
+
+                print_ai_response_to_stderr(graph_result=last_state)
+                output = await self._extract_output(
+                    task_name=task_name,
+                    ctx=context,
+                    request=request,
+                    output_config=output_config,
+                    state=last_state,
+                )
+                logger.info(f"✅ Automation '{task_name}' is success ✅")
+                await task.finalize(content=output, state=last_state_snapshot)
+                return output
+            except asyncio.CancelledError:
+                err = f"[{task_name}] Task cancelled"
                 logger.warning(err)
-                await task.finalize(content=output, state=last_state_snapshot, error=err)
-                return None
+                await task.finalize(
+                    content=output,
+                    state=last_state_snapshot,
+                    error=err,
+                    cancelled=True,
+                )
+                raise
+            except Exception as e:
+                err = f"[{task_name}] Error running automation: {e}"
+                logger.error(err)
+                await task.finalize(
+                    content=output,
+                    state=last_state_snapshot,
+                    error=err,
+                )
+                raise
+            finally:
+                self._finalize_tracing(task=task, context=context)
 
-            print_ai_response_to_stderr(graph_result=last_state)
-            output = await self._extract_output(
-                task_name=task_name,
-                ctx=context,
-                request=request,
-                output_config=output_config,
-                state=last_state,
+        if self._current_task and not self._current_task.done():
+            logger.warning(
+                "Another automation task is already running. "
+                "Stopping it before starting the new one."
             )
-            logger.info(f"✅ Automation '{task_name}' is success ✅")
-            await task.finalize(content=output, state=last_state_snapshot)
-        except asyncio.CancelledError:
-            err = f"[{task_name}] Task cancelled"
-            logger.warning(err)
-            await task.finalize(
-                content=output,
-                state=last_state_snapshot,
-                error=err,
-                cancelled=True,
-            )
-            raise
-        except Exception as e:
-            err = f"[{task_name}] Error running automation: {e}"
-            logger.error(err)
-            await task.finalize(
-                content=output,
-                state=last_state_snapshot,
-                error=err,
-            )
-            raise
+            self.stop_current_task()
+            await asyncio.sleep(0.5)
+
+        try:
+            self._current_task = asyncio.create_task(_execute_task_logic())
+            return await self._current_task
         finally:
-            self._finalize_tracing(task=task, context=context)
-        return output
+            self._current_task = None
+
+    def stop_current_task(self):
+        """Requests cancellation of the currently running automation task."""
+        if self._current_task and not self._current_task.done():
+            logger.info("Requesting to stop the current automation task...")
+            was_cancelled = self._current_task.cancel()
+            if was_cancelled:
+                logger.success("Cancellation request for the current task was sent.")
+            else:
+                logger.warning(
+                    "Could not send cancellation request for the current task "
+                    "(it may already be completing)."
+                )
+        else:
+            logger.info("No active automation task to stop.")
 
     def is_healthy(self):
         """
