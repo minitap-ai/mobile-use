@@ -3,6 +3,7 @@ from enum import Enum
 from typing import Annotated, Literal
 
 import yaml
+from adbutils import AdbClient
 from langgraph.types import Command
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 from requests import JSONDecodeError
@@ -257,8 +258,31 @@ def erase_text(ctx: MobileUseContext, nb_chars: int | None = None, dry_run: bool
 
 
 def launch_app(ctx: MobileUseContext, package_name: str, dry_run: bool = False):
+    adb_client = ctx.adb_client
+    if adb_client:
+        logger.info("Launching app with adb")
+        # Use am start with MAIN/LAUNCHER intent - more reliable than monkey
+        # First try to resolve the main activity, fallback to monkey if that fails
+        resolve_cmd = f"cmd package resolve-activity --brief {package_name}"
+        result = str(
+            adb_client.shell(
+                command=f"am start -n $({resolve_cmd} | tail -n 1) 2>&1 "
+                f"|| monkey -p {package_name} -c android.intent.category.LAUNCHER 1",
+                serial=ctx.device.device_id,
+            )
+        )
+        # Check if launch failed
+        result_lower = result.lower()
+        if "error" in result_lower or "not found" in result_lower:
+            logger.error(f"Failed to launch {package_name}: {result}")
+            return {"error": result}
+        return None
+
+    # Fallback to Maestro
     flow_input = [{"launchApp": package_name}]
-    return run_flow_with_wait_for_animation_to_end(ctx, flow_input, dry_run=dry_run)
+    return run_flow_with_wait_for_animation_to_end(
+        ctx, flow_input, dry_run=dry_run, wait_for_animation_to_end=True
+    )
 
 
 def stop_app(ctx: MobileUseContext, package_name: str | None = None, dry_run: bool = False):
@@ -311,25 +335,31 @@ def wait_for_animation_to_end(
 
 
 def run_flow_with_wait_for_animation_to_end(
-    ctx: MobileUseContext, base_flow: list, dry_run: bool = False
+    ctx: MobileUseContext,
+    base_flow: list,
+    dry_run: bool = False,
+    wait_for_animation_to_end: bool = False,
 ):
-    base_flow.append({"waitForAnimationToEnd": {"timeout": int(WaitTimeout.MEDIUM.value)}})
+    if wait_for_animation_to_end:
+        base_flow.append({"waitForAnimationToEnd": {"timeout": int(WaitTimeout.SHORT.value)}})
     return run_flow(ctx, base_flow, dry_run=dry_run)
 
 
 if __name__ == "__main__":
+    adb_client = AdbClient(host="192.168.43.107", port=5037)
     ctx = MobileUseContext(
         trace_id="trace_id",
         llm_config=initialize_llm_config(),
         device=DeviceContext(
             host_platform="WINDOWS",
             mobile_platform=DevicePlatform.ANDROID,
-            device_id="emulator-5554",
+            device_id="986066a",
             device_width=1080,
-            device_height=1920,
+            device_height=2340,
         ),
         hw_bridge_client=DeviceHardwareClient("http://localhost:9999"),
         screen_api_client=ScreenApiClient("http://localhost:9998"),
+        adb_client=adb_client,
     )
     screen_data = get_screen_data(ctx.screen_api_client)
     from minitap.mobile_use.graph.state import State

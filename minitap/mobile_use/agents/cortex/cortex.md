@@ -155,7 +155,9 @@ If you decide to act, output a **valid JSON stringified structured set of instru
 
 #### Agent Thought:
 
-> I need to launch the WhatsApp app. I will use the `launch_app` tool to open it.
+
+> I need to launch the WhatsApp app to achieve the current subgoal. The `launch_app` tool is the most reliable method for opening applications.
+ 
 
 ### Example 2
 
