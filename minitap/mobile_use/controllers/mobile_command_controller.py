@@ -225,6 +225,8 @@ def _android_tap_by_coordinates(
         return TapOutput(error=None)
     except Exception as e:
         return TapOutput(error=f"ADB tap failed: {str(e)}")
+
+
 def _android_tap_by_resource_id_or_text(
     ctx: MobileUseContext,
     ui_hierarchy: list[dict],
@@ -253,7 +255,6 @@ def _android_tap_by_resource_id_or_text(
         return TapOutput(error=f"Could not extract bounds for element with {criteria}")
 
     center = bounds.get_center()
-    return _android_tap_by_coordinates(ctx=ctx, coords=center, long_press=long_press)    center = bounds.get_center()
     return _android_tap_by_coordinates(ctx=ctx, coords=center, long_press=long_press)
 
 
@@ -359,6 +360,8 @@ def long_press_on(
         long_press_on_body["index"] = index
     flow_input = [{"longPressOn": long_press_on_body}]
     return run_flow_with_wait_for_animation_to_end(ctx, flow_input, dry_run=dry_run)
+
+
 def swipe_android(
     ctx: MobileUseContext,
     request: SwipeRequest,
