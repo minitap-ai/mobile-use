@@ -159,10 +159,6 @@ class DeviceHardwareBridge:
                 if self.process:
                     self.process.kill()
                 break
-            else:
-                with self.lock:
-                    if self.status == BridgeStatus.STARTING:
-                        self.status = BridgeStatus.FAILED
 
     def _wait_for_health_check(self, retries=5, delay=2):
         health_url = f"http://localhost:{DEVICE_HARDWARE_BRIDGE_PORT}/api/banner-message"
