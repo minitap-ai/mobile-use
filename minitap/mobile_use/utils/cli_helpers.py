@@ -17,21 +17,20 @@ def display_device_status(console: Console, adb_client: AdbClient | None = None)
             console.print(f"  - {device.serial}")
     else:
         console.print("❌ [bold red]No Android device found.[/bold red]")
-        console.print("Please make sure your emulator is running or a device is connected via USB.")
         command = "emulator -avd <avd_name>"
         if sys.platform not in ["win32", "darwin"]:
             command = f"./{command}"
-        console.print(f"You can start an emulator using a command like: [bold]'{command}'[/bold]")
-        console.print("[italic]iOS detection coming soon...[/italic]")
+            console.print(f"You can start an emulator using a command like: [bold]'{command}'[/bold]")
 
     xcrun_available, ios_devices, error_message = get_ios_devices()
     if xcrun_available:
         if ios_devices:
             console.print("✅ [bold green]iOS device(s) connected:[/bold green]")
             for device in ios_devices:
-                console.print(f"  - {device}")
+                console.print(f"  - [green]{device}[/green]")
         else:
-            console.print("❌ [bold red]No iOS device found.[/bold red]")
+            console.print("❌ [bold red]No iOS device found. We only support iOS simulators for now."
+             "[/bold red]")
             console.print(
                 "[iOS] Please make sure your emulator is running or a device is connected via USB."
             )
