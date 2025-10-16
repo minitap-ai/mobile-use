@@ -137,20 +137,26 @@ If you decide to act, output a **valid JSON stringified structured set of instru
   A **valid stringified JSON** describing what should be executed **right now** to advance through the subgoals as much as possible.
 
 - **Decisions Reason** _(2-4 sentences)_:
-  **MANDATORY: Start by analyzing previous agent thoughts** - Did previous reasoning contain errors? Are we repeating failed approaches? What worked before in similar situations?
+  Start by analyzing previous agent thoughts. Then explain your current decision. Explicitly mention if correcting errors or changing strategy. Include checkpoints for indefinite actions (e.g., "Swiping up - last seen recipe was X").
 
-  Then explain your current decision based on this analysis. If there is any information you need to remember for later steps, you must include it here (agent thoughts will be used to produce the final structured output).
+- **Goals Completion Reason**: Explain why marking subgoals complete based on observed evidence, or state "None".
 
-  **Explicitly mention if you're correcting a previous error or changing strategy based on agent thoughts analysis.**
-  You must also use this field to mention checkpoints when you perform actions without definite ending: for instance "Swiping up to reveal more recipes - last seen recipe was <ID or NAME>, stop when no more".
+- **Screen Analysis Prompt** _(optional)_: A specific question for visual analysis (e.g., "Is there a search icon visible?"). Leave empty if not needed.
 
-- **Goals Completion Reason** _(1-2 sentences)_:
-  Explain why you are marking any subgoals as complete, or state "None" if no subgoals are being completed in this turn.
+**Important Decision Rules:**
 
-- **Screen Analysis Prompt** _(optional)_:
-  If you need visual analysis of the screen, provide a specific question or instruction for the screen_analyzer agent. Examples: "Is there a search icon visible?", "What app is currently displayed?", "Describe the main content on screen". Leave this field empty (None) if you don't need screen analysis.
+1. **Goal Completion + Execution Decisions**: You CAN provide both `complete_subgoals_by_ids` AND `Structured Decisions` in the same turn. This is the PREFERRED approach when:
 
-**Important:** `complete_subgoals_by_ids` and the structured decisions are mutually exclusive: if you provide both, the structured decisions will be ignored. Therefore, you must always prioritize completing subgoals over providing structured decisions.
+   - Agent thoughts show a previous action has ALREADY succeeded → Complete that subgoal
+   - The current screen requires new actions → Provide structured decisions
+   - **CRITICAL**: Only complete goals based on OBSERVED evidence from agent thoughts. NEVER complete goals "in advance" assuming an action will succeed.
+
+2. **Screen Analysis + Execution Decisions ARE MUTUALLY EXCLUSIVE**: If you provide both `screen_analysis_prompt` AND `Structured Decisions`, the execution decisions will take priority and screen analysis will be ignored. This should NEVER happen. Use screen analysis only when you need visual insights for the NEXT turn, not the current one.
+
+3. **Maximum Decisions Per Turn**: You can make up to 3 types of decisions simultaneously:
+   - Complete examined subgoals (based on agent thoughts showing completion)
+   - Execute actions on the current screen
+   - Request screen analysis for visual confirmation needed in the next turn
 
 ---
 
@@ -189,6 +195,85 @@ If you decide to act, output a **valid JSON stringified structured set of instru
 #### Decisions Reason:
 
 > I can see the search icon in the UI hierarchy at the specified coordinates. No prior attempts for this subgoal are recorded, so this is the first try. Executor feedback shows no conflicts. I'm targeting the search icon with all available identifiers (resource_id, text, coordinates) to ensure reliable execution following the element rule.
+
+### Example 2: Execution Decisions + Goal Completion
+
+#### Current Subgoal:
+
+> "Send 'Hello!' to Alice on WhatsApp"
+
+#### Context:
+
+- **Agent thoughts history shows**: Previous turn executed `input_text` to type "Hello!" in the message field. Executor feedback confirms the text was successfully entered.
+- **Current UI state**: The UI hierarchy shows the message "Hello!" is in the input field, and a send button with resource_id `com.whatsapp:id/send` is present.
+
+#### Complete Subgoals By IDs:
+
+```text
+["subgoal-4-type-message"]
+```
+
+#### Structured Decisions:
+
+```text
+"[{\"action\": \"tap\", \"target\": {\"resource_id\": \"com.whatsapp:id/send\", \"resource_id_index\": 0, \"coordinates\": {\"x\": 950, \"y\": 1800, \"width\": 100, \"height\": 100}}}]"
+```
+
+#### Decisions Reason:
+
+> Analysis: Agent thoughts confirm the text "Hello!" was successfully entered in the previous turn (executor feedback showed successful input). The current UI shows the message in the field and the send button is visible. I am completing the typing subgoal based on OBSERVED evidence, and tapping send to proceed. Providing full target information following the element rule.
+
+#### Goals Completion Reason:
+
+> Completing "type-message" subgoal because agent thoughts show the Executor successfully entered "Hello!" in the previous turn, and the current UI hierarchy confirms the text is present in the message field.
+
+#### Screen Analysis Prompt:
+
+```text
+None
+```
+
+**Why this makes sense:** We're completing a goal that ALREADY happened (typing) based on observed evidence from agent thoughts, while simultaneously executing the next action (sending). We're not anticipating the send will succeed—we're only completing what has been confirmed.
+
+### Example 3: Screen Analysis + Goal Completion
+
+#### Current Subgoal:
+
+> "Verify the message was delivered to Alice"
+
+#### Context:
+
+- **Agent thoughts history shows**: Previous turn executed `tap` on the send button. Executor feedback confirms the tap was successful.
+- **Current UI state**: The UI hierarchy shows we're still in the WhatsApp chat with Alice. The hierarchy contains text elements but doesn't clearly indicate delivery status.
+- **Next step consideration**: We need visual confirmation of delivery checkmarks, which are not reliably exposed in the UI hierarchy.
+
+#### Complete Subgoals By IDs:
+
+```text
+["subgoal-5-send-message"]
+```
+
+#### Structured Decisions:
+
+```text
+None
+```
+
+#### Decisions Reason:
+
+> None
+
+#### Goals Completion Reason:
+
+> Completing "send-message" subgoal because agent thoughts show the send button tap was executed successfully in the previous turn, and we remain in the chat screen (not an error state).
+
+#### Screen Analysis Prompt:
+
+```text
+Are there delivery checkmarks (single or double) visible next to the message "Hello!" in the chat? Describe their appearance.
+```
+
+**Why this makes sense:** We're completing the goal that ALREADY happened (sending the message) based on observed evidence from agent thoughts. We need screen analysis to verify delivery status for the next subgoal, but we have no execution decisions to make on the current screen. This respects the mutual exclusivity between execution decisions and screen analysis.
 
 ### Input
 
