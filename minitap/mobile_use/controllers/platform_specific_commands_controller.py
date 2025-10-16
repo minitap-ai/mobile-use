@@ -1,11 +1,11 @@
-from datetime import date
 import json
+from datetime import date
 
 from adbutils import AdbDevice
+
+from minitap.mobile_use.context import DevicePlatform, MobileUseContext
 from minitap.mobile_use.utils.logger import MobileUseLogger
 from minitap.mobile_use.utils.shell_utils import run_shell_command_on_host
-from minitap.mobile_use.context import MobileUseContext
-from minitap.mobile_use.context import DevicePlatform
 
 
 def get_adb_device(ctx: MobileUseContext) -> AdbDevice:
@@ -69,5 +69,17 @@ def list_packages(ctx: MobileUseContext) -> str:
         return run_shell_command_on_host(" ".join(cmd))
     else:
         device = get_adb_device(ctx)
+        # Get full package list with paths
         cmd = ["pm", "list", "packages", "-f"]
-        return str(device.shell(" ".join(cmd)))
+        raw_output = str(device.shell(" ".join(cmd)))
+
+        # Extract only package names (remove paths and "package:" prefix)
+        # Format: "package:/path/to/app.apk=com.example.app" -> "com.example.app"
+        lines = raw_output.strip().split("\n")
+        packages = []
+        for line in lines:
+            if "=" in line:
+                package_name = line.split("=")[-1].strip()
+                packages.append(package_name)
+
+        return "\n".join(sorted(packages))

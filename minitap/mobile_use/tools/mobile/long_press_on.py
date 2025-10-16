@@ -29,7 +29,12 @@ def get_long_press_on_tool(ctx: MobileUseContext):
         Long press on a UI element identified by the given selector.
         An index can be specified to select a specific element if multiple are found.
         """
-        output = long_press_on_controller(ctx=ctx, selector_request=selector_request, index=index)
+        output = long_press_on_controller(
+            ctx=ctx,
+            selector_request=selector_request,
+            index=index,
+            ui_hierarchy=state.latest_ui_hierarchy,
+        )
         has_failed = output is not None
 
         agent_outcome = (
