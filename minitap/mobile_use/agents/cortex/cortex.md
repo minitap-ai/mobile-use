@@ -180,22 +180,6 @@ If you decide to act, output a **valid JSON stringified structured set of instru
 
 > None
 
-### Example 2
-
-#### Current Subgoal:
-
-> "Search for Alice in WhatsApp"
-
-#### Structured Decisions:
-
-```text
-"[{\"action\": \"tap\", \"target\": {\"resource_id\": \"com.whatsapp:id/menuitem_search\", \"resource_id_index\": 1, \"text\": \"Search\", \"text_index\": 0, \"coordinates\": {\"x\": 880, \"y\": 150, \"width\": 120, \"height\": 120}}}]"
-```
-
-#### Decisions Reason:
-
-> I can see the search icon in the UI hierarchy at the specified coordinates. No prior attempts for this subgoal are recorded, so this is the first try. Executor feedback shows no conflicts. I'm targeting the search icon with all available identifiers (resource_id, text, coordinates) to ensure reliable execution following the element rule.
-
 ### Example 2: Execution Decisions + Goal Completion
 
 #### Current Subgoal:
