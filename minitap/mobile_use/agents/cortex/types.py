@@ -10,8 +10,8 @@ class CortexOutput(BaseModel):
         default=None,
         description="The reason for the goals completion, if there are any goals to be completed.",
     )
-    complete_subgoals_by_ids: list[str] | None = Field(
-        default=None, description="List of subgoal IDs to complete"
+    complete_subgoals_by_ids: list[str] = Field(
+        default_factory=list, description="List of subgoal IDs to complete"
     )
     screen_analysis_prompt: str | None = Field(
         default=None,

@@ -119,7 +119,7 @@ class CortexNode:
             update={
                 "agents_thoughts": [agent_thought],
                 "structured_decisions": response.decisions,
-                "complete_subgoals_by_ids": response.complete_subgoals_by_ids or [],
+                "complete_subgoals_by_ids": response.complete_subgoals_by_ids,
                 "screen_analysis_prompt": response.screen_analysis_prompt,
                 "latest_screenshot_base64": None,
                 "latest_ui_hierarchy": None,
