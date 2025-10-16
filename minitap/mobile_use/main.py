@@ -103,7 +103,7 @@ def main(
     Run the Mobile-use agent to automate tasks on a mobile device.
     """
     console = Console()
-    
+
     adb_client = None
     try:
         if which("adb"):
@@ -113,7 +113,7 @@ def main(
             )
     except Exception:
         pass  # ADB not available, will only support iOS devices
-    
+
     display_device_status(console, adb_client=adb_client)
     asyncio.run(
         run_automation(
