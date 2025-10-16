@@ -516,7 +516,7 @@ def open_link(ctx: MobileUseContext, url: str, dry_run: bool = False):
     if adb_client:
         logger.info("Opening link with adb")
         device = _get_adb_device(ctx)
-        device.shell(f"am start -a android.intent.action.VIEW -d {url}")
+        device.shell(["am", "start", "-a", "android.intent.action.VIEW", "-d", url])
         return None
 
     # Fallback to Maestro
