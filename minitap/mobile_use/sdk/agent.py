@@ -90,6 +90,7 @@ class Agent:
     _hw_bridge_client: DeviceHardwareClient
     _adb_client: AdbClient | None
     _current_task: asyncio.Task | None = None
+    _task_lock: asyncio.Lock
 
     def __init__(self, *, config: AgentConfig | None = None):
         self._config = config or get_default_agent_config()
@@ -102,6 +103,7 @@ class Agent:
         self._is_default_screen_api = (
             self._config.servers.screen_api_base_url == DEFAULT_SCREEN_API_BASE_URL
         )
+        self._task_lock = asyncio.Lock()
         # Initialize platform service if API key is available in environment
         # Note: Can also be initialized later with API key from request
         if settings.MINITAP_API_KEY:
@@ -411,22 +413,23 @@ class Agent:
             finally:
                 self._finalize_tracing(task=task, context=context)
 
-        if self._current_task and not self._current_task.done():
-            logger.warning(
-                "Another automation task is already running. "
-                "Stopping it before starting the new one."
-            )
-            self.stop_current_task()
-            try:
-                await self._current_task
-            except asyncio.CancelledError:
-                pass
+        async with self._task_lock:
+            if self._current_task and not self._current_task.done():
+                logger.warning(
+                    "Another automation task is already running. "
+                    "Stopping it before starting the new one."
+                )
+                self.stop_current_task()
+                try:
+                    await self._current_task
+                except asyncio.CancelledError:
+                    pass
 
-        try:
-            self._current_task = asyncio.create_task(_execute_task_logic())
-            return await self._current_task
-        finally:
-            self._current_task = None
+            try:
+                self._current_task = asyncio.create_task(_execute_task_logic())
+                return await self._current_task
+            finally:
+                self._current_task = None
 
     def stop_current_task(self):
         """Requests cancellation of the currently running automation task."""
