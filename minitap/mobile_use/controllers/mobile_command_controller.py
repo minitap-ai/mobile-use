@@ -186,7 +186,7 @@ def _get_ui_element(
     for element in ui_hierarchy:
         if resource_id and element.get("resource-id") == resource_id:
             matches.append(element)
-        elif text and element.get("text") == text:
+        elif text and (element.get("text") == text or element.get("accessibilityText") == text):
             matches.append(element)
 
     if not matches:
@@ -274,6 +274,18 @@ def tap_android(
         return _android_tap_by_coordinates(
             ctx=ctx,
             coords=selector.coordinates,
+            long_press=long_press,
+        )
+
+    # Convert percentage-based selectors to coordinates
+    if isinstance(selector, SelectorRequestWithPercentages):
+        coords = selector.percentages.to_coords(
+            width=ctx.device.device_width,
+            height=ctx.device.device_height,
+        )
+        return _android_tap_by_coordinates(
+            ctx=ctx,
+            coords=coords,
             long_press=long_press,
         )
 
@@ -416,9 +428,25 @@ def input_text(ctx: MobileUseContext, text: str, dry_run: bool = False):
     adb_client = ctx.adb_client
     if adb_client:
         logger.info("Inputting text with adb")
-        # Escape special characters for shell
-        escaped_text = text.replace("\\", "\\\\").replace('"', '\\"').replace(" ", "%s")
-        adb_client.shell(command=f'input text "{escaped_text}"', serial=ctx.device.device_id)
+        # Split text by '%s' sequence to avoid Android input binary interpretation
+        # '%s' is interpreted as a space by the Android input binary
+        parts = text.split("%s")
+        
+        for i, part in enumerate(parts):
+            if part:  # Only process non-empty parts
+                # Use single quotes to avoid shell interpretation of special characters
+                # Escape single quotes by ending the quoted string, adding escaped quote,
+                # and starting new quoted string
+                escaped_part = part.replace("'", "'\\''")
+                adb_client.shell(
+                    command=f"input text '{escaped_part}'",
+                    serial=ctx.device.device_id,
+                )
+            # Add the literal '%s' back between parts (except after the last part)
+            if i < len(parts) - 1:
+                adb_client.shell(command="input text '%'", serial=ctx.device.device_id)
+                adb_client.shell(command="input text 's'", serial=ctx.device.device_id)
+        
         return None
 
     # Fallback to Maestro

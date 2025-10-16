@@ -48,10 +48,9 @@ class PercentagesSelectorRequest(BaseModel):
 
     def to_coords(self, width: int, height: int) -> CoordinatesSelectorRequest:
         """Convert percentages to pixel coordinates."""
-        return CoordinatesSelectorRequest(
-            x=int(width * self.x_percent / 100),
-            y=int(height * self.y_percent / 100),
-        )
+        x = min(max(int(width * self.x_percent / 100), 0), max(0, width - 1))
+        y = min(max(int(height * self.y_percent / 100), 0), max(0, height - 1))
+        return CoordinatesSelectorRequest(x=x, y=y)
 
 
 class SwipeStartEndCoordinatesRequest(BaseModel):
