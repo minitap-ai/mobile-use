@@ -27,6 +27,13 @@ from minitap.mobile_use.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
+def _get_adb_device(ctx: MobileUseContext):
+    """Get ADB device object from the client."""
+    if ctx.adb_client is None:
+        raise ValueError("ADB client is not initialized")
+    return ctx.adb_client.device(serial=ctx.device.device_id)
+
+
 ###### Screen elements retrieval ######
 
 
@@ -221,7 +228,8 @@ def _android_tap_by_coordinates(
         cmd = f"input tap {coords.x} {coords.y}"
 
     try:
-        ctx.adb_client.shell(serial=ctx.device.device_id, command=cmd)
+        device = _get_adb_device(ctx)
+        device.shell(cmd)
         return TapOutput(error=None)
     except Exception as e:
         return TapOutput(error=f"ADB tap failed: {str(e)}")
@@ -401,10 +409,8 @@ def swipe_android(
         f"{swipe_coords.end.x} {swipe_coords.end.y} "
         f"{duration}"
     )
-    ctx.adb_client.shell(
-        serial=ctx.device.device_id,
-        command=cmd,
-    )
+    device = _get_adb_device(ctx)
+    device.shell(cmd)
     return None
 
 
@@ -437,10 +443,8 @@ def input_text(ctx: MobileUseContext, text: str, dry_run: bool = False):
             if i < len(parts) - 1:
                 to_write += "%"
 
-            adb_client.shell(
-                command=["input", "text", to_write],
-                serial=ctx.device.device_id,
-            )
+            device = _get_adb_device(ctx)
+            device.shell(["input", "text", to_write])
 
         return None
 
@@ -458,7 +462,8 @@ def erase_text(ctx: MobileUseContext, nb_chars: int | None = None, dry_run: bool
         logger.info("Erasing text with adb")
         chars_to_delete = nb_chars if nb_chars is not None else 50
         for _ in range(chars_to_delete):
-            adb_client.shell(command="input keyevent KEYCODE_DEL", serial=ctx.device.device_id)
+            device = _get_adb_device(ctx)
+            device.shell("input keyevent KEYCODE_DEL")
         return None
 
     # Fallback to Maestro
@@ -477,11 +482,11 @@ def launch_app(ctx: MobileUseContext, package_name: str, dry_run: bool = False):
         # Use am start with MAIN/LAUNCHER intent - more reliable than monkey
         # First try to resolve the main activity, fallback to monkey if that fails
         resolve_cmd = f"cmd package resolve-activity --brief {package_name}"
+        device = _get_adb_device(ctx)
         result = str(
-            adb_client.shell(
-                command=f"am start -n $({resolve_cmd} | tail -n 1) 2>&1 "
-                f"|| monkey -p {package_name} -c android.intent.category.LAUNCHER 1",
-                serial=ctx.device.device_id,
+            device.shell(
+                f"am start -n $({resolve_cmd} | tail -n 1) 2>&1 "
+                f"|| monkey -p {package_name} -c android.intent.category.LAUNCHER 1"
             )
         )
         # Check if launch failed
@@ -510,10 +515,8 @@ def open_link(ctx: MobileUseContext, url: str, dry_run: bool = False):
     adb_client = ctx.adb_client
     if adb_client:
         logger.info("Opening link with adb")
-        adb_client.shell(
-            command=f"am start -a android.intent.action.VIEW -d {url}",
-            serial=ctx.device.device_id,
-        )
+        device = _get_adb_device(ctx)
+        device.shell(f"am start -a android.intent.action.VIEW -d {url}")
         return None
 
     # Fallback to Maestro
@@ -528,7 +531,8 @@ def back(ctx: MobileUseContext, dry_run: bool = False):
     adb_client = ctx.adb_client
     if adb_client:
         logger.info("Pressing back with adb")
-        adb_client.shell(command="input keyevent KEYCODE_BACK", serial=ctx.device.device_id)
+        device = _get_adb_device(ctx)
+        device.shell("input keyevent KEYCODE_BACK")
         return None
 
     # Fallback to Maestro
