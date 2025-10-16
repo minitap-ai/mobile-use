@@ -1,5 +1,6 @@
 import json
 from datetime import date
+from shutil import which
 
 from adbutils import AdbDevice
 
@@ -22,29 +23,30 @@ def get_first_device(
     logger: MobileUseLogger | None = None,
 ) -> tuple[str | None, DevicePlatform | None]:
     """Gets the first available device."""
-    try:
-        android_output = run_shell_command_on_host("adb devices")
-        lines = android_output.strip().split("\n")
-        for line in lines:
-            if "device" in line and not line.startswith("List of devices"):
-                return line.split()[0], DevicePlatform.ANDROID
-    except RuntimeError as e:
-        if logger:
-            logger.error(f"ADB command failed: {e}")
-        return None, None
+    if which("adb"):
+        try:
+            android_output = run_shell_command_on_host("adb devices")
+            lines = android_output.strip().split("\n")
+            for line in lines:
+                if "device" in line and not line.startswith("List of devices"):
+                    return line.split()[0], DevicePlatform.ANDROID
+        except RuntimeError as e:
+            if logger:
+                logger.error(f"ADB command failed: {e}")
 
-    try:
-        ios_output = run_shell_command_on_host("xcrun simctl list devices booted -j")
-        data = json.loads(ios_output)
-        for runtime, devices in data.get("devices", {}).items():
-            if "iOS" not in runtime:
-                continue
-            for device in devices:
-                if device.get("state") == "Booted":
-                    return device["udid"], DevicePlatform.IOS
-    except RuntimeError as e:
-        if logger:
-            logger.error(f"xcrun command failed: {e}")
+    if which("xcrun"):
+        try:
+            ios_output = run_shell_command_on_host("xcrun simctl list devices booted -j")
+            data = json.loads(ios_output)
+            for runtime, devices in data.get("devices", {}).items():
+                if "iOS" not in runtime:
+                    continue
+                for device in devices:
+                    if device.get("state") == "Booted":
+                        return device["udid"], DevicePlatform.IOS
+        except RuntimeError as e:
+            if logger:
+                logger.error(f"xcrun command failed: {e}")
 
     return None, None
 
