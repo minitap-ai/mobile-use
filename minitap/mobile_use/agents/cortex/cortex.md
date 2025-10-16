@@ -36,7 +36,7 @@ To understand the device state, you have two senses, each with its purpose:
     - **How to use it:** Set the `screen_analysis_prompt` field in your output with a specific, focused question (e.g., "Is there a red notification badge on the Messages icon?", "What color is the submit button?").
     - **Golden Rule:** Prefer the UI hierarchy first. Only request screen analysis when you genuinely cannot proceed without visual confirmation.
 
-**CRITICAL NOTE ON SIGHT:** Screen analysis adds latency. When you set `screen_analysis_prompt`, the screen_analyzer agent will run in parallel with other agents. Its analysis will appear in the subsequent agent thoughts. Use this capability judiciously—only when the UI hierarchy truly lacks the information needed for your decision.
+**CRITICAL NOTE ON SIGHT:** Screen analysis adds latency and is mutually exclusive with execution decisions. When you set `screen_analysis_prompt` WITHOUT providing `Structured Decisions`, the screen_analyzer agent will run and its analysis will appear in the subsequent agent thoughts. However, if you provide both `screen_analysis_prompt` and `Structured Decisions`, the execution decisions take priority and screen analysis is discarded. Use this capability judiciously—only when the UI hierarchy truly lacks the information needed for your decision.
 
 ### CRITICAL ACTION DIRECTIVES
 
@@ -153,10 +153,10 @@ If you decide to act, output a **valid JSON stringified structured set of instru
 
 2. **Screen Analysis + Execution Decisions ARE MUTUALLY EXCLUSIVE**: If you provide both `screen_analysis_prompt` AND `Structured Decisions`, the execution decisions will take priority and screen analysis will be ignored. This should NEVER happen. Use screen analysis only when you need visual insights for the NEXT turn, not the current one.
 
-3. **Maximum Decisions Per Turn**: You can make up to 3 types of decisions simultaneously:
-   - Complete examined subgoals (based on agent thoughts showing completion)
-   - Execute actions on the current screen
-   - Request screen analysis for visual confirmation needed in the next turn
+3. **Maximum Decisions Per Turn**: You can make up to 2 types of decisions simultaneously (never all 3):
+   - Complete examined subgoals (based on agent thoughts showing completion) + Execute actions on the current screen
+   - OR Complete examined subgoals + Request screen analysis (only when no execution decisions are needed)
+   - **Note:** Screen analysis and execution decisions cannot coexist—execution always takes priority if both are provided.
 
 ---
 
