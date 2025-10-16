@@ -6,6 +6,7 @@ from adbutils import AdbClient
 from langchain.callbacks.base import Callbacks
 from rich.console import Console
 from typing import Annotated
+from shutil import which
 
 from minitap.mobile_use.config import (
     initialize_llm_config,
@@ -102,10 +103,17 @@ def main(
     Run the Mobile-use agent to automate tasks on a mobile device.
     """
     console = Console()
-    adb_client = AdbClient(
-        host=settings.ADB_HOST or "localhost",
-        port=settings.ADB_PORT or 5037,
-    )
+    
+    adb_client = None
+    try:
+        if which("adb"):
+            adb_client = AdbClient(
+                host=settings.ADB_HOST or "localhost",
+                port=settings.ADB_PORT or 5037,
+            )
+    except Exception:
+        pass  # ADB not available, will only support iOS devices
+    
     display_device_status(console, adb_client=adb_client)
     asyncio.run(
         run_automation(
