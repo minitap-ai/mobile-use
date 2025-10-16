@@ -86,13 +86,23 @@ class CortexNode:
             ),
         )  # type: ignore
 
-        is_subgoal_completed = (
-            response.complete_subgoals_by_ids is not None
-            and len(response.complete_subgoals_by_ids) > 0
-            and (len(response.decisions) == 0 or response.decisions in ["{}", "[]", "null", ""])
-        )
-        if not is_subgoal_completed:
-            response.complete_subgoals_by_ids = []
+        EMPTY_STRING_TOKENS = ["{}", "[]", "null", "", "None"]
+
+        if response.decisions in EMPTY_STRING_TOKENS:
+            response.decisions = None
+        if response.goals_completion_reason in EMPTY_STRING_TOKENS:
+            response.goals_completion_reason = None
+        if response.screen_analysis_prompt in EMPTY_STRING_TOKENS:
+            response.screen_analysis_prompt = None
+
+        # Enforce mutual exclusivity: screen_analysis_prompt and decisions cannot coexist
+        # If both are provided, prioritize decisions and discard screen_analysis_prompt
+        if response.decisions is not None and response.screen_analysis_prompt is not None:
+            logger.warning(
+                "Both 'decisions' and 'screen_analysis_prompt' were provided. "
+                "Prioritizing execution decisions and discarding screen analysis request."
+            )
+            response.screen_analysis_prompt = None
 
         thought_parts = []
         if response.decisions_reason:
@@ -108,7 +118,7 @@ class CortexNode:
             ctx=self.ctx,
             update={
                 "agents_thoughts": [agent_thought],
-                "structured_decisions": response.decisions if not is_subgoal_completed else None,
+                "structured_decisions": response.decisions,
                 "complete_subgoals_by_ids": response.complete_subgoals_by_ids or [],
                 "screen_analysis_prompt": response.screen_analysis_prompt,
                 "latest_screenshot_base64": None,
