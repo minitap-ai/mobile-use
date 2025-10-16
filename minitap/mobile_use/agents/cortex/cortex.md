@@ -55,6 +55,7 @@ To understand the device state, you have two senses, each with its purpose:
 Focus on the **current PENDING subgoal and the next subgoals not yet started**.
 
 **CRITICAL: Before making any decision, you MUST thoroughly analyze the agent thoughts history to:**
+
 - **Detect patterns of failure or repeated attempts** that suggest the current approach isn't working
 - **Identify contradictions** between what was planned and what actually happened
 - **Spot errors in previous reasoning** that need to be corrected
@@ -153,8 +154,7 @@ If you decide to act, output a **valid JSON stringified structured set of instru
 
 #### Agent Thought:
 
-
-> I need to launch the WhatsApp app to achieve the current subgoal. The `launch_app` tool is the most reliable method for opening applications.
+> No previous attempts for this subgoal exist in agent thoughts history, so this is a fresh start. I need to launch the WhatsApp app to achieve the current subgoal. The `launch_app` tool is the most reliable method for opening applications.
  
 
 ### Example 2
