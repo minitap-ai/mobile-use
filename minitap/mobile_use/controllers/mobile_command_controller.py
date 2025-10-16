@@ -431,7 +431,7 @@ def input_text(ctx: MobileUseContext, text: str, dry_run: bool = False):
         # Split text by '%s' sequence to avoid Android input binary interpretation
         # '%s' is interpreted as a space by the Android input binary
         parts = text.split("%s")
-        
+
         for i, part in enumerate(parts):
             if part:  # Only process non-empty parts
                 # Use single quotes to avoid shell interpretation of special characters
@@ -446,7 +446,7 @@ def input_text(ctx: MobileUseContext, text: str, dry_run: bool = False):
             if i < len(parts) - 1:
                 adb_client.shell(command="input text '%'", serial=ctx.device.device_id)
                 adb_client.shell(command="input text 's'", serial=ctx.device.device_id)
-        
+
         return None
 
     # Fallback to Maestro
