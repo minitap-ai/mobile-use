@@ -1,8 +1,11 @@
+from typing import Annotated
+
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
 from langchain_core.tools.base import InjectedToolCallId
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
+
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.mobile_command_controller import (
@@ -10,7 +13,6 @@ from minitap.mobile_use.controllers.mobile_command_controller import (
 )
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
-from typing import Annotated
 
 
 def get_wait_for_delay_tool(ctx: MobileUseContext):
@@ -35,6 +37,8 @@ def get_wait_for_delay_tool(ctx: MobileUseContext):
             - wait_for_delay with time_in_ms=1000 (waits 1 second)
             - wait_for_delay with time_in_ms=500 (waits 0.5 seconds)
         """
+        if time_in_ms < 0:
+            time_in_ms = 1000
         output = wait_for_delay_controller(time_in_ms)
         has_failed = output is not None
         tool_message = ToolMessage(
