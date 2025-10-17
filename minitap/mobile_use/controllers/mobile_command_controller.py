@@ -596,7 +596,6 @@ if __name__ == "__main__":
         messages=[],
         initial_goal="",
         subgoal_plan=[],
-        latest_screenshot_base64=screen_data.base64,
         focused_app_info=None,
         device_date="",
         structured_decisions=None,

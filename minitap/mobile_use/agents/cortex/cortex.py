@@ -18,7 +18,6 @@ from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message, with_fallback
 from minitap.mobile_use.tools.index import EXECUTOR_WRAPPERS_TOOLS, format_tools_list
-from minitap.mobile_use.utils.conversations import get_screenshot_message_for_llm
 from minitap.mobile_use.utils.decorators import wrap_with_callbacks
 from minitap.mobile_use.utils.logger import get_logger
 
@@ -61,10 +60,6 @@ class CortexNode:
         ]
         for thought in state.agents_thoughts:
             messages.append(AIMessage(content=thought))
-
-        if state.latest_screenshot_base64:
-            messages.append(get_screenshot_message_for_llm(state.latest_screenshot_base64))
-            logger.info("Added screenshot to context")
 
         if state.latest_ui_hierarchy:
             ui_hierarchy_dict: list[dict] = state.latest_ui_hierarchy
@@ -121,7 +116,6 @@ class CortexNode:
                 "structured_decisions": response.decisions,
                 "complete_subgoals_by_ids": response.complete_subgoals_by_ids,
                 "screen_analysis_prompt": response.screen_analysis_prompt,
-                "latest_screenshot_base64": None,
                 "latest_ui_hierarchy": None,
                 "focused_app_info": None,
                 "device_date": None,
