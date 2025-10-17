@@ -1,4 +1,5 @@
 import re
+import time
 import uuid
 from enum import Enum
 
@@ -554,18 +555,10 @@ def press_key(ctx: MobileUseContext, key: Key, dry_run: bool = False):
 #### Other commands ####
 
 
-class WaitTimeout(Enum):
-    SHORT = "500"
-    MEDIUM = "1000"
-    LONG = "5000"
-
-
-def wait_for_animation_to_end(
-    ctx: MobileUseContext, timeout: WaitTimeout | None = None, dry_run: bool = False
-):
-    if timeout is None:
-        return run_flow(ctx, ["waitForAnimationToEnd"], dry_run=dry_run)
-    return run_flow(ctx, [{"waitForAnimationToEnd": {"timeout": timeout.value}}], dry_run=dry_run)
+def wait_for_delay(time_in_ms: int):
+    """Wait for a specified delay in milliseconds."""
+    time.sleep(time_in_ms / 1000)
+    return None
 
 
 def run_flow_with_wait_for_animation_to_end(
@@ -575,7 +568,7 @@ def run_flow_with_wait_for_animation_to_end(
     wait_for_animation_to_end: bool = False,
 ):
     if wait_for_animation_to_end:
-        base_flow.append({"waitForAnimationToEnd": {"timeout": int(WaitTimeout.SHORT.value)}})
+        base_flow.append({"waitForAnimationToEnd": {"timeout": 500}})
     return run_flow(ctx, base_flow, dry_run=dry_run)
 
 
