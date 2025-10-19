@@ -238,9 +238,9 @@ class TextClearer:
         )
 
 
-def get_clear_text_tool(ctx: MobileUseContext):
+def get_focus_and_clear_text_tool(ctx: MobileUseContext):
     @tool
-    async def clear_text(
+    async def focus_and_clear_text(
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
         agent_thought: str,
@@ -255,9 +255,9 @@ def get_clear_text_tool(ctx: MobileUseContext):
         )
 
         agent_outcome = (
-            clear_text_wrapper.on_failure_fn(result.error_message)
+            focus_and_clear_text_wrapper.on_failure_fn(result.error_message)
             if not result.success
-            else clear_text_wrapper.on_success_fn(
+            else focus_and_clear_text_wrapper.on_success_fn(
                 nb_char_erased=result.chars_erased, new_text_value=result.final_text
             )
         )
@@ -280,7 +280,7 @@ def get_clear_text_tool(ctx: MobileUseContext):
             ),
         )
 
-    return clear_text
+    return focus_and_clear_text
 
 
 def _format_success_message(nb_char_erased: int, new_text_value: str | None) -> str:
@@ -299,8 +299,8 @@ def _format_failure_message(output: str | None) -> str:
     return "Failed to erase text. " + (str(output) if output else "")
 
 
-clear_text_wrapper = ToolWrapper(
-    tool_fn_getter=get_clear_text_tool,
+focus_and_clear_text_wrapper = ToolWrapper(
+    tool_fn_getter=get_focus_and_clear_text_tool,
     on_success_fn=_format_success_message,
     on_failure_fn=_format_failure_message,
 )

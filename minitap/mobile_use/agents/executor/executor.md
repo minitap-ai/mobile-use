@@ -50,7 +50,7 @@ Call the `tap_on_element` tool with:
 
 #### 📝 Text Input Best Practice
 
-When using the `input_text` tool:
+When using the `focus_and_input_text` tool:
 
 - **Provide all available information** in the target object to identify text input element
   - `resource_id`: The resource ID of the text input element (when available)
@@ -69,11 +69,11 @@ When using the `input_text` tool:
 
 #### 🔄 Text Clearing Best Practice
 
-When you need to completely clear text from an input field, always use the clear_text tool with the correct resource_id.
+When you need to completely clear text from an input field, always use the focus_and_clear_text tool with the correct resource_id.
 
 This tool automatically takes care of focusing the element (if needed), and ensuring the field is fully emptied.
 
-Only and if only the clear_text tool fails to clear the text, try to long press the input, select all, and call erase_one_char.
+Only and if only the focus_and_clear_text tool fails to clear the text, try to long press the input, select all, and call erase_one_char.
 
 #### 🔁 Final Notes
 

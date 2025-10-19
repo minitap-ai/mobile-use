@@ -614,10 +614,10 @@ if __name__ == "__main__":
         agents_thoughts=[],
     )
 
-    # from minitap.mobile_use.tools.mobile.input_text import get_input_text_tool
+    # from minitap.mobile_use.tools.mobile.focus_and_input_text import get_focus_and_input_text_tool
 
     # input_resource_id = "com.google.android.apps.nexuslauncher:id/search_container_hotseat"
-    # command_output: Command = get_input_text_tool(ctx=ctx).invoke(
+    # command_output: Command = get_focus_and_input_text_tool(ctx=ctx).invoke(
     #     {
     #         "tool_call_id": uuid.uuid4().hex,
     #         "agent_thought": "",
@@ -627,10 +627,10 @@ if __name__ == "__main__":
     #         "executor_metadata": None,
     #     }
     # )
-    from minitap.mobile_use.tools.mobile.clear_text import get_clear_text_tool
+    from minitap.mobile_use.tools.mobile.focus_and_clear_text import get_focus_and_clear_text_tool
 
     input_resource_id = "com.google.android.apps.nexuslauncher:id/input"
-    command_output: Command = get_clear_text_tool(ctx=ctx).invoke(
+    command_output: Command = get_focus_and_clear_text_tool(ctx=ctx).invoke(
         {
             "tool_call_id": uuid.uuid4().hex,
             "agent_thought": "",
