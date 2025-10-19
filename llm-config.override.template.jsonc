@@ -21,6 +21,10 @@
       "model": ""
     }
   },
+  "screen_analyzer": {
+    "provider": "",
+    "model": ""
+  },
   "executor": {
     "provider": "",
     "model": ""

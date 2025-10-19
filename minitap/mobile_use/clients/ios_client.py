@@ -27,9 +27,13 @@ def get_ios_devices() -> tuple[bool, list[str], str]:
 
         for runtime, devices in devices_dict.items():
             if "ios" in runtime.lower():  # e.g. "com.apple.CoreSimulator.SimRuntime.iOS-17-0"
-                for dev in devices:
-                    if "udid" in dev:
-                        serials.append(dev["udid"])
+                for device in devices:
+                    if device.get("state") != "Booted":
+                        continue
+                    device_udid = device.get("udid")
+                    if not device_udid:
+                        continue
+                    serials.append(device_udid)
 
         return True, serials, ""
 

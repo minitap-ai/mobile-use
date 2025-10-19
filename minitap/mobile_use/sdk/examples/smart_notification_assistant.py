@@ -22,6 +22,7 @@ from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field
+
 from minitap.mobile_use.config import LLM, LLMConfig, LLMConfigUtils, LLMWithFallback
 from minitap.mobile_use.sdk import Agent
 from minitap.mobile_use.sdk.builders import Builders
@@ -69,6 +70,10 @@ def get_agent() -> Agent:
                 model="o4-mini",
                 fallback=LLM(provider="openai", model="gpt-5"),
             ),
+            screen_analyzer=LLM(
+                provider="openai",
+                model="gpt-4o",
+            ),
             executor=LLM(provider="openai", model="gpt-5-nano"),
             utils=LLMConfigUtils(
                 outputter=LLM(provider="openai", model="gpt-5-nano"),
@@ -88,6 +93,10 @@ def get_agent() -> Agent:
                 provider="openai",
                 model="o4-mini",
                 fallback=LLM(provider="openai", model="gpt-5"),
+            ),
+            screen_analyzer=LLM(
+                provider="openai",
+                model="gpt-4o",
             ),
             executor=LLM(provider="openai", model="gpt-4o-mini"),
             utils=LLMConfigUtils(

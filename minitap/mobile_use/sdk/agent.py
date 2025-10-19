@@ -128,7 +128,7 @@ class Agent:
 
         # Get first available device ID
         if not self._config.device_id or not self._config.device_platform:
-            device_id, platform = get_first_device()
+            device_id, platform = get_first_device(logger=logger)
         else:
             device_id, platform = self._config.device_id, self._config.device_platform
 
@@ -564,6 +564,7 @@ class Agent:
             device_date=None,
             structured_decisions=None,
             complete_subgoals_by_ids=[],
+            screen_analysis_prompt=None,
             agents_thoughts=[],
             remaining_steps=task.request.max_steps,
             executor_messages=[],

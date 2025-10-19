@@ -135,23 +135,30 @@ class DeviceHardwareBridge:
             print(f"[Maestro Studio ERROR]: {line}")
             self.output.append(line)
 
-            if "device offline" in line.lower():
+            lower_line = line.lower()
+
+            # Ignore known benign warnings (common on macOS/JDK 21+)
+            if line.startswith("WARNING:") or (
+                "restricted method" in lower_line
+                or "jansi" in lower_line
+                or "enable-native-access" in lower_line
+                or "java.lang.system::load" in lower_line
+            ):
+                continue
+
+            if "device offline" in lower_line:
                 with self.lock:
                     self.status = BridgeStatus.FAILED
                 if self.process:
                     self.process.kill()
                 break
 
-            if "address already in use" in line.lower():
+            if "address already in use" in lower_line:
                 with self.lock:
                     self.status = BridgeStatus.PORT_IN_USE
                 if self.process:
                     self.process.kill()
                 break
-            else:
-                with self.lock:
-                    if self.status == BridgeStatus.STARTING:
-                        self.status = BridgeStatus.FAILED
 
     def _wait_for_health_check(self, retries=5, delay=2):
         health_url = f"http://localhost:{DEVICE_HARDWARE_BRIDGE_PORT}/api/banner-message"

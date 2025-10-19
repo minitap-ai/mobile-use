@@ -94,7 +94,7 @@ def record_events(output_path: Path | None, events: list[str] | BaseModel | Any)
 
 LLMProvider = Literal["openai", "google", "openrouter", "xai", "vertexai", "minitap"]
 LLMUtilsNode = Literal["outputter", "hopper"]
-AgentNode = Literal["planner", "orchestrator", "cortex", "executor"]
+AgentNode = Literal["planner", "orchestrator", "cortex", "screen_analyzer", "executor"]
 AgentNodeWithFallback = Literal["cortex"]
 
 ROOT_DIR = Path(__file__).parent.parent.parent
@@ -157,6 +157,7 @@ class LLMConfig(BaseModel):
     planner: LLM
     orchestrator: LLM
     cortex: LLMWithFallback
+    screen_analyzer: LLM
     executor: LLM
     utils: LLMConfigUtils
 
@@ -164,6 +165,7 @@ class LLMConfig(BaseModel):
         self.planner.validate_provider("Planner")
         self.orchestrator.validate_provider("Orchestrator")
         self.cortex.validate_provider("Cortex")
+        self.screen_analyzer.validate_provider("ScreenAnalyzer")
         self.executor.validate_provider("Executor")
         self.utils.outputter.validate_provider("Outputter")
         self.utils.hopper.validate_provider("Hopper")
@@ -173,6 +175,7 @@ class LLMConfig(BaseModel):
 📃 Planner: {self.planner}
 🎯 Orchestrator: {self.orchestrator}
 🧠 Cortex: {self.cortex}
+👁️ ScreenAnalyzer: {self.screen_analyzer}
 🛠️ Executor: {self.executor}
 🧩 Utils:
     🔽 Hopper: {self.utils.hopper}
@@ -203,6 +206,7 @@ def get_default_llm_config() -> LLMConfig:
                 model="o3",
                 fallback=LLM(provider="openai", model="gpt-5"),
             ),
+            screen_analyzer=LLM(provider="openai", model="gpt-4o"),
             executor=LLM(provider="openai", model="gpt-4.1"),
             utils=LLMConfigUtils(
                 outputter=LLM(provider="openai", model="gpt-5-nano"),
@@ -230,6 +234,7 @@ def get_default_minitap_llm_config() -> LLMConfig | None:
             model="google/gemini-2.5-pro",
             fallback=LLM(provider="minitap", model="openai/gpt-5"),
         ),
+        screen_analyzer=LLM(provider="minitap", model="meta-llama/llama-3.2-90b-vision-instruct"),
         executor=LLM(provider="minitap", model="meta-llama/llama-3.3-70b-instruct"),
         utils=LLMConfigUtils(
             outputter=LLM(provider="minitap", model="openai/gpt-4.1"),
