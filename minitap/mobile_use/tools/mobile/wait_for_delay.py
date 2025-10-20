@@ -1,3 +1,4 @@
+import asyncio
 from typing import Annotated
 
 from langchain_core.messages import ToolMessage
@@ -44,8 +45,13 @@ def get_wait_for_delay_tool(ctx: MobileUseContext):
             time_in_ms = 1000
         if time_in_ms > MAX_DELAY_MS:
             time_in_ms = MAX_DELAY_MS
-        output = wait_for_delay_controller(time_in_ms)
-        has_failed = output is not None
+        try:
+            await asyncio.to_thread(wait_for_delay_controller, time_in_ms)
+            output = None
+            has_failed = False
+        except Exception as e:
+            output = str(e)
+            has_failed = True
         agent_outcome = (
             wait_for_delay_wrapper.on_failure_fn()
             if has_failed
