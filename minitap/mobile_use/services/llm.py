@@ -13,6 +13,7 @@ from minitap.mobile_use.config import (
     AgentNode,
     AgentNodeWithFallback,
     LLMUtilsNode,
+    LLMUtilsNodeWithFallback,
     LLMWithFallback,
     settings,
 )
@@ -169,8 +170,9 @@ def get_llm(
 @overload
 def get_llm(
     ctx: MobileUseContext,
-    name: AgentNode,
+    name: LLMUtilsNode,
     *,
+    is_utils: Literal[True],
     temperature: float = 1,
 ) -> BaseChatModel: ...
 
@@ -178,9 +180,10 @@ def get_llm(
 @overload
 def get_llm(
     ctx: MobileUseContext,
-    name: LLMUtilsNode,
+    name: LLMUtilsNodeWithFallback,
     *,
     is_utils: Literal[True],
+    use_fallback: bool = False,
     temperature: float = 1,
 ) -> BaseChatModel: ...
 
