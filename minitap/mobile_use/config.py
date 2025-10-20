@@ -94,8 +94,9 @@ def record_events(output_path: Path | None, events: list[str] | BaseModel | Any)
 
 LLMProvider = Literal["openai", "google", "openrouter", "xai", "vertexai", "minitap"]
 LLMUtilsNode = Literal["outputter", "hopper"]
+LLMUtilsNodeWithFallback = LLMUtilsNode
 AgentNode = Literal["planner", "orchestrator", "cortex", "screen_analyzer", "executor"]
-AgentNodeWithFallback = Literal["cortex"]
+AgentNodeWithFallback = AgentNode
 
 ROOT_DIR = Path(__file__).parent.parent.parent
 DEFAULT_LLM_CONFIG_FILENAME = "llm-config.defaults.jsonc"
@@ -149,16 +150,16 @@ class LLMWithFallback(LLM):
 
 
 class LLMConfigUtils(BaseModel):
-    outputter: LLM
-    hopper: LLM
+    outputter: LLMWithFallback
+    hopper: LLMWithFallback
 
 
 class LLMConfig(BaseModel):
-    planner: LLM
-    orchestrator: LLM
+    planner: LLMWithFallback
+    orchestrator: LLMWithFallback
     cortex: LLMWithFallback
-    screen_analyzer: LLM
-    executor: LLM
+    screen_analyzer: LLMWithFallback
+    executor: LLMWithFallback
     utils: LLMConfigUtils
 
     def validate_providers(self):
@@ -182,10 +183,10 @@ class LLMConfig(BaseModel):
     📝 Outputter: {self.utils.outputter}
 """
 
-    def get_agent(self, item: AgentNode) -> LLM:
+    def get_agent(self, item: AgentNode) -> LLMWithFallback:
         return getattr(self, item)
 
-    def get_utils(self, item: LLMUtilsNode) -> LLM:
+    def get_utils(self, item: LLMUtilsNode) -> LLMWithFallback:
         return getattr(self.utils, item)
 
 
@@ -199,18 +200,42 @@ def get_default_llm_config() -> LLMConfig:
     except Exception as e:
         logger.error(f"Failed to load default llm config: {e}. Falling back to hardcoded config")
         return LLMConfig(
-            planner=LLM(provider="openai", model="gpt-4.1"),
-            orchestrator=LLM(provider="openai", model="gpt-4.1"),
+            planner=LLMWithFallback(
+                provider="openai",
+                model="gpt-5-nano",
+                fallback=LLM(provider="openai", model="gpt-5-mini"),
+            ),
+            orchestrator=LLMWithFallback(
+                provider="openai",
+                model="gpt-5-nano",
+                fallback=LLM(provider="openai", model="gpt-5-mini"),
+            ),
             cortex=LLMWithFallback(
                 provider="openai",
-                model="o3",
-                fallback=LLM(provider="openai", model="gpt-5"),
+                model="gpt-5",
+                fallback=LLM(provider="openai", model="o4-mini"),
             ),
-            screen_analyzer=LLM(provider="openai", model="gpt-4o"),
-            executor=LLM(provider="openai", model="gpt-4.1"),
+            screen_analyzer=LLMWithFallback(
+                provider="openai",
+                model="gpt-4o",
+                fallback=LLM(provider="openai", model="gpt-5-mini"),
+            ),
+            executor=LLMWithFallback(
+                provider="openai",
+                model="gpt-5-nano",
+                fallback=LLM(provider="openai", model="gpt-5-mini"),
+            ),
             utils=LLMConfigUtils(
-                outputter=LLM(provider="openai", model="gpt-5-nano"),
-                hopper=LLM(provider="openai", model="gpt-4.1"),
+                outputter=LLMWithFallback(
+                    provider="openai",
+                    model="gpt-5-nano",
+                    fallback=LLM(provider="openai", model="gpt-5-mini"),
+                ),
+                hopper=LLMWithFallback(
+                    provider="openai",
+                    model="gpt-5-nano",
+                    fallback=LLM(provider="openai", model="gpt-5-mini"),
+                ),
             ),
         )
 
@@ -227,18 +252,42 @@ def get_default_minitap_llm_config() -> LLMConfig | None:
         return None
 
     return LLMConfig(
-        planner=LLM(provider="minitap", model="meta-llama/llama-4-scout"),
-        orchestrator=LLM(provider="minitap", model="openai/gpt-oss-120b"),
+        planner=LLMWithFallback(
+            provider="minitap",
+            model="meta-llama/llama-4-scout",
+            fallback=LLM(provider="minitap", model="meta-llama/llama-4-maverick"),
+        ),
+        orchestrator=LLMWithFallback(
+            provider="minitap",
+            model="openai/gpt-oss-120b",
+            fallback=LLM(provider="minitap", model="meta-llama/llama-4-maverick"),
+        ),
         cortex=LLMWithFallback(
             provider="minitap",
             model="google/gemini-2.5-pro",
             fallback=LLM(provider="minitap", model="openai/gpt-5"),
         ),
-        screen_analyzer=LLM(provider="minitap", model="meta-llama/llama-3.2-90b-vision-instruct"),
-        executor=LLM(provider="minitap", model="meta-llama/llama-3.3-70b-instruct"),
+        screen_analyzer=LLMWithFallback(
+            provider="minitap",
+            model="meta-llama/llama-3.2-90b-vision-instruct",
+            fallback=LLM(provider="minitap", model="openai/gpt-4o"),
+        ),
+        executor=LLMWithFallback(
+            provider="minitap",
+            model="meta-llama/llama-3.3-70b-instruct",
+            fallback=LLM(provider="minitap", model="openai/gpt-5-mini"),
+        ),
         utils=LLMConfigUtils(
-            outputter=LLM(provider="minitap", model="openai/gpt-4.1"),
-            hopper=LLM(provider="minitap", model="openai/gpt-5-nano"),
+            outputter=LLMWithFallback(
+                provider="minitap",
+                model="openai/gpt-5-nano",
+                fallback=LLM(provider="minitap", model="openai/gpt-5-mini"),
+            ),
+            hopper=LLMWithFallback(
+                provider="minitap",
+                model="openai/gpt-5-nano",
+                fallback=LLM(provider="minitap", model="openai/gpt-5-mini"),
+            ),
         ),
     )
 
