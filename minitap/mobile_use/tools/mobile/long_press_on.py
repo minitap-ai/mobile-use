@@ -40,7 +40,7 @@ def get_long_press_on_tool(ctx: MobileUseContext) -> BaseTool:
         The 'target' object allows specifying an element by its resource_id
         (with an optional index), its coordinates, or its text content (with an optional index).
         The tool uses a fallback strategy, trying the locators in that order.
-        
+
         Args:
             target: The UI element to long press on (coordinates, resource_id, or text).
             duration_ms: Duration of the long press in milliseconds. Choose based on interaction:
