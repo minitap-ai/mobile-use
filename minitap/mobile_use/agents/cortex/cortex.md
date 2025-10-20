@@ -89,7 +89,7 @@ Focus on the **current PENDING subgoal and the next subgoals not yet started**.
 
 **You MUST follow it for every element interaction.**
 
-When you target a UI element (for a `tap`, `input_text`, `clear_text`, etc.), you **MUST** provide a comprehensive `target` object containing every piece of information you can find about **that single element**.
+When you target a UI element (for a `tap`, `focus_and_input_text`, `focus_and_clear_text`, etc.), you **MUST** provide a comprehensive `target` object containing every piece of information you can find about **that single element**.
 
 - **1. `resource_id`**: Include this if it is present in the UI hierarchy.
 - **2. `resource_id_index`**: If there are multiple elements with the same `resource_id`, provide the zero-based index of the specific one you are targeting.
@@ -124,9 +124,9 @@ If you decide to act, output a **valid JSON stringified structured set of instru
 - Your goal is to achieve subgoals **fast** - so you must put as much actions as possible in your instructions to complete all achievable subgoals (based on your observations) in one go.
 - If you refer to a UI element or coordinates, specify it clearly (e.g., `resource-id: com.whatsapp:id/search`, `resource-id-index: 0`, `text: "Alice"`, `resource-id-index: 0`, `x: 100, y: 200, width: 100, height: 100`).
 - **The structure is up to you**, but it must be valid **JSON stringified output**. You will accompany this output with a **natural-language summary** of your reasoning and approach in your agent thought.
-- **Always use a single `input_text` action** to type in a field. This tool handles focusing the element and placing the cursor correctly. If the tool feedback indicates verification is needed or shows None/empty content, perform verification before proceeding.
+- **Always use a single `focus_and_input_text` action** to type in a field. This tool handles focusing the element, placing the cursor correctly and typing the text. If the tool feedback indicates verification is needed or shows None/empty content, perform verification before proceeding.
 - **Only reference UI element IDs or visible texts that are explicitly present in the provided UI hierarchy or screenshot. Do not invent, infer, or guess any IDs or texts that are not directly observed**.
-- **For text clearing**: When you need to completely clear text from an input field, always call the `clear_text` tool with the correct resource_id. This tool automatically focuses the element, and ensures the field is emptied. If you notice this tool fails to clear the text, try to long press the input, select all, and call `erase_one_char`.
+- **For text clearing**: When you need to completely clear text from an input field, always call the `focus_and_clear_text` tool with the correct resource_id. This tool automatically focuses the element, and ensures the field is emptied. If you notice this tool fails to clear the text, try to long press the input, select all, and call `erase_one_char`.
 
 ### Output
 
