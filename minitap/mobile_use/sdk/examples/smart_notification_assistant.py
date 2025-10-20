@@ -63,21 +63,42 @@ def get_agent() -> Agent:
     analyzer_profile = AgentProfile(
         name="analyzer",
         llm_config=LLMConfig(
-            planner=LLM(provider="openrouter", model="meta-llama/llama-4-scout"),
-            orchestrator=LLM(provider="openrouter", model="meta-llama/llama-4-scout"),
+            planner=LLMWithFallback(
+                provider="openrouter",
+                model="meta-llama/llama-4-scout",
+                fallback=LLM(provider="openrouter", model="meta-llama/llama-4-maverick"),
+            ),
+            orchestrator=LLMWithFallback(
+                provider="openrouter",
+                model="meta-llama/llama-4-scout",
+                fallback=LLM(provider="openrouter", model="meta-llama/llama-4-maverick"),
+            ),
             cortex=LLMWithFallback(
                 provider="openai",
                 model="o4-mini",
                 fallback=LLM(provider="openai", model="gpt-5"),
             ),
-            screen_analyzer=LLM(
+            screen_analyzer=LLMWithFallback(
                 provider="openai",
                 model="gpt-4o",
+                fallback=LLM(provider="openai", model="gpt-5-nano"),
             ),
-            executor=LLM(provider="openai", model="gpt-5-nano"),
+            executor=LLMWithFallback(
+                provider="openai",
+                model="gpt-5-nano",
+                fallback=LLM(provider="openai", model="gpt-5-mini"),
+            ),
             utils=LLMConfigUtils(
-                outputter=LLM(provider="openai", model="gpt-5-nano"),
-                hopper=LLM(provider="openai", model="gpt-4.1"),
+                outputter=LLMWithFallback(
+                    provider="openai",
+                    model="gpt-5-nano",
+                    fallback=LLM(provider="openai", model="gpt-5-mini"),
+                ),
+                hopper=LLMWithFallback(
+                    provider="openai",
+                    model="gpt-5-nano",
+                    fallback=LLM(provider="openai", model="gpt-5-mini"),
+                ),
             ),
         ),
         # from_file="/tmp/analyzer.jsonc"  # can be loaded from file
@@ -87,21 +108,40 @@ def get_agent() -> Agent:
     action_profile = AgentProfile(
         name="note_taker",
         llm_config=LLMConfig(
-            planner=LLM(provider="openai", model="o3"),
-            orchestrator=LLM(provider="google", model="gemini-2.5-flash"),
+            planner=LLMWithFallback(
+                provider="openai", model="o3", fallback=LLM(provider="openai", model="gpt-5")
+            ),
+            orchestrator=LLMWithFallback(
+                provider="google",
+                model="gemini-2.5-flash",
+                fallback=LLM(provider="openai", model="gpt-5"),
+            ),
             cortex=LLMWithFallback(
                 provider="openai",
                 model="o4-mini",
                 fallback=LLM(provider="openai", model="gpt-5"),
             ),
-            screen_analyzer=LLM(
+            screen_analyzer=LLMWithFallback(
                 provider="openai",
                 model="gpt-4o",
+                fallback=LLM(provider="openai", model="gpt-5-nano"),
             ),
-            executor=LLM(provider="openai", model="gpt-4o-mini"),
+            executor=LLMWithFallback(
+                provider="openai",
+                model="gpt-4o-mini",
+                fallback=LLM(provider="openai", model="gpt-5-nano"),
+            ),
             utils=LLMConfigUtils(
-                outputter=LLM(provider="openai", model="gpt-5-nano"),
-                hopper=LLM(provider="openai", model="gpt-4.1"),
+                outputter=LLMWithFallback(
+                    provider="openai",
+                    model="gpt-5-nano",
+                    fallback=LLM(provider="openai", model="gpt-5-mini"),
+                ),
+                hopper=LLMWithFallback(
+                    provider="openai",
+                    model="gpt-5-nano",
+                    fallback=LLM(provider="openai", model="gpt-5-mini"),
+                ),
             ),
         ),
     )
