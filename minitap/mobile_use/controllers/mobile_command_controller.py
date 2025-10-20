@@ -242,6 +242,7 @@ def _android_tap_by_resource_id_or_text(
     text: str | None = None,
     index: int | None = None,
     long_press: bool = False,
+    long_press_duration: int = 1000,
 ) -> TapOutput:
     """Tap on an element by finding it in the UI hierarchy."""
     if ctx.adb_client is None:
@@ -263,7 +264,9 @@ def _android_tap_by_resource_id_or_text(
         return TapOutput(error=f"Could not extract bounds for element with {criteria}")
 
     center = bounds.get_center()
-    return _android_tap_by_coordinates(ctx=ctx, coords=center, long_press=long_press)
+    return _android_tap_by_coordinates(
+        ctx=ctx, coords=center, long_press=long_press, long_press_duration=long_press_duration
+    )
 
 
 def tap_android(
@@ -272,6 +275,7 @@ def tap_android(
     index: int | None = None,
     ui_hierarchy: list[dict] | None = None,
     long_press: bool = False,
+    long_press_duration: int = 1000,
 ) -> TapOutput:
     """Execute tap using ADB with fallback strategies."""
     if not ctx.adb_client:
@@ -283,6 +287,7 @@ def tap_android(
             ctx=ctx,
             coords=selector.coordinates,
             long_press=long_press,
+            long_press_duration=long_press_duration,
         )
 
     # Convert percentage-based selectors to coordinates
@@ -295,6 +300,7 @@ def tap_android(
             ctx=ctx,
             coords=coords,
             long_press=long_press,
+            long_press_duration=long_press_duration,
         )
 
     # For other selectors, we need the UI hierarchy
@@ -310,6 +316,7 @@ def tap_android(
         text=text,
         index=index,
         long_press=long_press,
+        long_press_duration=long_press_duration,
     )
 
 
@@ -353,6 +360,7 @@ def long_press_on(
     dry_run: bool = False,
     index: int | None = None,
     ui_hierarchy: list[dict] | None = None,
+    long_press_duration: int = 1000,
 ):
     """
     Long press on a selector.
@@ -367,6 +375,7 @@ def long_press_on(
             index=index,
             ui_hierarchy=ui_hierarchy,
             long_press=True,
+            long_press_duration=long_press_duration,
         )
         return output.error if output.error else None
 
