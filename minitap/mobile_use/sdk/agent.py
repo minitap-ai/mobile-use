@@ -559,7 +559,6 @@ class Agent:
             initial_goal=task.request.goal,
             subgoal_plan=[],
             latest_ui_hierarchy=None,
-            latest_screenshot_base64=None,
             focused_app_info=None,
             device_date=None,
             structured_decisions=None,

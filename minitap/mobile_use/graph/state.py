@@ -25,7 +25,6 @@ class State(AgentStatePydantic):
     subgoal_plan: Annotated[list[Subgoal], "The current plan, made of subgoals"]
 
     # contextor related keys
-    latest_screenshot_base64: Annotated[str | None, "Latest screenshot of the device", take_last]
     latest_ui_hierarchy: Annotated[
         list[dict] | None, "Latest UI hierarchy of the device", take_last
     ]

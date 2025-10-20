@@ -1,4 +1,3 @@
-from minitap.mobile_use.agents.executor.utils import is_last_tool_message_take_screenshot
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.mobile_command_controller import get_screen_data
 from minitap.mobile_use.controllers.platform_specific_commands_controller import (
@@ -26,16 +25,9 @@ class ContextorNode:
         focused_app_info = get_focused_app_info(self.ctx)
         device_date = get_device_date(self.ctx)
 
-        should_add_screenshot_context = is_last_tool_message_take_screenshot(
-            list(state.executor_messages)
-        )
-
         return await state.asanitize_update(
             ctx=self.ctx,
             update={
-                "latest_screenshot_base64": device_data.base64
-                if should_add_screenshot_context
-                else None,
                 "latest_ui_hierarchy": device_data.elements,
                 "focused_app_info": focused_app_info,
                 "screen_size": (device_data.width, device_data.height),
