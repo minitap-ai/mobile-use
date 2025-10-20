@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from minitap.mobile_use.config import OutputConfig
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.graph.state import State
-from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message
+from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message, with_fallback
 from minitap.mobile_use.utils.conversations import is_ai_message
 from minitap.mobile_use.utils.logger import get_logger
 
@@ -46,7 +46,11 @@ async def outputter(
         messages.append(HumanMessage(content=output_config.output_description))
 
     llm = get_llm(ctx=ctx, name="outputter", is_utils=True, temperature=1)
+    llm_fallback = get_llm(
+        ctx=ctx, name="outputter", is_utils=True, use_fallback=True, temperature=1
+    )
     structured_llm = llm
+    structured_llm_fallback = llm_fallback
 
     if output_config.structured_output:
         schema: dict | type[BaseModel] | None = None
@@ -61,9 +65,15 @@ async def outputter(
 
         if schema is not None:
             structured_llm = llm.with_structured_output(schema)
+            structured_llm_fallback = llm_fallback.with_structured_output(schema)
 
-    response = await invoke_llm_with_timeout_message(
-        structured_llm.ainvoke(messages), agent_name="Outputter"
+    response = await with_fallback(
+        main_call=lambda: invoke_llm_with_timeout_message(
+            structured_llm.ainvoke(messages), agent_name="Outputter"
+        ),
+        fallback_call=lambda: invoke_llm_with_timeout_message(
+            structured_llm_fallback.ainvoke(messages), agent_name="Outputter (Fallback)"
+        ),
     )  # type: ignore
     if isinstance(response, BaseModel):
         if output_config.output_description and hasattr(response, "content"):

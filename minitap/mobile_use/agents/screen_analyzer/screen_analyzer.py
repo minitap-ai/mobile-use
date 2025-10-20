@@ -8,7 +8,7 @@ from minitap.mobile_use.controllers.mobile_command_controller import (
     take_screenshot as take_screenshot_controller,
 )
 from minitap.mobile_use.graph.state import State
-from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message
+from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message, with_fallback
 from minitap.mobile_use.utils.conversations import get_screenshot_message_for_llm
 from minitap.mobile_use.utils.decorators import wrap_with_callbacks
 from minitap.mobile_use.utils.logger import get_logger
@@ -98,8 +98,14 @@ async def screen_analyzer(ctx: MobileUseContext, screenshot_base64: str, prompt:
     ]
 
     llm = get_llm(ctx=ctx, name="screen_analyzer", temperature=0)
+    llm_fallback = get_llm(ctx=ctx, name="screen_analyzer", use_fallback=True, temperature=0)
 
-    response = await invoke_llm_with_timeout_message(
-        llm.ainvoke(messages), agent_name="ScreenAnalyzer"
+    response = await with_fallback(
+        main_call=lambda: invoke_llm_with_timeout_message(
+            llm.ainvoke(messages), agent_name="ScreenAnalyzer"
+        ),
+        fallback_call=lambda: invoke_llm_with_timeout_message(
+            llm_fallback.ainvoke(messages), agent_name="ScreenAnalyzer (Fallback)"
+        ),
     )
     return response.content  # type: ignore

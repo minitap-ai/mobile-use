@@ -15,7 +15,7 @@ from minitap.mobile_use.agents.planner.utils import (
 )
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.graph.state import State
-from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message
+from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message, with_fallback
 from minitap.mobile_use.utils.decorators import wrap_with_callbacks
 from minitap.mobile_use.utils.logger import get_logger
 
@@ -74,10 +74,19 @@ class OrchestratorNode:
             HumanMessage(content=human_message),
         ]
 
-        llm = get_llm(ctx=self.ctx, name="orchestrator", temperature=1)
-        llm = llm.with_structured_output(OrchestratorOutput)
-        response: OrchestratorOutput = await invoke_llm_with_timeout_message(
-            llm.ainvoke(messages), agent_name="Orchestrator"
+        llm = get_llm(ctx=self.ctx, name="orchestrator", temperature=1).with_structured_output(
+            OrchestratorOutput
+        )
+        llm_fallback = get_llm(
+            ctx=self.ctx, name="orchestrator", use_fallback=True, temperature=1
+        ).with_structured_output(OrchestratorOutput)
+        response: OrchestratorOutput = await with_fallback(
+            main_call=lambda: invoke_llm_with_timeout_message(
+                llm.ainvoke(messages), agent_name="Orchestrator"
+            ),
+            fallback_call=lambda: invoke_llm_with_timeout_message(
+                llm_fallback.ainvoke(messages), agent_name="Orchestrator (Fallback)"
+            ),
         )  # type: ignore
         if response.needs_replaning:
             thoughts = [response.reason]

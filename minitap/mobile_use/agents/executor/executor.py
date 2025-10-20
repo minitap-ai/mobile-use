@@ -8,7 +8,7 @@ from langchain_google_vertexai.chat_models import ChatVertexAI
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.graph.state import State
-from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message
+from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message, with_fallback
 from minitap.mobile_use.tools.index import EXECUTOR_WRAPPERS_TOOLS, get_tools_from_wrappers
 from minitap.mobile_use.utils.decorators import wrap_with_callbacks
 from minitap.mobile_use.utils.logger import get_logger
@@ -53,6 +53,7 @@ class ExecutorNode:
         ]
 
         llm = get_llm(ctx=self.ctx, name="executor")
+        llm_fallback = get_llm(ctx=self.ctx, name="executor", use_fallback=True)
         llm_bind_tools_kwargs: dict = {
             "tools": get_tools_from_wrappers(self.ctx, EXECUTOR_WRAPPERS_TOOLS),
         }
@@ -62,8 +63,14 @@ class ExecutorNode:
             llm_bind_tools_kwargs["parallel_tool_calls"] = True
 
         llm = llm.bind_tools(**llm_bind_tools_kwargs)
-        response = await invoke_llm_with_timeout_message(
-            llm.ainvoke(messages), agent_name="Executor"
+        llm_fallback = llm_fallback.bind_tools(**llm_bind_tools_kwargs)
+        response = await with_fallback(
+            main_call=lambda: invoke_llm_with_timeout_message(
+                llm.ainvoke(messages), agent_name="Executor"
+            ),
+            fallback_call=lambda: invoke_llm_with_timeout_message(
+                llm_fallback.ainvoke(messages), agent_name="Executor (Fallback)"
+            ),
         )
         return await state.asanitize_update(
             ctx=self.ctx,
