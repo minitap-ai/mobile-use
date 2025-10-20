@@ -49,7 +49,7 @@ def get_long_press_on_tool(ctx: MobileUseContext) -> BaseTool:
                         - 1500-2000ms: Extended long press (e.g., context menus, special actions)
                         - 2500ms+: Very long press (e.g., accessibility, advanced gestures)
         """
-        output = {
+        error_obj: dict | None = {
             "error": "No valid selector provided or all selectors failed."
         }  # Default to failure
         latest_selector_info: str | None = None
@@ -72,21 +72,21 @@ def get_long_press_on_tool(ctx: MobileUseContext) -> BaseTool:
                     long_press_duration=duration_ms,
                 )
                 if result is None:  # Success
-                    output = None
+                    error_obj = None
                 else:
                     logger.warning(
                         f"Long press with coordinates '{target.coordinates}' failed. "
                         f"Error: {result}"
                     )
-                    output = result
+                    error_obj = {"error": result} if isinstance(result, str) else result
             except Exception as e:
                 logger.warning(
                     f"Exception during long press with coordinates '{target.coordinates}': {e}"
                 )
-                output = {"error": str(e)}
+                error_obj = {"error": str(e)}
 
         # 2. If coordinates failed or weren't provided, try with resource_id
-        if output is not None and target.resource_id:
+        if error_obj is not None and target.resource_id:
             try:
                 selector = IdSelectorRequest(id=target.resource_id)
                 logger.info(
@@ -104,21 +104,21 @@ def get_long_press_on_tool(ctx: MobileUseContext) -> BaseTool:
                     long_press_duration=duration_ms,
                 )
                 if result is None:  # Success
-                    output = None
+                    error_obj = None
                 else:
                     logger.warning(
                         f"Long press with resource_id '{target.resource_id}' failed. "
                         f"Error: {result}"
                     )
-                    output = result
+                    error_obj = {"error": result} if isinstance(result, str) else result
             except Exception as e:
                 logger.warning(
                     f"Exception during long press with resource_id '{target.resource_id}': {e}"
                 )
-                output = {"error": str(e)}
+                error_obj = {"error": str(e)}
 
         # 3. If resource_id failed or wasn't provided, try with text (last resort)
-        if output is not None and target.text:
+        if error_obj is not None and target.text:
             try:
                 selector = TextSelectorRequest(text=target.text)
                 logger.info(
@@ -134,15 +134,15 @@ def get_long_press_on_tool(ctx: MobileUseContext) -> BaseTool:
                     long_press_duration=duration_ms,
                 )
                 if result is None:  # Success
-                    output = None
+                    error_obj = None
                 else:
                     logger.warning(f"Long press with text '{target.text}' failed. Error: {result}")
-                    output = result
+                    error_obj = {"error": result} if isinstance(result, str) else result
             except Exception as e:
                 logger.warning(f"Exception during long press with text '{target.text}': {e}")
-                output = {"error": str(e)}
+                error_obj = {"error": str(e)}
 
-        has_failed = output is not None
+        has_failed = error_obj is not None
         final_selector_info = latest_selector_info if latest_selector_info else "N/A"
         agent_outcome = (
             long_press_on_wrapper.on_failure_fn(final_selector_info)
@@ -153,7 +153,7 @@ def get_long_press_on_tool(ctx: MobileUseContext) -> BaseTool:
         tool_message = ToolMessage(
             tool_call_id=tool_call_id,
             content=agent_outcome,
-            additional_kwargs={"error": output} if has_failed else {},
+            additional_kwargs=error_obj if has_failed else {},
             status="error" if has_failed else "success",
         )
         return Command(
