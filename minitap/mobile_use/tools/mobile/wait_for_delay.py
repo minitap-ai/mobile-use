@@ -14,6 +14,8 @@ from minitap.mobile_use.controllers.mobile_command_controller import (
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 
+MAX_DELAY_MS = 60000
+
 
 def get_wait_for_delay_tool(ctx: MobileUseContext):
     @tool
@@ -31,7 +33,8 @@ def get_wait_for_delay_tool(ctx: MobileUseContext):
         to update after an action, regardless of whether an animation is playing.
 
         Args:
-            time_in_ms: The number of milliseconds to wait.
+            time_in_ms: The number of milliseconds to wait. (capped at 60 seconds)
+
 
         Example:
             - wait_for_delay with time_in_ms=1000 (waits 1 second)
@@ -39,6 +42,8 @@ def get_wait_for_delay_tool(ctx: MobileUseContext):
         """
         if time_in_ms < 0:
             time_in_ms = 1000
+        if time_in_ms > MAX_DELAY_MS:
+            time_in_ms = MAX_DELAY_MS
         output = wait_for_delay_controller(time_in_ms)
         has_failed = output is not None
         agent_outcome = (
