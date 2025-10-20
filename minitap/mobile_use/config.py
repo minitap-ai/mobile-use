@@ -247,14 +247,14 @@ def deep_merge_llm_config(default: LLMConfig, override: dict) -> LLMConfig:
     def _deep_merge_dict(base: dict, extra: dict, path: str = ""):
         for key, value in extra.items():
             current_path = f"{path}.{key}" if path else key
-            
+
             if key not in base:
                 logger.warning(
                     f"Unsupported config key '{current_path}' found in override config. "
                     f"Ignoring this key."
                 )
                 continue
-            
+
             if isinstance(value, dict) and isinstance(base[key], dict):
                 _deep_merge_dict(base[key], value, current_path)
             else:
