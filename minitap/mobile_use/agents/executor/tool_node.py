@@ -1,12 +1,16 @@
 import asyncio
-from typing import Any
+from typing import Any, override
+
+from langchain_core.messages import AnyMessage, ToolCall, ToolMessage
+from langchain_core.runnables import RunnableConfig
+from langgraph.prebuilt import ToolNode
+from langgraph.store.base import BaseStore
 from langgraph.types import Command
 from pydantic import BaseModel
-from typing import override
-from langchain_core.runnables import RunnableConfig
-from langgraph.store.base import BaseStore
-from langchain_core.messages import AnyMessage, ToolCall, ToolMessage
-from langgraph.prebuilt import ToolNode
+
+from minitap.mobile_use.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class ExecutorToolNode(ToolNode):
@@ -67,6 +71,15 @@ class ExecutorToolNode(ToolNode):
                         message=f"Unexpected tool output type: {type(output)}",
                     )
                     failed = True
+
+            call_without_state = call.copy()
+            if "state" in call_without_state["args"]:
+                del call_without_state["args"]["state"]
+            if failed:
+                logger.info("❌ Tool call failed: " + str(call_without_state))
+            else:
+                logger.info("✅ Tool call succeeded: " + str(call_without_state))
+
             outputs.append(output)
         return self._combine_tool_outputs(outputs, input_type)  # type: ignore
 
