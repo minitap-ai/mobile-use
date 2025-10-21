@@ -86,7 +86,7 @@ def record_events(output_path: Path | None, events: list[str] | BaseModel | Any)
     else:
         events_content = json.dumps(events, indent=2)
 
-    with open(output_path, "w") as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         f.write(events_content)
 
 
