@@ -76,7 +76,18 @@ class ExecutorToolNode(ToolNode):
             if "state" in call_without_state["args"]:
                 del call_without_state["args"]["state"]
             if failed:
-                logger.info("❌ Tool call failed: " + str(call_without_state))
+                error_msg = ""
+                try:
+                    if isinstance(output, ToolMessage):
+                        error_msg = output.content
+                    elif isinstance(output, Command):
+                        tool_msg = self._get_tool_message(output)
+                        error_msg = tool_msg.content
+                except Exception:
+                    error_msg = "Could not extract error details"
+
+                logger.info(f"❌ Tool call failed: {call_without_state}")
+                logger.info(f"   Error: {error_msg}")
             else:
                 logger.info("✅ Tool call succeeded: " + str(call_without_state))
 
