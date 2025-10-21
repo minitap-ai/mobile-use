@@ -101,11 +101,7 @@ async def screen_analyzer(ctx: MobileUseContext, screenshot_base64: str, prompt:
     llm_fallback = get_llm(ctx=ctx, name="screen_analyzer", use_fallback=True, temperature=0)
 
     response = await with_fallback(
-        main_call=lambda: invoke_llm_with_timeout_message(
-            llm.ainvoke(messages), agent_name="ScreenAnalyzer"
-        ),
-        fallback_call=lambda: invoke_llm_with_timeout_message(
-            llm_fallback.ainvoke(messages), agent_name="ScreenAnalyzer (Fallback)"
-        ),
+        main_call=lambda: invoke_llm_with_timeout_message(llm.ainvoke(messages)),
+        fallback_call=lambda: invoke_llm_with_timeout_message(llm_fallback.ainvoke(messages)),
     )
     return response.content  # type: ignore

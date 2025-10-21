@@ -52,10 +52,10 @@ class PlannerNode:
         ).with_structured_output(PlannerOutput)
         response: PlannerOutput = await with_fallback(
             main_call=lambda: invoke_llm_with_timeout_message(
-                llm.ainvoke(messages), agent_name="Planner"
+                llm.ainvoke(messages),
             ),
             fallback_call=lambda: invoke_llm_with_timeout_message(
-                llm_fallback.ainvoke(messages), agent_name="Planner (Fallback)"
+                llm_fallback.ainvoke(messages),
             ),
         )  # type: ignore
         subgoals_plan = [

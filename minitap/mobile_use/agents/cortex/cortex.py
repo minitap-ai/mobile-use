@@ -74,10 +74,10 @@ class CortexNode:
         ).with_structured_output(CortexOutput)
         response: CortexOutput = await with_fallback(
             main_call=lambda: invoke_llm_with_timeout_message(
-                llm.ainvoke(messages), agent_name="Cortex"
+                llm.ainvoke(messages)
             ),
             fallback_call=lambda: invoke_llm_with_timeout_message(
-                llm_fallback.ainvoke(messages), agent_name="Cortex (Fallback)"
+                llm_fallback.ainvoke(messages)
             ),
         )  # type: ignore
 

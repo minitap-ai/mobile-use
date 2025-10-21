@@ -28,7 +28,6 @@ user_messages_logger = get_logger(__name__)
 
 async def invoke_llm_with_timeout_message[T](
     llm_call: Coroutine[Any, Any, T],
-    agent_name: str,
     timeout_seconds: int = 10,
 ) -> T:
     """
@@ -36,7 +35,6 @@ async def invoke_llm_with_timeout_message[T](
 
     Args:
         llm_call: The coroutine of the LLM call to execute.
-        agent_name: The name of the agent making the call (for the message).
         timeout_seconds: The delay in seconds before displaying the message.
 
     Returns:
