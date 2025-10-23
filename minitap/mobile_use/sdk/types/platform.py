@@ -63,6 +63,7 @@ class CreateTaskRunRequest(BaseApiModel):
 
     task_id: str = Field(..., description="ID of the task to run")
     llm_profile_id: str = Field(..., description="LLM profile ID to use")
+    virtual_mobile_id: str | None = Field(None, description="Virtual mobile ID to use")
 
 
 class UpdateTaskRunStatusRequest(BaseApiModel):

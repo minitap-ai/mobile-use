@@ -2,12 +2,13 @@
 Task-related type definitions for the Mobile-use SDK.
 """
 
+from asyncio import Event
 from collections.abc import Callable, Coroutine
 from datetime import datetime
 from pathlib import Path
 from typing import Any, TypeVar, overload
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from minitap.mobile_use.config import LLMConfig, get_default_llm_config
 from minitap.mobile_use.constants import RECURSION_LIMIT
@@ -133,6 +134,14 @@ class PlatformTaskRequest[TOutput](TaskRequestBase):
     task: str | ManualTaskConfig
     profile: str | None = None
     api_key: str | None = None
+
+
+class CloudDevicePlatformTaskRequest[TOutput](PlatformTaskRequest[TOutput]):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    task_run_id_available_event: Event = Event()
+    task_run_id: str | None = None
+    virtual_mobile_id: str | None = None
 
 
 class TaskResult(BaseModel):

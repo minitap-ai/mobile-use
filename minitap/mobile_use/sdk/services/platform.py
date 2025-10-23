@@ -23,6 +23,7 @@ from minitap.mobile_use.sdk.types.platform import (
 )
 from minitap.mobile_use.sdk.types.task import (
     AgentProfile,
+    CloudDevicePlatformTaskRequest,
     ManualTaskConfig,
     PlatformTaskInfo,
     PlatformTaskRequest,
@@ -60,6 +61,10 @@ class PlatformService:
 
     async def create_task_run(self, request: PlatformTaskRequest) -> PlatformTaskInfo:
         try:
+            virtual_mobile_id = None
+            if isinstance(request, CloudDevicePlatformTaskRequest):
+                virtual_mobile_id = request.virtual_mobile_id
+
             # Check if task is a string (fetch from platform) or ManualTaskConfig (create manually)
             if isinstance(request.task, str):
                 # Fetch task from platform
@@ -87,7 +92,11 @@ class PlatformService:
                     thoughts_output_path=request.thoughts_output_path,
                 )
 
-                task_run = await self._create_task_run(task=task, profile=profile)
+                task_run = await self._create_task_run(
+                    task=task,
+                    profile=profile,
+                    virtual_mobile_id=virtual_mobile_id,
+                )
             else:
                 # Create task manually from ManualTaskConfig
                 logger.info(f"Creating manual task with goal: {request.task.goal}")
@@ -113,6 +122,7 @@ class PlatformService:
                 task_run = await self._create_manual_task_run(
                     manual_config=request.task,
                     profile=profile,
+                    virtual_mobile_id=virtual_mobile_id,
                 )
 
             return PlatformTaskInfo(
@@ -244,12 +254,14 @@ class PlatformService:
         self,
         task: TaskResponse,
         profile: LLMProfileResponse,
+        virtual_mobile_id: str | None = None,
     ) -> TaskRunResponse:
         try:
             logger.info(f"Creating task run for task: {task.name}")
             task_run = CreateTaskRunRequest(
                 task_id=task.id,
                 llm_profile_id=profile.id,
+                virtual_mobile_id=virtual_mobile_id,
             )
             response = await self._client.post(url="v1/task-runs", json=task_run.model_dump())
             response.raise_for_status()
@@ -264,6 +276,7 @@ class PlatformService:
         self,
         manual_config: ManualTaskConfig,
         profile: LLMProfileResponse,
+        virtual_mobile_id: str | None = None,
     ) -> TaskRunResponse:
         """
         Create an orphan task run from a manual task configuration.
@@ -277,6 +290,7 @@ class PlatformService:
                 "inputPrompt": manual_config.goal,
                 "outputDescription": manual_config.output_description,
                 "llmProfileId": profile.id,
+                "virtualMobileId": virtual_mobile_id,
             }
 
             response = await self._client.post(url="v1/task-runs/orphan", json=orphan_payload)

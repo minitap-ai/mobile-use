@@ -53,6 +53,7 @@ from minitap.mobile_use.sdk.types.task import (
     AgentProfile,
     PlatformTaskInfo,
     PlatformTaskRequest,
+    CloudDevicePlatformTaskRequest,
     Task,
     TaskRequest,
 )
@@ -244,6 +245,9 @@ class Agent:
                 else:
                     raise PlatformServiceUninitializedError()
                 task_info = await platform_service.create_task_run(request=request)
+                if isinstance(request, CloudDevicePlatformTaskRequest):
+                    request.task_run_id = task_info.task_run.id
+                    request.task_run_id_available_event.set()
                 self._config.agent_profiles[task_info.llm_profile.name] = task_info.llm_profile
                 request = task_info.task_request
             return await self._run_task(
