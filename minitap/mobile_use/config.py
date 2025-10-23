@@ -240,7 +240,7 @@ def get_default_llm_config() -> LLMConfig:
         )
 
 
-def get_default_minitap_llm_config() -> LLMConfig | None:
+def get_default_minitap_llm_config(validate: bool = True) -> LLMConfig | None:
     """
     Returns a default LLM config using the Minitap provider.
     Only returns a config if MINITAP_API_KEY is available.
@@ -248,7 +248,7 @@ def get_default_minitap_llm_config() -> LLMConfig | None:
     Returns:
         LLMConfig with minitap provider if API key is available, None otherwise
     """
-    if not settings.MINITAP_API_KEY:
+    if validate and not settings.MINITAP_API_KEY:
         return None
 
     return LLMConfig(
