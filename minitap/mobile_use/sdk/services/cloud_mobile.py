@@ -2,10 +2,12 @@
 
 import asyncio
 from datetime import UTC, datetime
+from io import BytesIO
 from typing import Any, Literal
 from collections.abc import Callable
 
 import httpx
+from PIL import Image
 from pydantic import BaseModel, Field
 
 from minitap.mobile_use.config import settings
@@ -506,3 +508,35 @@ class CloudMobileService:
             logger.info(f"Task runs cancelled on cloud mobile '{cloud_mobile_id}'")
         except httpx.HTTPStatusError as e:
             raise PlatformServiceError(message=f"Failed to cancel task run: {e}")
+
+    async def get_screenshot(self, cloud_mobile_id: str) -> Image.Image:
+        """
+        Get a screenshot from a cloud mobile.
+
+        Args:
+            cloud_mobile_id: ID of the cloud mobile to capture screenshot from
+
+        Returns:
+            Screenshot as PIL Image
+
+        Raises:
+            PlatformServiceError: If the screenshot capture fails
+        """
+        try:
+            logger.info(f"Capturing screenshot from cloud mobile '{cloud_mobile_id}'")
+            response = await self._client.get(f"daas/virtual-mobiles/{cloud_mobile_id}/screenshot")
+            response.raise_for_status()
+
+            # Convert bytes to PIL Image
+            image = Image.open(BytesIO(response.content))
+
+            size_bytes = len(response.content)
+            logger.info(
+                f"Screenshot captured from cloud mobile '{cloud_mobile_id}' ({size_bytes} bytes)"
+            )
+            return image
+        except httpx.HTTPStatusError as e:
+            raise PlatformServiceError(
+                message=f"Failed to get screenshot from cloud mobile: "
+                f"{e.response.status_code} - {e.response.text}"
+            )
