@@ -13,6 +13,7 @@ from typing import Any, TypeVar, overload
 from adbutils import AdbClient
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage
+from PIL import Image
 from pydantic import BaseModel
 
 from minitap.mobile_use.agents.outputter.outputter import outputter
@@ -559,6 +560,81 @@ class Agent:
             return False
         except Exception:
             return False
+
+    async def get_screenshot(self) -> Image.Image:
+        """
+        Capture a screenshot from the mobile device.
+
+        For cloud mobiles, this method calls the mobile-manager endpoint.
+        For local mobiles, it uses ADB (Android) or xcrun (iOS) directly.
+
+        Returns:
+            Screenshot as PIL Image
+
+        Raises:
+            AgentNotInitializedError: If the agent is not initialized
+            PlatformServiceUninitializedError: If cloud mobile service is not available
+            Exception: If screenshot capture fails
+        """
+        # Check if cloud mobile is configured
+        if self._config.cloud_mobile_id:
+            # Use cloud mobile service to get screenshot
+            if not self._cloud_mobile_service:
+                raise PlatformServiceUninitializedError()
+
+            logger.info(f"Capturing screenshot from cloud mobile '{self._config.cloud_mobile_id}'")
+            screenshot = await self._cloud_mobile_service.get_screenshot(
+                cloud_mobile_id=self._config.cloud_mobile_id,
+            )
+            logger.info("Screenshot captured from cloud mobile")
+            return screenshot
+
+        # Local device - use ADB or xcrun directly
+        if not self._initialized:
+            raise AgentNotInitializedError()
+
+        if self._device_context.mobile_platform == DevicePlatform.ANDROID:
+            # Use ADB to capture screenshot
+            logger.info("Capturing screenshot from local Android device")
+            if not self._adb_client:
+                raise Exception("ADB client not initialized")
+
+            device = self._adb_client.device(serial=self._device_context.device_id)
+            screenshot = device.screenshot()
+            logger.info("Screenshot captured from local Android device")
+            return screenshot
+
+        elif self._device_context.mobile_platform == DevicePlatform.IOS:
+            # Use xcrun to capture screenshot
+            import subprocess
+            from io import BytesIO
+
+            logger.info("Capturing screenshot from local iOS device")
+            try:
+                # xcrun simctl io <device> screenshot --type=png -
+                result = subprocess.run(
+                    [
+                        "xcrun",
+                        "simctl",
+                        "io",
+                        self._device_context.device_id,
+                        "screenshot",
+                        "--type=png",
+                        "-",
+                    ],
+                    capture_output=True,
+                    check=True,
+                )
+                # Convert bytes to PIL Image
+                screenshot = Image.open(BytesIO(result.stdout))
+                logger.info("Screenshot captured from local iOS device")
+                return screenshot
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Failed to capture screenshot: {e}")
+                raise Exception(f"Failed to capture screenshot from iOS device: {e}")
+
+        else:
+            raise Exception(f"Unsupported platform: {self._device_context.mobile_platform}")
 
     def clean(self, force: bool = False):
         if not self._initialized and not force:
