@@ -1,4 +1,5 @@
 import asyncio
+import copy
 from typing import Any, override
 
 from langchain_core.messages import AnyMessage, ToolCall, ToolMessage
@@ -72,8 +73,8 @@ class ExecutorToolNode(ToolNode):
                     )
                     failed = True
 
-            call_without_state = call.copy()
-            if "state" in call_without_state["args"]:
+            call_without_state = copy.deepcopy(call)
+            if "args" in call_without_state and "state" in call_without_state["args"]:
                 del call_without_state["args"]["state"]
             if failed:
                 error_msg = ""
