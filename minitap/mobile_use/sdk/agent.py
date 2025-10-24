@@ -13,6 +13,7 @@ from typing import Any, TypeVar, overload
 from adbutils import AdbClient
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage
+from PIL import Image
 from pydantic import BaseModel
 
 from minitap.mobile_use.agents.outputter.outputter import outputter
@@ -37,6 +38,7 @@ from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.sdk.builders.agent_config_builder import get_default_agent_config
 from minitap.mobile_use.sdk.builders.task_request_builder import TaskRequestBuilder
 from minitap.mobile_use.sdk.constants import DEFAULT_HW_BRIDGE_BASE_URL, DEFAULT_SCREEN_API_BASE_URL
+from minitap.mobile_use.sdk.services.cloud_mobile import CloudMobileService
 from minitap.mobile_use.sdk.services.platform import PlatformService
 from minitap.mobile_use.sdk.types.agent import AgentConfig
 from minitap.mobile_use.sdk.types.exceptions import (
@@ -109,8 +111,11 @@ class Agent:
         # Note: Can also be initialized later with API key from request
         if settings.MINITAP_API_KEY:
             self._platform_service = PlatformService()
+            # Initialize cloud device service for remote execution
+            self._cloud_mobile_service = CloudMobileService()
         else:
             self._platform_service = None
+            self._cloud_mobile_service = None
 
     def init(
         self,
@@ -118,6 +123,12 @@ class Agent:
         retry_count: int = 5,
         retry_wait_seconds: int = 5,
     ):
+        # Skip initialization for cloud devices - no local setup required
+        if self._config.cloud_mobile_id:
+            logger.info("Cloud device configured - skipping local initialization")
+            self._initialized = True
+            return True
+
         if not which("adb") and not which("xcrun"):
             raise ExecutableNotFoundError("cli_tools")
         if self._is_default_hw_bridge and not which("maestro"):
@@ -233,6 +244,17 @@ class Agent:
         name: str | None = None,
         request: TaskRequest[TOutput] | PlatformTaskRequest[TOutput] | None = None,
     ) -> str | dict | TOutput | None:
+        # Check if cloud mobile is configured
+        if self._config.cloud_mobile_id:
+            if request is None or not isinstance(request, PlatformTaskRequest):
+                raise AgentTaskRequestError(
+                    "When using a cloud mobile, only PlatformTaskRequest is supported. "
+                    "Use AgentConfigBuilder.for_cloud_mobile() only with PlatformTaskRequest."
+                )
+            # Use cloud mobile execution path
+            return await self._run_cloud_mobile_task(request=request)
+
+        # Normal local execution path
         if request is not None:
             task_info = None
             platform_service = None
@@ -266,6 +288,80 @@ class Agent:
         if name is not None:
             task_request.with_name(name=name)
         return await self._run_task(task_request.build())
+
+    async def _run_cloud_mobile_task(
+        self,
+        request: PlatformTaskRequest[TOutput],
+    ) -> str | dict | TOutput | None:
+        """
+        Execute a task on a cloud mobile.
+
+        This method triggers the task execution on the Platform and polls
+        for completion without running any agentic logic locally.
+        """
+        if not self._config.cloud_mobile_id:
+            raise AgentTaskRequestError("Cloud mobile ID is not configured")
+
+        # Initialize cloud device service with API key from request if provided
+        cloud_mobile_service = None
+        if request.api_key:
+            cloud_mobile_service = CloudMobileService(api_key=request.api_key)
+        elif self._cloud_mobile_service:
+            cloud_mobile_service = self._cloud_mobile_service
+        else:
+            raise PlatformServiceUninitializedError()
+
+        # Start cloud mobile if not already started
+        logger.info(f"Starting cloud mobile '{self._config.cloud_mobile_id}'...")
+        await cloud_mobile_service.start_and_wait_for_ready(
+            cloud_mobile_id=self._config.cloud_mobile_id,
+        )
+
+        logger.info(
+            f"Starting cloud mobile task execution '{self._config.cloud_mobile_id}'",
+        )
+
+        def log_callback(message: str):
+            """Callback for logging timeline updates."""
+            logger.info(message)
+
+        def status_callback(
+            status: TaskRunStatus,
+            status_message: str | None,
+        ):
+            """Callback for status updates."""
+            logger.info(f"Task status update: [{status}] {status_message}")
+
+        try:
+            # Execute task on cloud mobile and wait for completion
+            final_status, error, output = await cloud_mobile_service.run_task_on_cloud_mobile(
+                cloud_mobile_id=self._config.cloud_mobile_id,
+                request=request,
+                on_status_update=status_callback,
+                on_log=log_callback,
+            )
+
+            if final_status == "completed":
+                logger.success("Cloud mobile task completed successfully")
+                return output
+            elif final_status == "failed":
+                logger.error(f"Cloud mobile task failed: {error}")
+                raise AgentTaskRequestError(f"Task failed: {error}")
+            elif final_status == "cancelled":
+                logger.warning("Cloud mobile task was cancelled")
+                raise AgentTaskRequestError("Task was cancelled")
+            else:
+                logger.error(f"Cloud mobile task ended with unexpected status: {final_status}")
+                raise AgentTaskRequestError(f"Task ended with unexpected status: {final_status}")
+
+        except asyncio.CancelledError:
+            logger.warning("Cloud mobile task execution cancelled locally")
+            await cloud_mobile_service.cancel_task_runs(self._config.cloud_mobile_id)
+            raise
+        except Exception as e:
+            logger.error(f"Cloud device task execution failed: {str(e)}")
+            await cloud_mobile_service.cancel_task_runs(self._config.cloud_mobile_id)
+            raise
 
     async def _run_task(
         self,
@@ -464,6 +560,81 @@ class Agent:
             return False
         except Exception:
             return False
+
+    async def get_screenshot(self) -> Image.Image:
+        """
+        Capture a screenshot from the mobile device.
+
+        For cloud mobiles, this method calls the mobile-manager endpoint.
+        For local mobiles, it uses ADB (Android) or xcrun (iOS) directly.
+
+        Returns:
+            Screenshot as PIL Image
+
+        Raises:
+            AgentNotInitializedError: If the agent is not initialized
+            PlatformServiceUninitializedError: If cloud mobile service is not available
+            Exception: If screenshot capture fails
+        """
+        # Check if cloud mobile is configured
+        if self._config.cloud_mobile_id:
+            # Use cloud mobile service to get screenshot
+            if not self._cloud_mobile_service:
+                raise PlatformServiceUninitializedError()
+
+            logger.info(f"Capturing screenshot from cloud mobile '{self._config.cloud_mobile_id}'")
+            screenshot = await self._cloud_mobile_service.get_screenshot(
+                cloud_mobile_id=self._config.cloud_mobile_id,
+            )
+            logger.info("Screenshot captured from cloud mobile")
+            return screenshot
+
+        # Local device - use ADB or xcrun directly
+        if not self._initialized:
+            raise AgentNotInitializedError()
+
+        if self._device_context.mobile_platform == DevicePlatform.ANDROID:
+            # Use ADB to capture screenshot
+            logger.info("Capturing screenshot from local Android device")
+            if not self._adb_client:
+                raise Exception("ADB client not initialized")
+
+            device = self._adb_client.device(serial=self._device_context.device_id)
+            screenshot = device.screenshot()
+            logger.info("Screenshot captured from local Android device")
+            return screenshot
+
+        elif self._device_context.mobile_platform == DevicePlatform.IOS:
+            # Use xcrun to capture screenshot
+            import subprocess
+            from io import BytesIO
+
+            logger.info("Capturing screenshot from local iOS device")
+            try:
+                # xcrun simctl io <device> screenshot --type=png -
+                result = subprocess.run(
+                    [
+                        "xcrun",
+                        "simctl",
+                        "io",
+                        self._device_context.device_id,
+                        "screenshot",
+                        "--type=png",
+                        "-",
+                    ],
+                    capture_output=True,
+                    check=True,
+                )
+                # Convert bytes to PIL Image
+                screenshot = Image.open(BytesIO(result.stdout))
+                logger.info("Screenshot captured from local iOS device")
+                return screenshot
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Failed to capture screenshot: {e}")
+                raise Exception(f"Failed to capture screenshot from iOS device: {e}")
+
+        else:
+            raise Exception(f"Unsupported platform: {self._device_context.mobile_platform}")
 
     def clean(self, force: bool = False):
         if not self._initialized and not force:

@@ -45,6 +45,7 @@ class AgentConfigBuilder:
         self._device_platform: DevicePlatform | None = None
         self._servers: ServerConfig = get_default_servers()
         self._graph_config_callbacks: Callbacks = None
+        self._cloud_mobile_id: str | None = None
 
     def add_profile(self, profile: AgentProfile, validate: bool = True) -> "AgentConfigBuilder":
         """
@@ -97,6 +98,19 @@ class AgentConfigBuilder:
         """
         self._device_id = device_id
         self._device_platform = platform
+        return self
+
+    def for_cloud_mobile(self, device_id: str) -> "AgentConfigBuilder":
+        """
+        Configure the mobile-use agent to use a cloud mobile.
+
+        When using a cloud mobile, tasks are executed remotely via the Platform API,
+        and only PlatformTaskRequest can be used.
+
+        Args:
+            device_id: The unique identifier for the cloud mobile
+        """
+        self._cloud_mobile_id = device_id
         return self
 
     def with_default_task_config(self, config: TaskRequestCommon) -> "AgentConfigBuilder":
@@ -217,6 +231,7 @@ class AgentConfigBuilder:
             device_platform=self._device_platform,
             servers=self._servers,
             graph_config_callbacks=self._graph_config_callbacks,
+            cloud_mobile_id=self._cloud_mobile_id,
         )
 
 
