@@ -46,7 +46,7 @@ class AgentConfigBuilder:
         self._servers: ServerConfig = get_default_servers()
         self._graph_config_callbacks: Callbacks = None
 
-    def add_profile(self, profile: AgentProfile) -> "AgentConfigBuilder":
+    def add_profile(self, profile: AgentProfile, validate: bool = True) -> "AgentConfigBuilder":
         """
         Add an agent profile to the mobile-use agent.
 
@@ -54,10 +54,15 @@ class AgentConfigBuilder:
             profile: The agent profile to add
         """
         self._agent_profiles[profile.name] = profile
-        profile.llm_config.validate_providers()
+        if validate:
+            profile.llm_config.validate_providers()
         return self
 
-    def add_profiles(self, profiles: list[AgentProfile]) -> "AgentConfigBuilder":
+    def add_profiles(
+        self,
+        profiles: list[AgentProfile],
+        validate: bool = True,
+    ) -> "AgentConfigBuilder":
         """
         Add multiple agent profiles to the mobile-use agent.
 
@@ -65,8 +70,7 @@ class AgentConfigBuilder:
             profiles: List of agent profiles to add
         """
         for profile in profiles:
-            self.add_profile(profile=profile)
-            profile.llm_config.validate_providers()
+            self.add_profile(profile=profile, validate=validate)
         return self
 
     def with_default_profile(self, profile: str | AgentProfile) -> "AgentConfigBuilder":
@@ -162,7 +166,7 @@ class AgentConfigBuilder:
         self._graph_config_callbacks = callbacks
         return self
 
-    def build(self) -> AgentConfig:
+    def build(self, validate_profiles: bool = True) -> AgentConfig:
         """
         Build the mobile-use AgentConfig object.
 
@@ -185,14 +189,17 @@ class AgentConfigBuilder:
         elif isinstance(self._default_profile, AgentProfile):
             default_profile = self._default_profile
             if default_profile.name not in self._agent_profiles:
-                self.add_profile(default_profile)
+                self.add_profile(default_profile, validate=validate_profiles)
         elif nb_profiles <= 0:
-            llm_config = get_default_minitap_llm_config() or get_default_llm_config()
+            llm_config = (
+                get_default_minitap_llm_config(validate=validate_profiles)
+                or get_default_llm_config()
+            )
             default_profile = AgentProfile(
                 name=DEFAULT_PROFILE_NAME,
                 llm_config=llm_config,
             )
-            self.add_profile(default_profile)
+            self.add_profile(default_profile, validate=validate_profiles)
         elif nb_profiles == 1:
             # Select the only one available
             default_profile = next(iter(self._agent_profiles.values()))
