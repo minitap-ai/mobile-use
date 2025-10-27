@@ -3,6 +3,7 @@
 import asyncio
 from datetime import UTC, datetime
 from io import BytesIO
+import json
 from typing import Any, Literal
 from collections.abc import Callable
 
@@ -62,7 +63,7 @@ class TaskRunInfo(BaseModel):
     id: str
     status: TaskRunStatus
     status_message: str | None = None
-    output: str | None = None
+    output: str | dict[str, Any] | None = None
 
 
 class TimelineItem(BaseModel):
@@ -128,7 +129,7 @@ class CloudMobileService:
 
         Args:
             cloud_mobile_id: ID of the cloud mobile to start
-            poll_interval_seconds: Seconds between status polls (default: 2.0)
+            poll_interval_seconds: Seconds between status polls (default: 5.0)
             timeout_seconds: Maximum time to wait for ready state (default: 300.0)
 
         Returns:
@@ -280,7 +281,7 @@ class CloudMobileService:
             )
 
             response = await self._client.post(
-                f"/daas/virtual-mobiles/{cloud_mobile_id}/run-task",
+                f"daas/virtual-mobiles/{cloud_mobile_id}/run-task",
                 json=payload.model_dump(by_alias=True),
             )
             response.raise_for_status()
@@ -306,7 +307,7 @@ class CloudMobileService:
         Returns:
             Tuple of (final_status, error_message, output)
         """
-        last_poll_time = datetime.min
+        last_poll_time: datetime | None = None
         last_activity_time = datetime.now(UTC)
         current_status: TaskRunStatus = "pending"
         previous_status: TaskRunStatus | None = None
@@ -384,11 +385,19 @@ class CloudMobileService:
             response.raise_for_status()
             data = response.json()
 
+            output: str | dict[str, Any] | None = None
+            raw_output = data.get("output")
+            try:
+                if raw_output is not None:
+                    output = json.loads(raw_output)
+            except json.JSONDecodeError:
+                output = raw_output
+
             return TaskRunInfo(
                 id=data["id"],
                 status=data["status"],
                 status_message=data.get("statusMessage"),
-                output=data.get("output"),
+                output=output,
             )
         except httpx.HTTPStatusError as e:
             raise PlatformServiceError(message=f"Failed to get task run status: {e}")
@@ -468,7 +477,7 @@ class CloudMobileService:
     ) -> list[TimelineItem]:
         """Get new agent thoughts from the timeline after a specific timestamp."""
         try:
-            params: dict[str, Any] = {"page": 1, "page_size": 50}
+            params: dict[str, Any] = {"page": 1, "pageSize": 50}
             if after_timestamp:
                 params["after"] = after_timestamp.isoformat()
 
