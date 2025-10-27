@@ -622,30 +622,34 @@ class Agent:
                 raise Exception("ADB client not initialized")
 
             device = self._adb_client.device(serial=self._device_context.device_id)
-            screenshot = device.screenshot()
+            screenshot = await asyncio.to_thread(device.screenshot)
             logger.info("Screenshot captured from local Android device")
             return screenshot
 
         elif self._device_context.mobile_platform == DevicePlatform.IOS:
             # Use xcrun to capture screenshot
+            import functools
             import subprocess
             from io import BytesIO
 
             logger.info("Capturing screenshot from local iOS device")
             try:
                 # xcrun simctl io <device> screenshot --type=png -
-                result = subprocess.run(
-                    [
-                        "xcrun",
-                        "simctl",
-                        "io",
-                        self._device_context.device_id,
-                        "screenshot",
-                        "--type=png",
-                        "-",
-                    ],
-                    capture_output=True,
-                    check=True,
+                result = await asyncio.to_thread(
+                    functools.partial(
+                        subprocess.run,
+                        [
+                            "xcrun",
+                            "simctl",
+                            "io",
+                            self._device_context.device_id,
+                            "screenshot",
+                            "--type=png",
+                            "-",
+                        ],
+                        capture_output=True,
+                        check=True,
+                    )
                 )
                 # Convert bytes to PIL Image
                 screenshot = Image.open(BytesIO(result.stdout))
