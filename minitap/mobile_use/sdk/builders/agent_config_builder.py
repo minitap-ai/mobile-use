@@ -96,11 +96,16 @@ class AgentConfigBuilder:
             platform: The device platform (ANDROID or IOS)
             device_id: The unique identifier for the device
         """
+        if self._cloud_mobile_id is not None:
+            raise ValueError(
+                "Device ID cannot be set when a cloud mobile is already configured.\n"
+                "> for_device() and for_cloud_mobile() are mutually exclusive"
+            )
         self._device_id = device_id
         self._device_platform = platform
         return self
 
-    def for_cloud_mobile(self, device_id: str) -> "AgentConfigBuilder":
+    def for_cloud_mobile(self, cloud_mobile_id: str) -> "AgentConfigBuilder":
         """
         Configure the mobile-use agent to use a cloud mobile.
 
@@ -108,9 +113,14 @@ class AgentConfigBuilder:
         and only PlatformTaskRequest can be used.
 
         Args:
-            device_id: The unique identifier for the cloud mobile
+            cloud_mobile_id: The unique identifier for the cloud mobile
         """
-        self._cloud_mobile_id = device_id
+        if self._device_id is not None:
+            raise ValueError(
+                "Cloud mobile device ID cannot be set when a device is already configured.\n"
+                "> for_device() and for_cloud_mobile() are mutually exclusive"
+            )
+        self._cloud_mobile_id = cloud_mobile_id
         return self
 
     def with_default_task_config(self, config: TaskRequestCommon) -> "AgentConfigBuilder":

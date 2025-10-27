@@ -332,36 +332,55 @@ class Agent:
             """Callback for status updates."""
             logger.info(f"Task status update: [{status}] {status_message}")
 
-        try:
-            # Execute task on cloud mobile and wait for completion
-            final_status, error, output = await cloud_mobile_service.run_task_on_cloud_mobile(
-                cloud_mobile_id=self._config.cloud_mobile_id,
-                request=request,
-                on_status_update=status_callback,
-                on_log=log_callback,
-            )
-
-            if final_status == "completed":
-                logger.success("Cloud mobile task completed successfully")
-                return output
-            elif final_status == "failed":
-                logger.error(f"Cloud mobile task failed: {error}")
-                raise AgentTaskRequestError(f"Task failed: {error}")
-            elif final_status == "cancelled":
-                logger.warning("Cloud mobile task was cancelled")
-                raise AgentTaskRequestError("Task was cancelled")
-            else:
+        async def _execute_cloud(cloud_mobile_id: str):
+            try:
+                # Execute task on cloud mobile and wait for completion
+                final_status, error, output = await cloud_mobile_service.run_task_on_cloud_mobile(
+                    cloud_mobile_id=cloud_mobile_id,
+                    request=request,
+                    on_status_update=status_callback,
+                    on_log=log_callback,
+                )
+                if final_status == "completed":
+                    logger.success("Cloud mobile task completed successfully")
+                    return output
+                if final_status == "failed":
+                    logger.error(f"Cloud mobile task failed: {error}")
+                    raise AgentTaskRequestError(f"Task failed: {error}")
+                if final_status == "cancelled":
+                    logger.warning("Cloud mobile task was cancelled")
+                    raise AgentTaskRequestError("Task was cancelled")
                 logger.error(f"Cloud mobile task ended with unexpected status: {final_status}")
-                raise AgentTaskRequestError(f"Task ended with unexpected status: {final_status}")
+                raise AgentTaskRequestError(
+                    f"Task ended with unexpected status: {final_status}",
+                )
 
-        except asyncio.CancelledError:
-            logger.warning("Cloud mobile task execution cancelled locally")
-            await cloud_mobile_service.cancel_task_runs(self._config.cloud_mobile_id)
-            raise
-        except Exception as e:
-            logger.error(f"Cloud device task execution failed: {str(e)}")
-            await cloud_mobile_service.cancel_task_runs(self._config.cloud_mobile_id)
-            raise
+            except asyncio.CancelledError:
+                logger.warning("Cloud mobile task execution cancelled locally")
+                await cloud_mobile_service.cancel_task_runs(cloud_mobile_id)
+                raise
+            except Exception as e:
+                logger.error(f"Cloud device task execution failed: {str(e)}")
+                await cloud_mobile_service.cancel_task_runs(cloud_mobile_id)
+                raise
+
+        async with self._task_lock:
+            if self._current_task and not self._current_task.done():
+                logger.warning(
+                    "Another cloud task is running; cancelling it before starting new one.",
+                )
+                self.stop_current_task()
+                try:
+                    await self._current_task
+                except asyncio.CancelledError:
+                    pass
+            try:
+                self._current_task = asyncio.create_task(
+                    _execute_cloud(self._config.cloud_mobile_id),
+                )
+                return await self._current_task
+            finally:
+                self._current_task = None
 
     async def _run_task(
         self,
@@ -552,6 +571,9 @@ class Agent:
         Uses the configured Screen API base URL instead of hardcoding localhost.
         """
         try:
+            # In cloud mode, local streaming health is irrelevant.
+            if self._config.cloud_mobile_id:
+                return True
             response = self._screen_api_client.get_with_retry("/streaming-status", timeout=2)
             if response.status_code == 200:
                 data = response.json()
@@ -637,6 +659,10 @@ class Agent:
             raise Exception(f"Unsupported platform: {self._device_context.mobile_platform}")
 
     def clean(self, force: bool = False):
+        if self._config.cloud_mobile_id:
+            self._initialized = False
+            logger.info("✅ Cloud-mode agent stopped.")
+            return
         if not self._initialized and not force:
             return
         screen_api_ok, hw_bridge_ok = stop_servers(
