@@ -15,7 +15,7 @@ These examples demonstrate two different ways to use the SDK, each applying an a
 This script shows the simplest way to run minitap :
 
 - Visit https://platform.minitap.ai to create a task and get your API key.
-- Initialize the agent with your API key: Agent(minitap_api_key=...).
+- Initialize the agent with your API key: .init(api_key=...).
 - Ask the agent to run one of the tasks you’ve set up in the Minitap platform
   (e.g., "like-instagram-post").
 - The task’s goal and settings live in the Minitap platform, you don’t need

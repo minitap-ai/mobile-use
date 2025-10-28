@@ -33,7 +33,7 @@ async def main() -> None:
 
     try:
         # Initialize agent (finds a device, starts required servers)
-        agent.init()
+        await agent.init()
 
         # Calculate yesterday's date for the example
         yesterday = date.today() - timedelta(days=1)
@@ -69,7 +69,7 @@ async def main() -> None:
         print(f"Error: {e}")
     finally:
         # Always clean up resources
-        agent.clean()
+        await agent.clean()
 
 
 if __name__ == "__main__":

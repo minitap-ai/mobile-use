@@ -43,7 +43,7 @@ async def run_automation(
         config.with_graph_config_callbacks(graph_config_callbacks)
 
     agent = Agent(config=config.build())
-    agent.init(
+    await agent.init(
         retry_count=int(os.getenv("MOBILE_USE_HEALTH_RETRIES", 5)),
         retry_wait_seconds=int(os.getenv("MOBILE_USE_HEALTH_DELAY", 2)),
     )
@@ -63,7 +63,7 @@ async def run_automation(
 
     await agent.run_task(request=task.build())
 
-    agent.clean()
+    await agent.clean()
 
 
 @app.command()
