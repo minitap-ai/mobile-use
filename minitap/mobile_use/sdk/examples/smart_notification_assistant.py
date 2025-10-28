@@ -167,7 +167,7 @@ async def main():
 
     try:
         # Initialize agent (finds a device, starts required servers)
-        agent.init()
+        await agent.init()
 
         print("Checking for notifications...")
 
@@ -217,7 +217,7 @@ async def main():
 
     finally:
         # Clean up
-        agent.clean()
+        await agent.clean()
         print(f"\nTraces saved to: {traces_dir}")
 
 

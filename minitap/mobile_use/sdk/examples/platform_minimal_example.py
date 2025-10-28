@@ -31,16 +31,15 @@ async def main() -> None:
     Set MINITAP_API_KEY and MINITAP_BASE_URL environment variables.
     """
     agent = Agent()
-    agent.init()
+    await agent.init(api_key="<api-key>")  # or set MINITAP_API_KEY env variable
     result = await agent.run_task(
         request=PlatformTaskRequest(
             task="your-task-name",
             profile="your-profile-name",
-            api_key="<api-key>",  # or set MINITAP_API_KEY env variable
         )
     )
     print(result)
-    agent.clean()
+    await agent.clean()
 
 
 if __name__ == "__main__":

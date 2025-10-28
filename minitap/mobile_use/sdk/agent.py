@@ -107,22 +107,27 @@ class Agent:
             self._config.servers.screen_api_base_url == DEFAULT_SCREEN_API_BASE_URL
         )
         self._task_lock = asyncio.Lock()
+
         # Initialize platform service if API key is available in environment
-        # Note: Can also be initialized later with API key from request
+        # Note: Can also be initialized later with API key at agent .init()
         if settings.MINITAP_API_KEY:
             self._platform_service = PlatformService()
-            # Initialize cloud device service for remote execution
             self._cloud_mobile_service = CloudMobileService()
         else:
             self._platform_service = None
             self._cloud_mobile_service = None
 
-    def init(
+    async def init(
         self,
+        api_key: str | None = None,
         server_restart_attempts: int = 3,
         retry_count: int = 5,
         retry_wait_seconds: int = 5,
     ):
+        if api_key:
+            self._platform_service = PlatformService(api_key=api_key)
+            self._cloud_mobile_service = CloudMobileService(api_key=api_key)
+
         # Skip initialization for cloud devices - no local setup required
         if self._config.cloud_mobile_id:
             logger.info("Cloud device configured - skipping local initialization")
@@ -257,23 +262,17 @@ class Agent:
         # Normal local execution path
         if request is not None:
             task_info = None
-            platform_service = None
             if isinstance(request, PlatformTaskRequest):
-                # Initialize platform service with API key from request if provided
-                if request.api_key:
-                    platform_service = PlatformService(api_key=request.api_key)
-                elif self._platform_service:
-                    platform_service = self._platform_service
-                else:
+                if not self._platform_service:
                     raise PlatformServiceUninitializedError()
-                task_info = await platform_service.create_task_run(request=request)
+                task_info = await self._platform_service.create_task_run(request=request)
                 if isinstance(request, CloudDevicePlatformTaskRequest):
                     request.task_run_id = task_info.task_run.id
                     request.task_run_id_available_event.set()
                 self._config.agent_profiles[task_info.llm_profile.name] = task_info.llm_profile
                 request = task_info.task_request
             return await self._run_task(
-                request=request, task_info=task_info, platform_service=platform_service
+                request=request, task_info=task_info, platform_service=self._platform_service
             )
         if goal is None:
             raise AgentTaskRequestError("Goal is required")
@@ -302,18 +301,12 @@ class Agent:
         if not self._config.cloud_mobile_id:
             raise AgentTaskRequestError("Cloud mobile ID is not configured")
 
-        # Initialize cloud device service with API key from request if provided
-        cloud_mobile_service = None
-        if request.api_key:
-            cloud_mobile_service = CloudMobileService(api_key=request.api_key)
-        elif self._cloud_mobile_service:
-            cloud_mobile_service = self._cloud_mobile_service
-        else:
+        if not self._cloud_mobile_service:
             raise PlatformServiceUninitializedError()
 
         # Start cloud mobile if not already started
         logger.info(f"Starting cloud mobile '{self._config.cloud_mobile_id}'...")
-        await cloud_mobile_service.start_and_wait_for_ready(
+        await self._cloud_mobile_service.start_and_wait_for_ready(
             cloud_mobile_id=self._config.cloud_mobile_id,
         )
 
@@ -332,7 +325,7 @@ class Agent:
             """Callback for status updates."""
             logger.info(f"Task status update: [{status}] {status_message}")
 
-        async def _execute_cloud(cloud_mobile_id: str):
+        async def _execute_cloud(cloud_mobile_service: CloudMobileService, cloud_mobile_id: str):
             try:
                 # Execute task on cloud mobile and wait for completion
                 final_status, error, output = await cloud_mobile_service.run_task_on_cloud_mobile(
@@ -376,7 +369,10 @@ class Agent:
                     pass
             try:
                 self._current_task = asyncio.create_task(
-                    _execute_cloud(self._config.cloud_mobile_id),
+                    _execute_cloud(
+                        cloud_mobile_service=self._cloud_mobile_service,
+                        cloud_mobile_id=self._config.cloud_mobile_id,
+                    ),
                 )
                 return await self._current_task
             finally:
@@ -662,7 +658,7 @@ class Agent:
         else:
             raise Exception(f"Unsupported platform: {self._device_context.mobile_platform}")
 
-    def clean(self, force: bool = False):
+    async def clean(self, force: bool = False):
         if self._config.cloud_mobile_id:
             self._initialized = False
             logger.info("✅ Cloud-mode agent stopped.")

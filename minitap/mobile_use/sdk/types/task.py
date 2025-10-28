@@ -127,13 +127,10 @@ class PlatformTaskRequest[TOutput](TaskRequestBase):
         task: Either a task name to fetch from the platform, or a
               ManualTaskConfig to create manually
         profile: Optional profile name specified by the user on the platform
-        api_key: Optional API key to authenticate with the platform
-                 (overrides MINITAP_API_KEY env variable)
     """
 
     task: str | ManualTaskConfig
     profile: str | None = None
-    api_key: str | None = None
 
 
 class CloudDevicePlatformTaskRequest[TOutput](PlatformTaskRequest[TOutput]):
