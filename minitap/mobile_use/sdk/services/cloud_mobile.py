@@ -80,6 +80,7 @@ class VirtualMobileInfo(BaseModel):
     """Information about a virtual mobile."""
 
     id: str
+    reference_name: str | None = None
     state: VMState
     message: str | None = None
 
@@ -196,12 +197,42 @@ class CloudMobileService:
 
             return VirtualMobileInfo(
                 id=data["id"],
+                reference_name=data.get("referenceName"),
                 state=data["state"].get("current", "Unknown"),
                 message=data["state"].get("message", "Unknown"),
             )
         except httpx.HTTPStatusError as e:
             raise PlatformServiceError(
                 message="Failed to get cloud mobile status: "
+                f"{e.response.status_code} - {e.response.text}"
+            )
+
+    async def resolve_cloud_mobile_id(self, cloud_mobile_id_or_ref: str) -> str:
+        """
+        Resolve a cloud mobile identifier (ID or reference name) to a cloud mobile UUID.
+
+        Uses the GetVirtualMobile endpoint which supports both UUID and reference name lookup.
+
+        Args:
+            cloud_mobile_id_or_ref: Either a cloud mobile UUID or reference name
+
+        Returns:
+            The cloud mobile UUID
+
+        Raises:
+            PlatformServiceError: If the cloud mobile is not found or resolution fails
+        """
+        try:
+            response = await self._client.get(f"daas/virtual-mobiles/{cloud_mobile_id_or_ref}")
+            response.raise_for_status()
+            data = response.json()
+
+            resolved_id = data["id"]
+            logger.info(f"Resolved '{cloud_mobile_id_or_ref}' to UUID '{resolved_id}'")
+            return resolved_id
+        except httpx.HTTPStatusError as e:
+            raise PlatformServiceError(
+                message=f"Failed to resolve cloud mobile identifier '{cloud_mobile_id_or_ref}': "
                 f"{e.response.status_code} - {e.response.text}"
             )
 

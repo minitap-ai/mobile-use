@@ -124,6 +124,13 @@ class PlatformServiceUninitializedError(MobileUseError):
         )
 
 
+class CloudMobileServiceUninitializedError(MobileUseError):
+    """Exception raised when a cloud mobile service call fails."""
+
+    def __init__(self):
+        super().__init__("Cloud mobile service is not initialized!")
+
+
 class PlatformServiceError(MobileUseError):
     """Exception raised when a platform service call fails."""
 
