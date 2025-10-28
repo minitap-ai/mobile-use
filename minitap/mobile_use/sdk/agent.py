@@ -45,6 +45,7 @@ from minitap.mobile_use.sdk.types.exceptions import (
     AgentNotInitializedError,
     AgentProfileNotFoundError,
     AgentTaskRequestError,
+    CloudMobileServiceUninitializedError,
     DeviceNotFoundError,
     ExecutableNotFoundError,
     PlatformServiceUninitializedError,
@@ -94,6 +95,7 @@ class Agent:
     _adb_client: AdbClient | None
     _current_task: asyncio.Task | None = None
     _task_lock: asyncio.Lock
+    _cloud_mobile_id: str | None = None
 
     def __init__(self, *, config: AgentConfig | None = None):
         self._config = config or get_default_agent_config()
@@ -129,7 +131,12 @@ class Agent:
             self._cloud_mobile_service = CloudMobileService(api_key=api_key)
 
         # Skip initialization for cloud devices - no local setup required
-        if self._config.cloud_mobile_id:
+        if self._config.cloud_mobile_id_or_ref:
+            if not self._cloud_mobile_service:
+                raise CloudMobileServiceUninitializedError()
+            self._cloud_mobile_id = await self._cloud_mobile_service.resolve_cloud_mobile_id(
+                cloud_mobile_id_or_ref=self._config.cloud_mobile_id_or_ref,
+            )
             logger.info("Cloud device configured - skipping local initialization")
             self._initialized = True
             return True
@@ -250,7 +257,7 @@ class Agent:
         request: TaskRequest[TOutput] | PlatformTaskRequest[TOutput] | None = None,
     ) -> str | dict | TOutput | None:
         # Check if cloud mobile is configured
-        if self._config.cloud_mobile_id:
+        if self._config.cloud_mobile_id_or_ref:
             if request is None or not isinstance(request, PlatformTaskRequest):
                 raise AgentTaskRequestError(
                     "When using a cloud mobile, only PlatformTaskRequest is supported. "
@@ -298,20 +305,19 @@ class Agent:
         This method triggers the task execution on the Platform and polls
         for completion without running any agentic logic locally.
         """
-        if not self._config.cloud_mobile_id:
+        if not self._cloud_mobile_id:
             raise AgentTaskRequestError("Cloud mobile ID is not configured")
 
         if not self._cloud_mobile_service:
-            raise PlatformServiceUninitializedError()
+            raise CloudMobileServiceUninitializedError()
 
         # Start cloud mobile if not already started
-        logger.info(f"Starting cloud mobile '{self._config.cloud_mobile_id}'...")
+        logger.info(f"Starting cloud mobile '{self._cloud_mobile_id}'...")
         await self._cloud_mobile_service.start_and_wait_for_ready(
-            cloud_mobile_id=self._config.cloud_mobile_id,
+            cloud_mobile_id=self._cloud_mobile_id,
         )
-
         logger.info(
-            f"Starting cloud mobile task execution '{self._config.cloud_mobile_id}'",
+            f"Starting cloud mobile task execution '{self._cloud_mobile_id}'",
         )
 
         def log_callback(message: str):
@@ -339,23 +345,24 @@ class Agent:
                     return output
                 if final_status == "failed":
                     logger.error(f"Cloud mobile task failed: {error}")
-                    raise AgentTaskRequestError(f"Task failed: {error}")
+                    raise AgentTaskRequestError(
+                        f"Task execution failed on cloud mobile: {error}",
+                    )
                 if final_status == "cancelled":
                     logger.warning("Cloud mobile task was cancelled")
-                    raise AgentTaskRequestError("Task was cancelled")
-                logger.error(f"Cloud mobile task ended with unexpected status: {final_status}")
-                raise AgentTaskRequestError(
-                    f"Task ended with unexpected status: {final_status}",
-                )
-
+                    raise AgentTaskRequestError("Task execution was cancelled")
+                logger.error(f"Unknown cloud mobile task status: {final_status}")
+                raise AgentTaskRequestError(f"Unknown task status: {final_status}")
             except asyncio.CancelledError:
-                logger.warning("Cloud mobile task execution cancelled locally")
-                await cloud_mobile_service.cancel_task_runs(cloud_mobile_id)
+                # Propagate cancellation to parent coroutine.
+                logger.info("Task cancelled during execution, re-raising CancelledError")
+                raise
+            except AgentTaskRequestError:
+                # Re-raise known exceptions
                 raise
             except Exception as e:
-                logger.error(f"Cloud device task execution failed: {str(e)}")
-                await cloud_mobile_service.cancel_task_runs(cloud_mobile_id)
-                raise
+                logger.error(f"Unexpected error during cloud mobile task execution: {e}")
+                raise AgentTaskRequestError(f"Unexpected error: {e}") from e
 
         async with self._task_lock:
             if self._current_task and not self._current_task.done():
@@ -371,7 +378,7 @@ class Agent:
                 self._current_task = asyncio.create_task(
                     _execute_cloud(
                         cloud_mobile_service=self._cloud_mobile_service,
-                        cloud_mobile_id=self._config.cloud_mobile_id,
+                        cloud_mobile_id=self._cloud_mobile_id,
                     ),
                 )
                 return await self._current_task
@@ -568,7 +575,7 @@ class Agent:
         """
         try:
             # In cloud mode, local streaming health is irrelevant.
-            if self._config.cloud_mobile_id:
+            if self._config.cloud_mobile_id_or_ref:
                 return True
             response = self._screen_api_client.get_with_retry("/streaming-status", timeout=2)
             if response.status_code == 200:
@@ -595,16 +602,12 @@ class Agent:
             Exception: If screenshot capture fails
         """
         # Check if cloud mobile is configured
-        if self._config.cloud_mobile_id:
-            # Use cloud mobile service to get screenshot
+        if self._cloud_mobile_id:
             if not self._cloud_mobile_service:
-                raise PlatformServiceUninitializedError()
-
-            logger.info(f"Capturing screenshot from cloud mobile '{self._config.cloud_mobile_id}'")
+                raise CloudMobileServiceUninitializedError()
             screenshot = await self._cloud_mobile_service.get_screenshot(
-                cloud_mobile_id=self._config.cloud_mobile_id,
+                cloud_mobile_id=self._cloud_mobile_id,
             )
-            logger.info("Screenshot captured from cloud mobile")
             return screenshot
 
         # Local device - use ADB or xcrun directly
@@ -659,7 +662,7 @@ class Agent:
             raise Exception(f"Unsupported platform: {self._device_context.mobile_platform}")
 
     async def clean(self, force: bool = False):
-        if self._config.cloud_mobile_id:
+        if self._cloud_mobile_id:
             self._initialized = False
             logger.info("✅ Cloud-mode agent stopped.")
             return

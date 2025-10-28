@@ -45,7 +45,7 @@ class AgentConfigBuilder:
         self._device_platform: DevicePlatform | None = None
         self._servers: ServerConfig = get_default_servers()
         self._graph_config_callbacks: Callbacks = None
-        self._cloud_mobile_id: str | None = None
+        self._cloud_mobile_id_or_ref: str | None = None
 
     def add_profile(self, profile: AgentProfile, validate: bool = True) -> "AgentConfigBuilder":
         """
@@ -96,7 +96,7 @@ class AgentConfigBuilder:
             platform: The device platform (ANDROID or IOS)
             device_id: The unique identifier for the device
         """
-        if self._cloud_mobile_id is not None:
+        if self._cloud_mobile_id_or_ref is not None:
             raise ValueError(
                 "Device ID cannot be set when a cloud mobile is already configured.\n"
                 "> for_device() and for_cloud_mobile() are mutually exclusive"
@@ -105,7 +105,7 @@ class AgentConfigBuilder:
         self._device_platform = platform
         return self
 
-    def for_cloud_mobile(self, cloud_mobile_id: str) -> "AgentConfigBuilder":
+    def for_cloud_mobile(self, cloud_mobile_id_or_ref: str) -> "AgentConfigBuilder":
         """
         Configure the mobile-use agent to use a cloud mobile.
 
@@ -113,14 +113,16 @@ class AgentConfigBuilder:
         and only PlatformTaskRequest can be used.
 
         Args:
-            cloud_mobile_id: The unique identifier for the cloud mobile
+            cloud_mobile_id_or_ref: The unique identifier or reference name for the cloud mobile.
+                Can be either a UUID (e.g., '550e8400-e29b-41d4-a716-446655440000')
+                or a reference name (e.g., 'my-test-device')
         """
         if self._device_id is not None:
             raise ValueError(
                 "Cloud mobile device ID cannot be set when a device is already configured.\n"
                 "> for_device() and for_cloud_mobile() are mutually exclusive"
             )
-        self._cloud_mobile_id = cloud_mobile_id
+        self._cloud_mobile_id_or_ref = cloud_mobile_id_or_ref
         return self
 
     def with_default_task_config(self, config: TaskRequestCommon) -> "AgentConfigBuilder":
@@ -241,7 +243,7 @@ class AgentConfigBuilder:
             device_platform=self._device_platform,
             servers=self._servers,
             graph_config_callbacks=self._graph_config_callbacks,
-            cloud_mobile_id=self._cloud_mobile_id,
+            cloud_mobile_id_or_ref=self._cloud_mobile_id_or_ref,
         )
 
 

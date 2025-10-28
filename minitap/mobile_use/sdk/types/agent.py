@@ -65,7 +65,8 @@ class AgentConfig(BaseModel):
         device_id: Specific device to target (if None, first available is used).
         device_platform: Platform of the device to target.
         servers: Custom server configurations.
-        cloud_mobile_id: ID of cloud mobile (virtual mobile) to use for remote execution.
+        cloud_mobile_id_or_ref: ID or reference name of cloud mobile (virtual mobile)
+                                to use for remote execution.
     """
 
     agent_profiles: dict[str, AgentProfile]
@@ -75,6 +76,6 @@ class AgentConfig(BaseModel):
     device_platform: DevicePlatform | None = None
     servers: ServerConfig
     graph_config_callbacks: Callbacks = None
-    cloud_mobile_id: str | None = None
+    cloud_mobile_id_or_ref: str | None = None
 
     model_config = {"arbitrary_types_allowed": True}
