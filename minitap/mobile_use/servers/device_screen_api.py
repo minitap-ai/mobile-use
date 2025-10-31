@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import json
 import threading
@@ -131,7 +132,7 @@ async def get_screen_info():
     waited_for_seconds = 0
     while not _latest_screen_ts or _latest_screen_ts < now:
         wait_for_seconds = 0.05
-        time.sleep(wait_for_seconds)
+        await asyncio.sleep(wait_for_seconds)
         waited_for_seconds += wait_for_seconds
         if waited_for_seconds >= MAX_WAIT_TIME:
             break
