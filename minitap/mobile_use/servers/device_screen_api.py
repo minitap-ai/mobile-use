@@ -17,7 +17,7 @@ from minitap.mobile_use.servers.utils import is_port_in_use
 DEVICE_HARDWARE_BRIDGE_BASE_URL = server_settings.DEVICE_HARDWARE_BRIDGE_BASE_URL
 DEVICE_HARDWARE_BRIDGE_API_URL = f"{DEVICE_HARDWARE_BRIDGE_BASE_URL}/api"
 
-MAX_WAIT_TIME = 4
+MAX_WAIT_TIME = 1
 
 _latest_screen_data = None
 _is_streaming_connected = False
