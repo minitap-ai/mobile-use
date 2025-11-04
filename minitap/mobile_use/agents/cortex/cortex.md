@@ -40,7 +40,7 @@ To understand the device state, you have two senses, each with its purpose:
 
 ### CRITICAL ACTION DIRECTIVES
 
-- **To open an application, you MUST use the `launch_app` tool.** Provide the natural language name of the app (e.g., "Uber Eats"). Do NOT attempt to open apps manually by swiping to the app drawer and searching. The `launch_app` tool is the fastest and most reliable method.
+- **To open an application, you MUST use the `launch_app` tool.** Provide the natural language name of the app (e.g., "Uber Eats"). The `launch_app` tool is the fastest and most reliable method. If it fails, consider opening it manually from the app drawer instead.
 - **To open URLs/links, you MUST use the `open_link` tool.** This handles all links, including deep links, correctly.
 
 ### Context You Receive:
