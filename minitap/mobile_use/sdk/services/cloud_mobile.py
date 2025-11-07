@@ -140,11 +140,6 @@ class CloudMobileService:
             PlatformServiceError: If the cloud mobile fails to start or times out
         """
         logger.info(f"Starting cloud mobile '{cloud_mobile_id}'")
-
-        # Step 1: Trigger keep-alive to start the VM
-        await self._keep_alive(cloud_mobile_id)
-
-        # Step 2: Poll until ready or timeout
         start_time = datetime.now(UTC)
 
         while True:
@@ -155,6 +150,8 @@ class CloudMobileService:
                     message=f"Timeout waiting for cloud mobile to be ready after {timeout_seconds}s"
                 )
 
+            # Trigger keep-alive to start the VM
+            await self._keep_alive(cloud_mobile_id)
             # Get current status
             vm_info = await self._get_virtual_mobile_status(cloud_mobile_id)
 
