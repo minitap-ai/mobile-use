@@ -90,6 +90,7 @@ class PlatformService:
                     trace_path=request.trace_path,
                     llm_output_path=request.llm_output_path,
                     thoughts_output_path=request.thoughts_output_path,
+                    task_name=task.name,
                 )
 
                 task_run = await self._create_task_run(
@@ -117,6 +118,7 @@ class PlatformService:
                     trace_path=request.trace_path,
                     llm_output_path=request.llm_output_path,
                     thoughts_output_path=request.thoughts_output_path,
+                    task_name=request.task.task_name,
                 )
 
                 task_run = await self._create_manual_task_run(
