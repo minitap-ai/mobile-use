@@ -14,7 +14,7 @@ authors = [
 requires-python = ">=3.12"
 
 dependencies = [
-    "langgraph>=0.6.6",
+    "langgraph>=1.0.0",
     "adbutils==2.9.3",
     "langchain-google-genai>=2.1.10",
     "langchain>=0.3.27",
