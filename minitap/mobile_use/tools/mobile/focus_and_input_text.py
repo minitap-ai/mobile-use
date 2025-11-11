@@ -65,8 +65,8 @@ def get_focus_and_input_text_tool(ctx: MobileUseContext) -> BaseTool:
             text: The text to type.
             target: The target of the text input (if available).
         """
-        focused = focus_element_if_needed(ctx=ctx, target=target)
-        if not focused:
+        focus_method = focus_element_if_needed(ctx=ctx, target=target)
+        if not focus_method:
             error_message = "Failed to focus the text input element before typing."
             tool_message = ToolMessage(
                 tool_call_id=tool_call_id,
@@ -103,9 +103,14 @@ def get_focus_and_input_text_tool(ctx: MobileUseContext) -> BaseTool:
                 text_input_content = get_element_text(element)
 
         agent_outcome = (
-            focus_and_input_text_wrapper.on_success_fn(text, text_input_content, target.resource_id)
+            focus_and_input_text_wrapper.on_success_fn(
+                text_to_type=text,
+                text_from_resource_id=text_input_content,
+                target_resource_id=target.resource_id,
+                focus_method=focus_method,
+            )
             if result.ok
-            else focus_and_input_text_wrapper.on_failure_fn(text, result.error)
+            else focus_and_input_text_wrapper.on_failure_fn(text_to_type=text, error=result.error)
         )
 
         tool_message = ToolMessage(
@@ -129,16 +134,19 @@ def get_focus_and_input_text_tool(ctx: MobileUseContext) -> BaseTool:
     return focus_and_input_text
 
 
-def _on_input_success(text, text_input_content, text_input_resource_id):
+def _on_input_success(text_to_type, text_from_resource_id, target_resource_id, focus_method):
     """Success message handler for input text operations."""
-    if text_input_resource_id is not None:
+    if focus_method == "resource_id":
         return (
-            f"Typed {repr(text)}.\n"
-            f"Here is the whole content of input with id {repr(text_input_resource_id)}: "
-            f"{repr(text_input_content)}"
+            f"Typed {repr(text_to_type)}\n"
+            f"Here is the whole content of input with id {repr(target_resource_id)}: "
+            f"{repr(text_from_resource_id)}"
         )
     else:
-        return "Typed text, should now verify before moving forward"
+        return (
+            f"Typed {repr(text_to_type)} using {focus_method}."
+            + " Should now verify before moving forward."
+        )
 
 
 focus_and_input_text_wrapper = ToolWrapper(
