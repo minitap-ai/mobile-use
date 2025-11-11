@@ -229,7 +229,7 @@ class TestFocusElementIfNeeded:
         result = focus_element_if_needed(ctx=mock_context, target=target)
 
         mock_tap.assert_not_called()
-        assert result is True
+        assert result == "resource_id"
         mock_context.hw_bridge_client.get_rich_hierarchy.assert_called_once()
 
     @patch("minitap.mobile_use.tools.utils.tap")
@@ -271,7 +271,7 @@ class TestFocusElementIfNeeded:
             index=0,
         )
         assert mock_context.hw_bridge_client.get_rich_hierarchy.call_count == 2
-        assert result is True
+        assert result == "resource_id"
 
     @patch("minitap.mobile_use.tools.utils.tap")
     @patch("minitap.mobile_use.tools.utils.logger")
@@ -308,7 +308,7 @@ class TestFocusElementIfNeeded:
 
             mock_logger.warning.assert_called_once()
             mock_tap.assert_called_once()
-            assert result is True
+            assert result == "text"
 
     @patch("minitap.mobile_use.tools.utils.tap")
     @patch("minitap.mobile_use.tools.utils.find_element_by_text")
@@ -343,7 +343,7 @@ class TestFocusElementIfNeeded:
         assert isinstance(selector, SelectorRequestWithCoordinates)
         assert selector.coordinates.x == 60  # 10 + 100/2
         assert selector.coordinates.y == 35  # 20 + 30/2
-        assert result is True
+        assert result == "text"
 
     @patch("minitap.mobile_use.tools.utils.logger")
     def test_focus_all_locators_fail(self, mock_logger, mock_context):
@@ -370,7 +370,7 @@ class TestFocusElementIfNeeded:
             "Failed to focus element."
             + " No valid locator (resource_id, coordinates, or text) succeeded."
         )
-        assert result is False
+        assert result is None
 
 
 if __name__ == "__main__":
