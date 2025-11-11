@@ -1,8 +1,8 @@
 from typing import Annotated
 
-from langchain.agents import AgentStatePydantic
 from langchain_core.messages import AIMessage, AnyMessage
 from langgraph.graph import add_messages
+from pydantic import BaseModel
 
 from minitap.mobile_use.agents.planner.types import Subgoal
 from minitap.mobile_use.config import AgentNode
@@ -17,7 +17,10 @@ def take_last(a, b):
     return b
 
 
-class State(AgentStatePydantic):
+class State(BaseModel):
+    messages: Annotated[list[AnyMessage], "Sequential messages", add_messages]
+    remaining_steps: Annotated[int | None, "Remaining steps before the task is completed"] = None
+
     # planner related keys
     initial_goal: Annotated[str, "Initial goal given by the user"]
 
