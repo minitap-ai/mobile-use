@@ -1,8 +1,8 @@
 from typing import Annotated
 
+from langchain.agents import AgentStatePydantic
 from langchain_core.messages import AIMessage, AnyMessage
 from langgraph.graph import add_messages
-from langgraph.prebuilt.chat_agent_executor import AgentStatePydantic
 
 from minitap.mobile_use.agents.planner.types import Subgoal
 from minitap.mobile_use.config import AgentNode
