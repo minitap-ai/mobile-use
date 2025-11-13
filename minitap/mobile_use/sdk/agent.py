@@ -698,10 +698,7 @@ class Agent:
         else:
             context.execution_setup.app_lock_status = app_lock_status
 
-        if (
-            app_lock_status.locked_app_package is not None
-            and app_lock_status.locked_app_initial_launch_success is False
-        ):
+        if app_lock_status.locked_app_initial_launch_success is False:
             error = app_lock_status.locked_app_initial_launch_error
             logger.warning(f"[{task_name}] Failed to launch locked app: {error}")
 

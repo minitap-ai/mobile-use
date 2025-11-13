@@ -22,7 +22,7 @@ from minitap.mobile_use.config import AgentNode, LLMConfig
 class AppLaunchResult(BaseModel):
     """Result of initial app launch attempt."""
 
-    locked_app_package: str | None
+    locked_app_package: str
     locked_app_initial_launch_success: bool | None
     locked_app_initial_launch_error: str | None
 
