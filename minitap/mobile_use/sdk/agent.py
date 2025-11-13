@@ -448,6 +448,7 @@ class Agent:
         )
 
         self._prepare_tracing(task=task, context=context)
+        await self._prepare_app_lock(task=task, context=context)
         self._prepare_output_files(task=task)
 
         output_config = None
@@ -458,21 +459,9 @@ class Agent:
             )
             logger.info(str(output_config))
 
-        locked_app_status = await _handle_initial_app_launch(
-            ctx=context, locked_app_package=request.locked_app_package
-        )
-
         logger.info(f"[{task_name}] Starting graph with goal: `{request.goal}`")
         state = self._get_graph_state(task=task)
         graph_input = state.model_dump()
-
-        if (
-            locked_app_status["locked_app_package"] is not None
-            and locked_app_status["locked_app_initial_launch_success"] is False
-        ):
-            error = locked_app_status.get("locked_app_initial_launch_error")
-            logger.error(f"Failed to launch locked app: {error}")
-            raise RuntimeError(f"Failed to launch locked app: {error}")
 
         async def _execute_task_logic():
             last_state: State | None = None
@@ -692,29 +681,52 @@ class Agent:
         self._initialized = False
         logger.info("✅ Mobile-use agent stopped.")
 
-    def _prepare_tracing(self, task: Task, context: MobileUseContext):
+    async def _prepare_app_lock(self, task: Task, context: MobileUseContext):
+        """Prepare app lock by launching the locked app if specified."""
+        if not task.request.locked_app_package:
+            return
+
         task_name = task.get_name()
-        
-        if task.request.record_trace:
-            temp_trace_path = Path(self._tmp_traces_dir / task_name).resolve()
-            traces_output_path = Path(task.request.trace_path).resolve()
-            logger.info(f"[{task_name}] 📂 Traces output path: {traces_output_path}")
-            logger.info(f"[{task_name}] 📄📂 Traces temp path: {temp_trace_path}")
-            traces_output_path.mkdir(parents=True, exist_ok=True)
-            temp_trace_path.mkdir(parents=True, exist_ok=True)
-            context.execution_setup = ExecutionSetup(
-                traces_path=self._tmp_traces_dir,
-                trace_name=task_name,
-                enable_remote_tracing=task.request.enable_remote_tracing,
-                locked_app_package=task.request.locked_app_package,
-            )
-        else:
+        logger.info(f"[{task_name}] Preparing app lock for: {task.request.locked_app_package}")
+
+        app_lock_status = await _handle_initial_app_launch(
+            ctx=context, locked_app_package=task.request.locked_app_package
+        )
+
+        if context.execution_setup is None:
             context.execution_setup = ExecutionSetup(
                 traces_path=Path(),
                 trace_name=task_name,
                 enable_remote_tracing=False,
-                locked_app_package=task.request.locked_app_package,
             )
+
+        context.execution_setup.app_lock_status = app_lock_status
+
+        if (
+            app_lock_status.locked_app_package is not None
+            and app_lock_status.locked_app_initial_launch_success is False
+        ):
+            error = app_lock_status.locked_app_initial_launch_error
+            logger.warning(f"[{task_name}] Failed to launch locked app: {error}")
+
+    def _prepare_tracing(self, task: Task, context: MobileUseContext):
+        """Prepare tracing setup if record_trace is enabled."""
+        if not task.request.record_trace:
+            return
+
+        task_name = task.get_name()
+        temp_trace_path = Path(self._tmp_traces_dir / task_name).resolve()
+        traces_output_path = Path(task.request.trace_path).resolve()
+        logger.info(f"[{task_name}] 📂 Traces output path: {traces_output_path}")
+        logger.info(f"[{task_name}] 📄📂 Traces temp path: {temp_trace_path}")
+        traces_output_path.mkdir(parents=True, exist_ok=True)
+        temp_trace_path.mkdir(parents=True, exist_ok=True)
+
+        context.execution_setup = ExecutionSetup(
+            traces_path=self._tmp_traces_dir,
+            trace_name=task_name,
+            enable_remote_tracing=task.request.enable_remote_tracing,
+        )
 
     def _finalize_tracing(self, task: Task, context: MobileUseContext):
         exec_setup_ctx = context.execution_setup

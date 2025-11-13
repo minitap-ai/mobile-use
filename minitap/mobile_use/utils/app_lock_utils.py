@@ -3,9 +3,8 @@ Utilities for handling app locking and initial app launch logic.
 """
 
 import asyncio
-from typing import TypedDict
 
-from minitap.mobile_use.context import MobileUseContext
+from minitap.mobile_use.context import AppLaunchResult, MobileUseContext
 from minitap.mobile_use.controllers.mobile_command_controller import launch_app
 from minitap.mobile_use.controllers.platform_specific_commands_controller import (
     get_current_foreground_package,
@@ -13,14 +12,6 @@ from minitap.mobile_use.controllers.platform_specific_commands_controller import
 from minitap.mobile_use.utils.logger import get_logger
 
 logger = get_logger(__name__)
-
-
-class AppLaunchResult(TypedDict):
-    """Result of initial app launch attempt."""
-
-    locked_app_package: str | None
-    locked_app_initial_launch_success: bool | None
-    locked_app_initial_launch_error: str | None
 
 
 async def _handle_initial_app_launch(
@@ -44,11 +35,11 @@ async def _handle_initial_app_launch(
     """
     if locked_app_package is None:
         logger.info("No locked app package specified, skipping initial app launch")
-        return {
-            "locked_app_package": None,
-            "locked_app_initial_launch_success": None,
-            "locked_app_initial_launch_error": None,
-        }
+        return AppLaunchResult(
+            locked_app_package=None,
+            locked_app_initial_launch_success=None,
+            locked_app_initial_launch_error=None,
+        )
 
     logger.info(f"Starting initial app launch for package: {locked_app_package}")
 
@@ -58,11 +49,11 @@ async def _handle_initial_app_launch(
 
         if current_package == locked_app_package:
             logger.info(f"App {locked_app_package} is already in foreground")
-            return {
-                "locked_app_package": locked_app_package,
-                "locked_app_initial_launch_success": True,
-                "locked_app_initial_launch_error": None,
-            }
+            return AppLaunchResult(
+                locked_app_package=locked_app_package,
+                locked_app_initial_launch_success=True,
+                locked_app_initial_launch_error=None,
+            )
 
         logger.info(f"App {locked_app_package} not in foreground, attempting to launch")
         max_retries = 3
@@ -74,11 +65,11 @@ async def _handle_initial_app_launch(
                 error_msg = f"Failed to execute launch command for {locked_app_package}"
                 logger.error(error_msg)
                 if attempt == max_retries:
-                    return {
-                        "locked_app_package": locked_app_package,
-                        "locked_app_initial_launch_success": False,
-                        "locked_app_initial_launch_error": error_msg,
-                    }
+                    return AppLaunchResult(
+                        locked_app_package=locked_app_package,
+                        locked_app_initial_launch_success=False,
+                        locked_app_initial_launch_error=error_msg,
+                    )
                 continue
 
             await asyncio.sleep(2)
@@ -90,11 +81,11 @@ async def _handle_initial_app_launch(
 
             if current_package == locked_app_package:
                 logger.info(f"✅ Successfully launched and verified app {locked_app_package}")
-                return {
-                    "locked_app_package": locked_app_package,
-                    "locked_app_initial_launch_success": True,
-                    "locked_app_initial_launch_error": None,
-                }
+                return AppLaunchResult(
+                    locked_app_package=locked_app_package,
+                    locked_app_initial_launch_success=True,
+                    locked_app_initial_launch_error=None,
+                )
 
             if attempt < max_retries:
                 logger.warning(f"App not in foreground after launch attempt {attempt}, retrying...")
@@ -104,17 +95,17 @@ async def _handle_initial_app_launch(
             f'Here is the actual foreground app: "{current_package}"'
         )
         logger.error(error_msg)
-        return {
-            "locked_app_package": locked_app_package,
-            "locked_app_initial_launch_success": False,
-            "locked_app_initial_launch_error": error_msg,
-        }
+        return AppLaunchResult(
+            locked_app_package=locked_app_package,
+            locked_app_initial_launch_success=False,
+            locked_app_initial_launch_error=error_msg,
+        )
 
     except Exception as e:
         error_msg = f"Exception during initial app launch: {str(e)}"
         logger.error(error_msg)
-        return {
-            "locked_app_package": locked_app_package,
-            "locked_app_initial_launch_success": False,
-            "locked_app_initial_launch_error": error_msg,
-        }
+        return AppLaunchResult(
+            locked_app_package=locked_app_package,
+            locked_app_initial_launch_success=False,
+            locked_app_initial_launch_error=error_msg,
+        )
