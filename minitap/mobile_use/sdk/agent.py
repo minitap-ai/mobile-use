@@ -466,7 +466,13 @@ class Agent:
         state = self._get_graph_state(task=task)
         graph_input = state.model_dump()
 
-        graph_input.update(locked_app_status)
+        if (
+            locked_app_status["locked_app_package"] is not None
+            and locked_app_status["locked_app_initial_launch_success"] is False
+        ):
+            error = locked_app_status.get("locked_app_initial_launch_error")
+            logger.error(f"Failed to launch locked app: {error}")
+            raise RuntimeError(f"Failed to launch locked app: {error}")
 
         async def _execute_task_logic():
             last_state: State | None = None
@@ -687,20 +693,28 @@ class Agent:
         logger.info("✅ Mobile-use agent stopped.")
 
     def _prepare_tracing(self, task: Task, context: MobileUseContext):
-        if not task.request.record_trace:
-            return
         task_name = task.get_name()
-        temp_trace_path = Path(self._tmp_traces_dir / task_name).resolve()
-        traces_output_path = Path(task.request.trace_path).resolve()
-        logger.info(f"[{task_name}] 📂 Traces output path: {traces_output_path}")
-        logger.info(f"[{task_name}] 📄📂 Traces temp path: {temp_trace_path}")
-        traces_output_path.mkdir(parents=True, exist_ok=True)
-        temp_trace_path.mkdir(parents=True, exist_ok=True)
-        context.execution_setup = ExecutionSetup(
-            traces_path=self._tmp_traces_dir,
-            trace_name=task_name,
-            enable_remote_tracing=task.request.enable_remote_tracing,
-        )
+        
+        if task.request.record_trace:
+            temp_trace_path = Path(self._tmp_traces_dir / task_name).resolve()
+            traces_output_path = Path(task.request.trace_path).resolve()
+            logger.info(f"[{task_name}] 📂 Traces output path: {traces_output_path}")
+            logger.info(f"[{task_name}] 📄📂 Traces temp path: {temp_trace_path}")
+            traces_output_path.mkdir(parents=True, exist_ok=True)
+            temp_trace_path.mkdir(parents=True, exist_ok=True)
+            context.execution_setup = ExecutionSetup(
+                traces_path=self._tmp_traces_dir,
+                trace_name=task_name,
+                enable_remote_tracing=task.request.enable_remote_tracing,
+                locked_app_package=task.request.locked_app_package,
+            )
+        else:
+            context.execution_setup = ExecutionSetup(
+                traces_path=Path(),
+                trace_name=task_name,
+                enable_remote_tracing=False,
+                locked_app_package=task.request.locked_app_package,
+            )
 
     def _finalize_tracing(self, task: Task, context: MobileUseContext):
         exec_setup_ctx = context.execution_setup
@@ -779,9 +793,6 @@ class Agent:
             remaining_steps=task.request.max_steps,
             executor_messages=[],
             cortex_last_thought=None,
-            locked_app_package=task.request.locked_app_package,
-            locked_app_initial_launch_success=None,
-            locked_app_initial_launch_error=None,
         )
 
     def _init_clients(self, platform: DevicePlatform, retry_count: int, retry_wait_seconds: int):

@@ -3,6 +3,7 @@ Utilities for handling app locking and initial app launch logic.
 """
 
 import asyncio
+from typing import TypedDict
 
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.mobile_command_controller import launch_app
@@ -14,27 +15,32 @@ from minitap.mobile_use.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
+class AppLaunchResult(TypedDict):
+    """Result of initial app launch attempt."""
+
+    locked_app_package: str | None
+    locked_app_initial_launch_success: bool | None
+    locked_app_initial_launch_error: str | None
+
+
 async def _handle_initial_app_launch(
     ctx: MobileUseContext,
     locked_app_package: str | None,
-) -> dict:
+) -> AppLaunchResult:
     """
     Handle initial app launch verification and launching if needed.
 
     If locked_app_package is set:
     1. Check if the app is already in the foreground
     2. If not, attempt to launch it (with retries)
-    3. Return status dict with success/error information
+    3. Return status with success/error information
 
     Args:
         ctx: Mobile use context
         locked_app_package: Package name (Android) or bundle ID (iOS) to lock to, or None
 
     Returns:
-        Dictionary with keys:
-        - locked_app_package: The package name (or None)
-        - locked_app_initial_launch_success: True/False/None
-        - locked_app_initial_launch_error: Error message or None
+        AppLaunchResult with launch status and error information
     """
     if locked_app_package is None:
         logger.info("No locked app package specified, skipping initial app launch")
