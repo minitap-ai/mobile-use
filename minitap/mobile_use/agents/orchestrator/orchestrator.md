@@ -34,4 +34,4 @@ All thoughts belong to the specific agent that generated them. There are four co
 
 The cortex has the ability to complete multiple subgoals (the PENDING one and NOT STARTED ones), which are the ones you'll need to examine. Although the plan should normally be completed in order - this is not a strict requirement based on the context.
 
-In its agent thoughts, the cortex may talk as if it were the one taking the action (e.g. "Tapping the button", ...) - but remember than only the executor can interact with the device.
+In its agent thoughts, the cortex may talk as if it were the one taking the action (e.g. "Tapping the button") - but remember than only the executor can interact with the device.
