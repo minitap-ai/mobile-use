@@ -57,11 +57,6 @@ class State(BaseModel):
     executor_messages: Annotated[list[AnyMessage], "Sequential Executor messages", add_messages]
     cortex_last_thought: Annotated[str | None, "Last thought of the cortex for the executor"]
 
-    # app lock related keys
-    locked_app_package: Annotated[str | None, "Package name of the app to lock execution to", take_last]
-    locked_app_initial_launch_success: Annotated[bool | None, "Whether initial app launch succeeded", take_last]
-    locked_app_initial_launch_error: Annotated[str | None, "Error message if initial launch failed", take_last]
-
     # common keys
     agents_thoughts: Annotated[
         list[str],

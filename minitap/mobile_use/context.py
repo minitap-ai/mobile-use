@@ -49,6 +49,7 @@ class ExecutionSetup(BaseModel):
     traces_path: Path
     trace_name: str
     enable_remote_tracing: bool
+    locked_app_package: str | None = None
 
 
 IsReplan = bool
