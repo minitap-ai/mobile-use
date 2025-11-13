@@ -36,6 +36,11 @@ class CortexNode:
     async def __call__(self, state: State):
         executor_feedback = get_executor_agent_feedback(state)
 
+        if self.ctx.execution_setup and self.ctx.execution_setup.app_lock_status:
+            current_locked_app_package = self.ctx.execution_setup.app_lock_status.locked_app_package
+        else:
+            current_locked_app_package = None
+
         system_message = Template(
             Path(__file__).parent.joinpath("cortex.md").read_text(encoding="utf-8")
         ).render(
@@ -45,6 +50,7 @@ class CortexNode:
             current_subgoal=get_current_subgoal(state.subgoal_plan),
             executor_feedback=executor_feedback,
             executor_tools_list=format_tools_list(ctx=self.ctx, wrappers=EXECUTOR_WRAPPERS_TOOLS),
+            locked_app_package=current_locked_app_package,
         )
         messages = [
             SystemMessage(content=system_message),
