@@ -19,6 +19,14 @@ from minitap.mobile_use.clients.screen_api_client import ScreenApiClient
 from minitap.mobile_use.config import AgentNode, LLMConfig
 
 
+class AppLaunchResult(BaseModel):
+    """Result of initial app launch attempt."""
+
+    locked_app_package: str | None
+    locked_app_initial_launch_success: bool | None
+    locked_app_initial_launch_error: str | None
+
+
 class DevicePlatform(str, Enum):
     """Mobile device platform enumeration."""
 
@@ -49,7 +57,7 @@ class ExecutionSetup(BaseModel):
     traces_path: Path
     trace_name: str
     enable_remote_tracing: bool
-    locked_app_package: str | None = None
+    app_lock_status: AppLaunchResult | None = None
 
 
 IsReplan = bool
