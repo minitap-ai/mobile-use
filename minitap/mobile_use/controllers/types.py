@@ -89,7 +89,7 @@ class SwipeRequest(BaseModel):
     )
     duration: int | None = Field(
         default=None,
-        description="Swipe duration in ms (default: 400). Placed at SwipeRequest level.",
+        description="Swipe duration in ms. If not provided, tool functions default to 400ms.",
         ge=1,
         le=10000,
     )
