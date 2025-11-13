@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import date
 from shutil import which
 
@@ -93,64 +94,61 @@ def get_current_foreground_package(ctx: MobileUseContext) -> str | None:
     """
     Get the package name of the currently focused/foreground app.
 
-    For Android: Extracts from 'adb shell dumpsys window | grep mCurrentFocus'
-    For iOS: Uses native xcrun command first, falls back to maestro query if available
+    Returns only the clean package/bundle name (e.g., 'com.whatsapp'),
+    without any metadata or window information.
 
     Returns:
-        The package/bundle name (e.g., 'com.whatsapp'), or None if unable to determine
+        The package/bundle name, or None if unable to determine
     """
     try:
         if ctx.device.mobile_platform == DevicePlatform.IOS:
+            # iOS - Try native xcrun first
+            output = run_shell_command_on_host(
+                "xcrun simctl spawn booted launchctl print "
+                "system/com.apple.SpringBoard.services | grep bundleIdentifier"
+            )
+            match = re.search(r'"bundleIdentifier"\s*=\s*"([^"]+)"', output)
+            if match:
+                bundle_id = match.group(1)
+                if "." in bundle_id:
+                    return bundle_id
+
+            # iOS fallback - Maestro
+            output = run_shell_command_on_host("maestro status")
             try:
-                cmd = (
-                    "xcrun simctl spawn booted launchctl print "
-                    "system/com.apple.SpringBoard.services | grep FrontmostApplication"
-                )
-                output = run_shell_command_on_host(cmd)
-                if output and "bundleIdentifier" in output:
-                    for line in output.split("\n"):
-                        if "bundleIdentifier" in line:
-                            parts = line.split('"')
-                            if len(parts) >= 4:
-                                bundle_id = parts[-2].strip()
-                                is_valid = (
-                                    bundle_id
-                                    and "." in bundle_id
-                                    and bundle_id.replace(".", "").replace("-", "").isalnum()
-                                )
-                                if is_valid:
-                                    return bundle_id
-                return None
-            except Exception as e:
-                logger.debug(f"Native iOS foreground detection failed: {e}")
-                try:
-                    output = run_shell_command_on_host("maestro status")
-                    if output and "current_app" in output.lower():
-                        for line in output.split("\n"):
-                            if "current_app" in line.lower() or "app" in line.lower():
-                                parts = line.split(":")
-                                if len(parts) >= 2:
-                                    app_id = parts[-1].strip().strip('"')
-                                    is_valid = (
-                                        app_id
-                                        and "." in app_id
-                                        and app_id.replace(".", "").replace("-", "").isalnum()
-                                    )
-                                    if is_valid:
-                                        return app_id
-                except Exception as e:
-                    logger.debug(f"Maestro fallback for iOS foreground detection failed: {e}")
-                return None
-        else:
-            device = get_adb_device(ctx)
-            output = str(device.shell("dumpsys window | grep mCurrentFocus"))
-            if output and "mCurrentFocus=" in output:
-                window_info = output.split("mCurrentFocus=")[-1]
-                if "/" in window_info:
-                    package_name = window_info.split("/")[0]
-                    package_name = package_name.lstrip("Window{").strip()
-                    if package_name and "." in package_name:
-                        return package_name
+                data = json.loads(output)
+                app = data.get("current_app")
+                if app and "." in app:
+                    return app
+            except (json.JSONDecodeError, ValueError):
+                for line in output.split("\n"):
+                    if "app" in line.lower() or "current" in line.lower():
+                        parts = line.split(":")
+                        if len(parts) >= 2:
+                            app = parts[-1].strip().strip('"')
+                            if app and "." in app:
+                                return app
             return None
-    except Exception:
+
+        device = get_adb_device(ctx)
+        output = str(device.shell("dumpsys window | grep mCurrentFocus"))
+
+        if "mCurrentFocus=" not in output:
+            return None
+
+        segment = output.split("mCurrentFocus=")[-1]
+
+        if "/" in segment:
+            tokens = segment.split()
+            for token in tokens:
+                if "." in token and not token.startswith("Window"):
+                    package = token.split("/")[0]
+                    package = package.rstrip("}")
+                    if package and "." in package:
+                        return package
+
+        return None
+
+    except Exception as e:
+        logger.debug(f"Failed to get current foreground package: {e}")
         return None

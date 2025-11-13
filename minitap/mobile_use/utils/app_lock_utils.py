@@ -50,7 +50,7 @@ async def _handle_initial_app_launch(
         current_package = get_current_foreground_package(ctx)
         logger.info(f"Current foreground app: {current_package}")
 
-        if current_package and current_package.strip() == locked_app_package.strip():
+        if current_package == locked_app_package:
             logger.info(f"App {locked_app_package} is already in foreground")
             return {
                 "locked_app_package": locked_app_package,
@@ -82,7 +82,7 @@ async def _handle_initial_app_launch(
                 f"After launch attempt {attempt}, current foreground app: {current_package}"
             )
 
-            if current_package and current_package.strip() == locked_app_package.strip():
+            if current_package == locked_app_package:
                 logger.info(f"✅ Successfully launched and verified app {locked_app_package}")
                 return {
                     "locked_app_package": locked_app_package,
