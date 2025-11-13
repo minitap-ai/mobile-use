@@ -78,6 +78,7 @@ class TaskRequestCommon(TaskRequestBase):
     """
 
     max_steps: int = RECURSION_LIMIT
+    locked_app_package: str | None = None
 
 
 class TaskRequest[TOutput](TaskRequestCommon):
