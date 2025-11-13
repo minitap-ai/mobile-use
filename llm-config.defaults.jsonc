@@ -42,6 +42,14 @@
         "model": "gpt-5-mini"
       }
     },
+    "contextor": {
+      "provider": "openai",
+      "model": "gpt-5-nano",
+      "fallback": {
+        "provider": "openai",
+        "model": "gpt-5-mini"
+      }
+    },
     "utils": {
       "hopper": {
         // Needs at least a 256k context window.
@@ -103,6 +111,14 @@
       "fallback": {
         "provider": "minitap",
         "model": "openai/gpt-5-mini"
+      }
+    },
+    "contextor": {
+      "provider": "minitap",
+      "model": "meta-llama/llama-3.1-8b-instruct",
+      "fallback": {
+        "provider": "minitap",
+        "model": "meta-llama/llama-3.3-70b-instruct"
       }
     },
     "utils": {
