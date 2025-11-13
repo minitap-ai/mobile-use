@@ -54,13 +54,6 @@ def get_first_device(
     return None, None
 
 
-def get_focused_app_info(ctx: MobileUseContext) -> str | None:
-    if ctx.device.mobile_platform == DevicePlatform.IOS:
-        return None
-    device = get_adb_device(ctx)
-    return str(device.shell("dumpsys window | grep -E 'mCurrentFocus|mFocusedApp'"))
-
-
 def get_device_date(ctx: MobileUseContext) -> str:
     if ctx.device.mobile_platform == DevicePlatform.IOS:
         return date.today().strftime("%a %b %d %H:%M:%S %Z %Y")

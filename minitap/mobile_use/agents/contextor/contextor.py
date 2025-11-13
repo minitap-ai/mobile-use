@@ -1,8 +1,8 @@
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.mobile_command_controller import get_screen_data
 from minitap.mobile_use.controllers.platform_specific_commands_controller import (
+    get_current_foreground_package,
     get_device_date,
-    get_focused_app_info,
 )
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.utils.decorators import wrap_with_callbacks
@@ -22,7 +22,7 @@ class ContextorNode:
     )
     async def __call__(self, state: State):
         device_data = get_screen_data(self.ctx.screen_api_client)
-        focused_app_info = get_focused_app_info(self.ctx)
+        focused_app_info = get_current_foreground_package(self.ctx)
         device_date = get_device_date(self.ctx)
 
         return await state.asanitize_update(
