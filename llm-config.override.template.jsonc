@@ -29,6 +29,10 @@
     "provider": "",
     "model": ""
   },
+  "contextor": {
+    "provider": "",
+    "model": ""
+  },
   "utils": {
     "hopper": {
       // Needs at least a 256k context window.
