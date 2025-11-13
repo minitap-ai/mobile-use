@@ -73,6 +73,11 @@ def get_agent() -> Agent:
                 model="meta-llama/llama-4-scout",
                 fallback=LLM(provider="openrouter", model="meta-llama/llama-4-maverick"),
             ),
+            contextor=LLMWithFallback(
+                provider="openrouter",
+                model="meta-llama/llama-4-scout",
+                fallback=LLM(provider="openrouter", model="meta-llama/llama-4-maverick"),
+            ),
             cortex=LLMWithFallback(
                 provider="openai",
                 model="o4-mini",
@@ -115,6 +120,11 @@ def get_agent() -> Agent:
                 provider="google",
                 model="gemini-2.5-flash",
                 fallback=LLM(provider="openai", model="gpt-5"),
+            ),
+            contextor=LLMWithFallback(
+                provider="openai",
+                model="gpt-5-nano",
+                fallback=LLM(provider="openai", model="gpt-5-mini"),
             ),
             cortex=LLMWithFallback(
                 provider="openai",
