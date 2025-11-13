@@ -29,7 +29,10 @@ def get_swipe_tool(ctx: MobileUseContext) -> BaseTool:
         agent_thought: str,
         swipe_request: SwipeRequest,
     ) -> Command:
-        """Swipes on the screen."""
+        """Swipe from start to end position on screen.
+
+        Supports percentage-based or coordinate-based positioning.
+        """
         output = swipe_controller(ctx=ctx, swipe_request=swipe_request)
         has_failed = output is not None
 
