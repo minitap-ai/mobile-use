@@ -102,7 +102,6 @@ def get_current_foreground_package(ctx: MobileUseContext) -> str | None:
     """
     try:
         if ctx.device.mobile_platform == DevicePlatform.IOS:
-            # iOS - Try native xcrun first
             output = run_shell_command_on_host(
                 "xcrun simctl spawn booted launchctl print "
                 "system/com.apple.SpringBoard.services | grep bundleIdentifier"
@@ -112,22 +111,6 @@ def get_current_foreground_package(ctx: MobileUseContext) -> str | None:
                 bundle_id = match.group(1)
                 if "." in bundle_id:
                     return bundle_id
-
-            # iOS fallback - Maestro
-            output = run_shell_command_on_host("maestro status")
-            try:
-                data = json.loads(output)
-                app = data.get("current_app")
-                if app and "." in app:
-                    return app
-            except (json.JSONDecodeError, ValueError):
-                for line in output.split("\n"):
-                    if "app" in line.lower() or "current" in line.lower():
-                        parts = line.split(":")
-                        if len(parts) >= 2:
-                            app = parts[-1].strip().strip('"')
-                            if app and "." in app:
-                                return app
             return None
 
         device = get_adb_device(ctx)
