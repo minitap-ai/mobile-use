@@ -54,9 +54,9 @@ from minitap.mobile_use.sdk.types.exceptions import (
 from minitap.mobile_use.sdk.types.platform import TaskRunPlanResponse, TaskRunStatus
 from minitap.mobile_use.sdk.types.task import (
     AgentProfile,
+    CloudDevicePlatformTaskRequest,
     PlatformTaskInfo,
     PlatformTaskRequest,
-    CloudDevicePlatformTaskRequest,
     Task,
     TaskRequest,
 )
@@ -66,6 +66,7 @@ from minitap.mobile_use.servers.start_servers import (
     start_device_screen_api,
 )
 from minitap.mobile_use.servers.stop_servers import stop_servers
+from minitap.mobile_use.utils.app_lock_utils import _handle_initial_app_launch
 from minitap.mobile_use.utils.logger import get_logger
 from minitap.mobile_use.utils.media import (
     create_gif_from_trace_folder,
@@ -447,6 +448,7 @@ class Agent:
         )
 
         self._prepare_tracing(task=task, context=context)
+        await self._prepare_app_lock(task=task, context=context)
         self._prepare_output_files(task=task)
 
         output_config = None
@@ -679,9 +681,32 @@ class Agent:
         self._initialized = False
         logger.info("✅ Mobile-use agent stopped.")
 
+    async def _prepare_app_lock(self, task: Task, context: MobileUseContext):
+        """Prepare app lock by launching the locked app if specified."""
+        if not task.request.locked_app_package:
+            return
+
+        task_name = task.get_name()
+        logger.info(f"[{task_name}] Preparing app lock for: {task.request.locked_app_package}")
+
+        app_lock_status = await _handle_initial_app_launch(
+            ctx=context, locked_app_package=task.request.locked_app_package
+        )
+
+        if context.execution_setup is None:
+            context.execution_setup = ExecutionSetup(app_lock_status=app_lock_status)
+        else:
+            context.execution_setup.app_lock_status = app_lock_status
+
+        if app_lock_status.locked_app_initial_launch_success is False:
+            error = app_lock_status.locked_app_initial_launch_error
+            logger.warning(f"[{task_name}] Failed to launch locked app: {error}")
+
     def _prepare_tracing(self, task: Task, context: MobileUseContext):
+        """Prepare tracing setup if record_trace is enabled."""
         if not task.request.record_trace:
             return
+
         task_name = task.get_name()
         temp_trace_path = Path(self._tmp_traces_dir / task_name).resolve()
         traces_output_path = Path(task.request.trace_path).resolve()
@@ -689,6 +714,7 @@ class Agent:
         logger.info(f"[{task_name}] 📄📂 Traces temp path: {temp_trace_path}")
         traces_output_path.mkdir(parents=True, exist_ok=True)
         temp_trace_path.mkdir(parents=True, exist_ok=True)
+
         context.execution_setup = ExecutionSetup(
             traces_path=self._tmp_traces_dir,
             trace_name=task_name,
@@ -698,6 +724,9 @@ class Agent:
     def _finalize_tracing(self, task: Task, context: MobileUseContext):
         exec_setup_ctx = context.execution_setup
         if not exec_setup_ctx:
+            return
+
+        if exec_setup_ctx.traces_path is None or exec_setup_ctx.trace_name is None:
             return
 
         task_name = task.get_name()

@@ -1,12 +1,15 @@
 import json
+import re
 from datetime import date
 from shutil import which
 
 from adbutils import AdbDevice
 
 from minitap.mobile_use.context import DevicePlatform, MobileUseContext
-from minitap.mobile_use.utils.logger import MobileUseLogger
+from minitap.mobile_use.utils.logger import MobileUseLogger, get_logger
 from minitap.mobile_use.utils.shell_utils import run_shell_command_on_host
+
+logger = get_logger(__name__)
 
 
 def get_adb_device(ctx: MobileUseContext) -> AdbDevice:
@@ -85,3 +88,50 @@ def list_packages(ctx: MobileUseContext) -> str:
                 packages.append(package_name)
 
         return "\n".join(sorted(packages))
+
+
+def get_current_foreground_package(ctx: MobileUseContext) -> str | None:
+    """
+    Get the package name of the currently focused/foreground app.
+
+    Returns only the clean package/bundle name (e.g., 'com.whatsapp'),
+    without any metadata or window information.
+
+    Returns:
+        The package/bundle name, or None if unable to determine
+    """
+    try:
+        if ctx.device.mobile_platform == DevicePlatform.IOS:
+            output = run_shell_command_on_host(
+                "xcrun simctl spawn booted launchctl print "
+                "system/com.apple.SpringBoard.services | grep bundleIdentifier"
+            )
+            match = re.search(r'"bundleIdentifier"\s*=\s*"([^"]+)"', output)
+            if match:
+                bundle_id = match.group(1)
+                if "." in bundle_id:
+                    return bundle_id
+            return None
+
+        device = get_adb_device(ctx)
+        output = str(device.shell("dumpsys window | grep mCurrentFocus"))
+
+        if "mCurrentFocus=" not in output:
+            return None
+
+        segment = output.split("mCurrentFocus=")[-1]
+
+        if "/" in segment:
+            tokens = segment.split()
+            for token in tokens:
+                if "." in token and not token.startswith("Window"):
+                    package = token.split("/")[0]
+                    package = package.rstrip("}")
+                    if package and "." in package:
+                        return package
+
+        return None
+
+    except Exception as e:
+        logger.debug(f"Failed to get current foreground package: {e}")
+        return None
