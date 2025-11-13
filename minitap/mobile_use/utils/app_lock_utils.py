@@ -16,7 +16,7 @@ logger = get_logger(__name__)
 
 async def _handle_initial_app_launch(
     ctx: MobileUseContext,
-    locked_app_package: str | None,
+    locked_app_package: str,
 ) -> AppLaunchResult:
     """
     Handle initial app launch verification and launching if needed.
@@ -33,13 +33,6 @@ async def _handle_initial_app_launch(
     Returns:
         AppLaunchResult with launch status and error information
     """
-    if locked_app_package is None:
-        logger.info("No locked app package specified, skipping initial app launch")
-        return AppLaunchResult(
-            locked_app_package=None,
-            locked_app_initial_launch_success=None,
-            locked_app_initial_launch_error=None,
-        )
 
     logger.info(f"Starting initial app launch for package: {locked_app_package}")
 
@@ -62,7 +55,9 @@ async def _handle_initial_app_launch(
 
             launch_result = launch_app(ctx, locked_app_package)
             if launch_result is not None:
-                error_msg = f"Failed to execute launch command for {locked_app_package}"
+                error_msg = (
+                    f"Failed to execute launch command for {locked_app_package}: {launch_result}"
+                )
                 logger.error(error_msg)
                 if attempt == max_retries:
                     return AppLaunchResult(
