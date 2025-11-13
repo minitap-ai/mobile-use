@@ -34,8 +34,8 @@ You work like an agile tech lead: defining the key milestones without locking in
 
 ### Output
 
-You must output a **list of subgoals (description)**, each representing a clear subgoal.
-Each subgoal should be:
+You must output a **list of subgoal objects**, where each object has a `description` field.
+Each subgoal description should be:
 
 - Focused on **purpose-driven mobile interactions** that clearly state the intent
 - Neither too vague nor too granular
