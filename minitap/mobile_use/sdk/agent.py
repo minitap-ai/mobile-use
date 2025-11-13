@@ -54,9 +54,9 @@ from minitap.mobile_use.sdk.types.exceptions import (
 from minitap.mobile_use.sdk.types.platform import TaskRunPlanResponse, TaskRunStatus
 from minitap.mobile_use.sdk.types.task import (
     AgentProfile,
+    CloudDevicePlatformTaskRequest,
     PlatformTaskInfo,
     PlatformTaskRequest,
-    CloudDevicePlatformTaskRequest,
     Task,
     TaskRequest,
 )
@@ -458,17 +458,14 @@ class Agent:
             )
             logger.info(str(output_config))
 
-        # Handle initial app launch if locked_app_package is specified
         locked_app_status = await _handle_initial_app_launch(
-            ctx=context,
-            locked_app_package=request.locked_app_package
+            ctx=context, locked_app_package=request.locked_app_package
         )
 
         logger.info(f"[{task_name}] Starting graph with goal: `{request.goal}`")
         state = self._get_graph_state(task=task)
         graph_input = state.model_dump()
 
-        # Update graph input with locked app status
         graph_input.update(locked_app_status)
 
         async def _execute_task_logic():
