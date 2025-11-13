@@ -61,3 +61,23 @@ Showcases more advanced SDK features while remaining practical:
 - **Traces**: When enabled, traces are saved to a specified directory (defaulting to `./mobile-use-traces/`) and can be useful for debugging and visualization.
 
 - **Structured Output**: Pydantic models enable type safety when processing task outputs, making it easier to handle and chain results between tasks.
+
+## Locked App Execution
+
+You can restrict task execution to a specific app using the `with_locked_app_package()` method. This ensures the agent stays within the target application throughout the task execution.
+
+```python
+# Lock execution to WhatsApp
+result = await agent.run_task(
+    request=agent.new_task("Send message to Bob")
+        .with_locked_app_package("com.whatsapp")
+        .build()
+)
+```
+
+**When locked to an app:**
+
+- The system verifies the app is open before starting
+- If the app is accidentally closed or navigated away from, the Contextor agent will attempt to relaunch it
+- The Planner and Cortex agents will prioritize in-app actions
+

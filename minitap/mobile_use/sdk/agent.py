@@ -201,6 +201,22 @@ class Agent:
         return True
 
     def new_task(self, goal: str):
+        """
+        Create a new task request builder.
+
+        Args:
+            goal: Natural language description of what to accomplish
+
+        Returns:
+            TaskRequestBuilder that can be configured with:
+            - .with_output_format() for structured output
+            - .with_output_description() for output description
+            - .with_locked_app_package() to restrict execution to a specific app
+            - .using_profile() to specify an LLM profile
+            - .with_max_steps() to set maximum execution steps
+            - .with_trace_recording() to enable trace recording
+            - .with_name() to set a custom task name
+        """
         return TaskRequestBuilder[None].from_common(
             goal=goal,
             common=self._config.task_request_defaults,
