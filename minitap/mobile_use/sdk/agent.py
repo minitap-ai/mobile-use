@@ -66,6 +66,7 @@ from minitap.mobile_use.servers.start_servers import (
     start_device_screen_api,
 )
 from minitap.mobile_use.servers.stop_servers import stop_servers
+from minitap.mobile_use.utils.app_lock_utils import _handle_initial_app_launch
 from minitap.mobile_use.utils.logger import get_logger
 from minitap.mobile_use.utils.media import (
     create_gif_from_trace_folder,
@@ -457,9 +458,18 @@ class Agent:
             )
             logger.info(str(output_config))
 
+        # Handle initial app launch if locked_app_package is specified
+        locked_app_status = await _handle_initial_app_launch(
+            ctx=context,
+            locked_app_package=request.locked_app_package
+        )
+
         logger.info(f"[{task_name}] Starting graph with goal: `{request.goal}`")
         state = self._get_graph_state(task=task)
         graph_input = state.model_dump()
+
+        # Update graph input with locked app status
+        graph_input.update(locked_app_status)
 
         async def _execute_task_logic():
             last_state: State | None = None
@@ -772,6 +782,9 @@ class Agent:
             remaining_steps=task.request.max_steps,
             executor_messages=[],
             cortex_last_thought=None,
+            locked_app_package=task.request.locked_app_package,
+            locked_app_initial_launch_success=None,
+            locked_app_initial_launch_error=None,
         )
 
     def _init_clients(self, platform: DevicePlatform, retry_count: int, retry_wait_seconds: int):
