@@ -5,9 +5,9 @@ Utilities for handling app locking and initial app launch logic.
 import asyncio
 
 from minitap.mobile_use.context import MobileUseContext
+from minitap.mobile_use.controllers.mobile_command_controller import launch_app
 from minitap.mobile_use.controllers.platform_specific_commands_controller import (
     get_current_foreground_package,
-    launch_app_by_package,
 )
 from minitap.mobile_use.utils.logger import get_logger
 
@@ -66,8 +66,8 @@ async def _handle_initial_app_launch(
             logger.info(f"Launch attempt {attempt}/{max_retries} for app {locked_app_package}")
 
             # Launch the app
-            launch_success = launch_app_by_package(ctx, locked_app_package)
-            if not launch_success:
+            launch_result = launch_app(ctx, locked_app_package)
+            if launch_result is not None:  # launch_app returns None on success
                 error_msg = f"Failed to execute launch command for {locked_app_package}"
                 logger.error(error_msg)
                 if attempt == max_retries:
