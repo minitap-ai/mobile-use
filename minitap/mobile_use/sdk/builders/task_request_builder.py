@@ -27,6 +27,7 @@ class TaskRequestCommonBuilder(BaseModel):
         self._trace_path = Path("mobile-use-traces")
         self._llm_output_path: Path | None = None
         self._thoughts_output_path: Path | None = None
+        self._locked_app_package: str | None = None
 
     def with_max_steps(self, max_steps: int) -> Self:
         """
@@ -73,6 +74,20 @@ class TaskRequestCommonBuilder(BaseModel):
         self._thoughts_output_path = Path(path)
         return self
 
+    def with_locked_app_package(self, package_name: str) -> Self:
+        """
+        Set the app package to lock execution to.
+
+        This ensures the specified app is launched and in the foreground before
+        the agentic loop starts.
+
+        Args:
+            package_name: Package name (Android, e.g., 'com.whatsapp') or
+                         bundle ID (iOS, e.g., 'com.apple.mobilesafari')
+        """
+        self._locked_app_package = package_name
+        return self
+
     def build(self) -> TaskRequestCommon:
         """
         Build the TaskRequestCommon object.
@@ -89,6 +104,7 @@ class TaskRequestCommonBuilder(BaseModel):
             trace_path=self._trace_path,
             llm_output_path=self._llm_output_path,
             thoughts_output_path=self._thoughts_output_path,
+            locked_app_package=self._locked_app_package,
         )
 
 
@@ -127,6 +143,7 @@ class TaskRequestBuilder[TIn](TaskRequestCommonBuilder):
         res._trace_path = common.trace_path
         res._llm_output_path = common.llm_output_path
         res._thoughts_output_path = common.thoughts_output_path
+        res._locked_app_package = common.locked_app_package
         return res
 
     def using_profile(self, profile: str | AgentProfile) -> "TaskRequestBuilder[TIn]":
@@ -214,5 +231,6 @@ class TaskRequestBuilder[TIn](TaskRequestCommonBuilder):
             trace_path=self._trace_path,
             llm_output_path=self._llm_output_path,
             thoughts_output_path=self._thoughts_output_path,
+            locked_app_package=self._locked_app_package,
         )
         return task_request
