@@ -95,7 +95,14 @@ def record_events(output_path: Path | None, events: list[str] | BaseModel | Any)
 LLMProvider = Literal["openai", "google", "openrouter", "xai", "vertexai", "minitap"]
 LLMUtilsNode = Literal["outputter", "hopper"]
 LLMUtilsNodeWithFallback = LLMUtilsNode
-AgentNode = Literal["planner", "orchestrator", "cortex", "screen_analyzer", "executor"]
+AgentNode = Literal[
+    "planner",
+    "orchestrator",
+    "contextor",
+    "cortex",
+    "screen_analyzer",
+    "executor",
+]
 AgentNodeWithFallback = AgentNode
 
 ROOT_DIR = Path(__file__).parent.parent.parent
@@ -157,6 +164,7 @@ class LLMConfigUtils(BaseModel):
 class LLMConfig(BaseModel):
     planner: LLMWithFallback
     orchestrator: LLMWithFallback
+    contextor: LLMWithFallback
     cortex: LLMWithFallback
     screen_analyzer: LLMWithFallback
     executor: LLMWithFallback
@@ -165,6 +173,7 @@ class LLMConfig(BaseModel):
     def validate_providers(self):
         self.planner.validate_provider("Planner")
         self.orchestrator.validate_provider("Orchestrator")
+        self.contextor.validate_provider("Contextor")
         self.cortex.validate_provider("Cortex")
         self.screen_analyzer.validate_provider("ScreenAnalyzer")
         self.executor.validate_provider("Executor")
@@ -175,6 +184,7 @@ class LLMConfig(BaseModel):
         return f"""
 📃 Planner: {self.planner}
 🎯 Orchestrator: {self.orchestrator}
+🔍 Contextor: {self.contextor}
 🧠 Cortex: {self.cortex}
 👁️ ScreenAnalyzer: {self.screen_analyzer}
 🛠️ Executor: {self.executor}
@@ -206,6 +216,11 @@ def get_default_llm_config() -> LLMConfig:
                 fallback=LLM(provider="openai", model="gpt-5-mini"),
             ),
             orchestrator=LLMWithFallback(
+                provider="openai",
+                model="gpt-5-nano",
+                fallback=LLM(provider="openai", model="gpt-5-mini"),
+            ),
+            contextor=LLMWithFallback(
                 provider="openai",
                 model="gpt-5-nano",
                 fallback=LLM(provider="openai", model="gpt-5-mini"),
@@ -261,6 +276,11 @@ def get_default_minitap_llm_config(validate: bool = True) -> LLMConfig | None:
             provider="minitap",
             model="openai/gpt-oss-120b",
             fallback=LLM(provider="minitap", model="meta-llama/llama-4-maverick"),
+        ),
+        contextor=LLMWithFallback(
+            provider="minitap",
+            model="meta-llama/llama-3.1-8b-instruct",
+            fallback=LLM(provider="minitap", model="meta-llama/llama-3.3-70b-instruct"),
         ),
         cortex=LLMWithFallback(
             provider="minitap",
