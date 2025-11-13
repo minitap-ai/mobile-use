@@ -34,7 +34,9 @@ You work like an agile tech lead: defining the key milestones without locking in
 
 ### Output
 
-You must output a **list of subgoal objects**, where each object has a `description` field.
+You must output a JSON object with a `subgoals` field containing a list of subgoal objects.
+Each subgoal object must have a `description` field (string).
+
 Each subgoal description should be:
 
 - Focused on **purpose-driven mobile interactions** that clearly state the intent
