@@ -79,9 +79,20 @@ class SwipeStartEndPercentagesRequest(BaseModel):
 
 
 class SwipeRequest(BaseModel):
+    """
+    Swipe from start to end position using coordinates or percentages.
+    """
+
     model_config = ConfigDict(extra="forbid")
-    swipe_mode: SwipeStartEndCoordinatesRequest | SwipeStartEndPercentagesRequest
-    duration: int | None = None  # in ms, default is 400ms
+    swipe_mode: SwipeStartEndCoordinatesRequest | SwipeStartEndPercentagesRequest = Field(
+        description="Start and end positions. Use EITHER (x, y) OR (x_percent, y_percent)."
+    )
+    duration: int | None = Field(
+        default=None,
+        description="Swipe duration in ms (default: 400). Placed at SwipeRequest level.",
+        ge=1,
+        le=10000,
+    )
 
     def to_dict(self):
         res = {}
