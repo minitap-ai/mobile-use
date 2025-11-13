@@ -51,7 +51,7 @@ async def _handle_initial_app_launch(
         current_package = get_current_foreground_package(ctx)
         logger.info(f"Current foreground app: {current_package}")
 
-        if current_package and locked_app_package in current_package:
+        if current_package and current_package.strip() == locked_app_package.strip():
             logger.info(f"App {locked_app_package} is already in foreground")
             return {
                 "locked_app_package": locked_app_package,
@@ -87,8 +87,10 @@ async def _handle_initial_app_launch(
                 f"After launch attempt {attempt}, current foreground app: {current_package}"
             )
 
-            if current_package and locked_app_package in current_package:
-                logger.info(f"✅ Successfully launched and verified app {locked_app_package}")
+            if current_package and current_package.strip() == locked_app_package.strip():
+                logger.info(
+                    f"✅ Successfully launched and verified app {locked_app_package}"
+                )
                 return {
                     "locked_app_package": locked_app_package,
                     "locked_app_initial_launch_success": True,
@@ -99,7 +101,10 @@ async def _handle_initial_app_launch(
                 logger.warning(f"App not in foreground after launch attempt {attempt}, retrying...")
 
         # All retries exhausted
-        error_msg = f'Failed to launch {locked_app_package} after {max_retries} attempts. Here is the actual foreground app: "{current_package}"'
+        error_msg = (
+            f"Failed to launch {locked_app_package} after {max_retries} attempts. "
+            f'Here is the actual foreground app: "{current_package}"'
+        )
         logger.error(error_msg)
         return {
             "locked_app_package": locked_app_package,

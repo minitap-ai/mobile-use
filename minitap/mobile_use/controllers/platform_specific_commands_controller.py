@@ -5,8 +5,10 @@ from shutil import which
 from adbutils import AdbDevice
 
 from minitap.mobile_use.context import DevicePlatform, MobileUseContext
-from minitap.mobile_use.utils.logger import MobileUseLogger
+from minitap.mobile_use.utils.logger import MobileUseLogger, get_logger
 from minitap.mobile_use.utils.shell_utils import run_shell_command_on_host
+
+logger = get_logger(__name__)
 
 
 def get_adb_device(ctx: MobileUseContext) -> AdbDevice:
@@ -112,12 +114,19 @@ def get_current_foreground_package(ctx: MobileUseContext) -> str | None:
                         if "bundleIdentifier" in line:
                             # Extract bundle ID from launchctl output
                             parts = line.split('"')
-                            if len(parts) >= 2:
-                                bundle_id = parts[-2]
-                                if bundle_id and "." in bundle_id:
+                            if len(parts) >= 4:  # Ensure we have enough parts
+                                bundle_id = parts[-2].strip()
+                                # Validate bundle ID format
+                                is_valid = (
+                                    bundle_id
+                                    and "." in bundle_id
+                                    and bundle_id.replace(".", "").replace("-", "").isalnum()
+                                )
+                                if is_valid:
                                     return bundle_id
                 return None
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Native iOS foreground detection failed: {e}")
                 # Fall back to maestro query if native method fails
                 try:
                     output = run_shell_command_on_host("maestro status")
@@ -129,10 +138,16 @@ def get_current_foreground_package(ctx: MobileUseContext) -> str | None:
                                 parts = line.split(":")
                                 if len(parts) >= 2:
                                     app_id = parts[-1].strip().strip('"')
-                                    if app_id and "." in app_id:
+                                    # Validate app ID format
+                                    is_valid = (
+                                        app_id
+                                        and "." in app_id
+                                        and app_id.replace(".", "").replace("-", "").isalnum()
+                                    )
+                                    if is_valid:
                                         return app_id
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Maestro fallback for iOS foreground detection failed: {e}")
                 return None
         else:
             device = get_adb_device(ctx)
