@@ -54,9 +54,9 @@ from minitap.mobile_use.sdk.types.exceptions import (
 from minitap.mobile_use.sdk.types.platform import TaskRunPlanResponse, TaskRunStatus
 from minitap.mobile_use.sdk.types.task import (
     AgentProfile,
+    CloudDevicePlatformTaskRequest,
     PlatformTaskInfo,
     PlatformTaskRequest,
-    CloudDevicePlatformTaskRequest,
     Task,
     TaskRequest,
 )

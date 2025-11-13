@@ -15,10 +15,11 @@ You will be given:
 You must then:
 
 1. For **each subgoal to examine provided by the user** (not all subgoals):
-    - if it's clearly finished and can be marked as complete, regardless of whether it was started or not -> add its ID to `completed_subgoal_ids`
-    Then fill the `reason` field with:
-    - the final answer to the initial goal if all subgoals are expected to be completed, OR
-    - an explanation of your decisions for the report.
+
+   - if it's clearly finished and can be marked as complete, regardless of whether it was started or not -> add its ID to `completed_subgoal_ids`
+     Then fill the `reason` field with:
+   - the final answer to the initial goal if all subgoals are expected to be completed, OR
+   - an explanation of your decisions for the report.
 
 2. Set `needs_replaning` to `TRUE` if the current plan no longer fits because of repeated failed attempts. In that case, the current subgoal will be marked as `FAILURE`, and a new plan will be defined. Explain in the `reason` field why the plan no longer fits.
 
