@@ -54,9 +54,9 @@ class DeviceContext(BaseModel):
 class ExecutionSetup(BaseModel):
     """Execution setup for a task."""
 
-    traces_path: Path
-    trace_name: str
-    enable_remote_tracing: bool
+    traces_path: Path | None = None
+    trace_name: str | None = None
+    enable_remote_tracing: bool = False
     app_lock_status: AppLaunchResult | None = None
 
 

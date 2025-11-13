@@ -694,13 +694,9 @@ class Agent:
         )
 
         if context.execution_setup is None:
-            context.execution_setup = ExecutionSetup(
-                traces_path=Path(),
-                trace_name=task_name,
-                enable_remote_tracing=False,
-            )
-
-        context.execution_setup.app_lock_status = app_lock_status
+            context.execution_setup = ExecutionSetup(app_lock_status=app_lock_status)
+        else:
+            context.execution_setup.app_lock_status = app_lock_status
 
         if (
             app_lock_status.locked_app_package is not None
@@ -731,6 +727,9 @@ class Agent:
     def _finalize_tracing(self, task: Task, context: MobileUseContext):
         exec_setup_ctx = context.execution_setup
         if not exec_setup_ctx:
+            return
+
+        if exec_setup_ctx.traces_path is None or exec_setup_ctx.trace_name is None:
             return
 
         task_name = task.get_name()
