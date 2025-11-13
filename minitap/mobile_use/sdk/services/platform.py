@@ -6,7 +6,7 @@ import httpx
 from pydantic import BaseModel, ValidationError
 
 from minitap.mobile_use.agents.planner.types import Subgoal, SubgoalStatus
-from minitap.mobile_use.config import LLMConfig, settings
+from minitap.mobile_use.config import deep_merge_llm_config, get_default_llm_config, settings
 from minitap.mobile_use.sdk.types.exceptions import PlatformServiceError
 from minitap.mobile_use.sdk.types.platform import (
     CreateTaskRunRequest,
@@ -312,9 +312,11 @@ class PlatformService:
             response.raise_for_status()
             profile_data = response.json()
             profile = LLMProfileResponse(**profile_data)
+            default_config = get_default_llm_config()
+            merged_config = deep_merge_llm_config(default_config, profile.llms)
             agent_profile = AgentProfile(
                 name=profile.name,
-                llm_config=LLMConfig(**profile.llms),
+                llm_config=merged_config,
             )
             return profile, agent_profile
         except ValidationError as e:
