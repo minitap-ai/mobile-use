@@ -15,6 +15,8 @@ logger = get_logger(__name__)
 def record_interaction(ctx: MobileUseContext, response: BaseMessage):
     if not ctx.execution_setup:
         raise ValueError("No execution setup found")
+    if not ctx.execution_setup.traces_path or not ctx.execution_setup.trace_name:
+        raise ValueError("No traces path or trace name found")
 
     logger.info("Recording interaction")
     screenshot_base64 = take_screenshot(ctx)
