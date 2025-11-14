@@ -78,10 +78,10 @@ class State(BaseModel):
         if updated_agents_thoughts is not None:
             if isinstance(updated_agents_thoughts, str):
                 updated_agents_thoughts = [updated_agents_thoughts]
-            elif not isinstance(updated_agents_thoughts, list):
+            elif isinstance(updated_agents_thoughts, list):
+                updated_agents_thoughts = [t for t in updated_agents_thoughts if t is not None]
+            else:
                 raise ValueError("agents_thoughts must be a str or list[str]")
-
-            updated_agents_thoughts = [t for t in updated_agents_thoughts if t is not None]
 
             if updated_agents_thoughts:
                 if agent is None:
@@ -92,6 +92,8 @@ class State(BaseModel):
                     new=updated_agents_thoughts,
                     agent=agent,
                 )
+            else:
+                update["agents_thoughts"] = []
         return update
 
 
