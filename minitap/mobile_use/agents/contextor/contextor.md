@@ -20,33 +20,40 @@ Decide whether the agent should:
 1. **Relaunch the locked app** (force the user back to the expected app), OR
 2. **Allow the deviation** (permit the agent to continue in the current app)
 
+### Default Behavior: RELAUNCH
+
+**By default, you should relaunch the locked app.** Deviations are only allowed in specific, well-justified cases.
+
 ### When to Allow Deviation (Do NOT relaunch)
 
-There are **legitimate reasons** why the user might temporarily leave the locked app:
+Only allow deviation if **ALL** of the following conditions are met:
 
-- **OAuth flows**: The app redirects to a browser or another app for authentication (e.g., Google login, Facebook login)
-- **Payment flows**: The app redirects to a payment provider (e.g., PayPal, Stripe)
-- **External verifications**: The app requires verification via SMS, email, or another app
-- **Deep links**: The app opens content in another app temporarily (e.g., opening a map, making a call)
-- **Permission grants**: The system opens Settings or another system app to grant permissions
-- **Multi-app workflows**: The task explicitly involves multiple apps working together
+1. **The deviation is clearly intentional** based on recent agent actions
+2. **The current app is directly necessary** to complete the task goal
+3. **There is explicit evidence** of one of these patterns:
+   - **Authentication flow**: Browser or auth provider opened for login (e.g., OAuth, SSO)
+   - **Payment flow**: Payment provider opened for transaction
+   - **System permission**: System settings opened to grant required permissions
+   - **External verification**: SMS, email, or verification app opened as part of workflow
+   - **Deep link**: Another app opened to handle specific content (map, phone, media)
 
 ### When to Relaunch (Force back to locked app)
 
-You should relaunch if:
+Relaunch if **ANY** of the following is true:
 
-- The deviation appears **accidental**
-- The current app is **unrelated** to the task goal
-- The deviation breaks the expected workflow without a clear reason
-- The task can only be completed in the locked app
+- The current app is **completely unrelated** to the task goal
+- The deviation appears **accidental** (no clear intent in agent thoughts)
+- The agent thoughts show **no explicit plan** to use the current app
+- The current app **cannot contribute** to completing the task goal
+- The deviation **interrupts the workflow** without clear justification
 
 ### Decision Guidelines
 
-1. **Analyze the task goal**: Does the goal suggest multi-app interaction?
-2. **Analyze the current app**: Is it plausibly related to the locked app's workflow?
-3. **Analyze the agent thoughts history**: Did the agent intentionally navigate away, or was it unexpected?
-4. **Consider common patterns**: OAuth, payments, permissions, deep links are usually intentional
-5. **When in doubt, allow deviation**: It's better to allow a legitimate workflow than to interrupt it
+1. **Check agent thoughts**: Is there explicit mention of navigating to the current app?
+2. **Verify necessity**: Can the task goal be completed without the current app?
+3. **Assess relationship**: Is the current app functionally related to the locked app's purpose?
+4. **Require evidence**: Only allow deviation if there's clear proof it's needed
+5. **When in doubt, RELAUNCH**: Prefer returning to the locked app over allowing unverified deviations
 
 ### Your Output
 
