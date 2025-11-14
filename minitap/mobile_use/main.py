@@ -1,17 +1,14 @@
 import asyncio
 import os
+from shutil import which
+from typing import Annotated
 
 import typer
 from adbutils import AdbClient
 from langchain.callbacks.base import Callbacks
 from rich.console import Console
-from typing import Annotated
-from shutil import which
 
-from minitap.mobile_use.config import (
-    initialize_llm_config,
-    settings,
-)
+from minitap.mobile_use.config import initialize_llm_config, settings
 from minitap.mobile_use.sdk import Agent
 from minitap.mobile_use.sdk.builders import Builders
 from minitap.mobile_use.sdk.types.task import AgentProfile
@@ -24,6 +21,7 @@ logger = get_logger(__name__)
 
 async def run_automation(
     goal: str,
+    locked_app_package: str | None = None,
     test_name: str | None = None,
     traces_output_path_str: str = "traces",
     output_description: str | None = None,
@@ -49,6 +47,8 @@ async def run_automation(
     )
 
     task = agent.new_task(goal)
+    if locked_app_package:
+        task.with_locked_app_package(locked_app_package)
     if test_name:
         task.with_name(test_name).with_trace_recording(path=traces_output_path_str)
     if output_description:
