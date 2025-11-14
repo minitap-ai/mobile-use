@@ -98,7 +98,7 @@ Each subgoal should be:
 **Locked App**: `com.whatsapp`
 
 **Plan**:
-- Open WhatsApp to access messaging features (app lock ensures we stay in WhatsApp)
+- Open WhatsApp to access messaging features
 - Search for or navigate to Bob's chat
 - Type the message "Running late" in the message field
 - Send the message

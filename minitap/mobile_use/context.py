@@ -59,6 +59,17 @@ class ExecutionSetup(BaseModel):
     enable_remote_tracing: bool = False
     app_lock_status: AppLaunchResult | None = None
 
+    def get_locked_app_package(self) -> str | None:
+        """
+        Get the locked app package name if app locking is enabled.
+
+        Returns:
+            The locked app package name, or None if app locking is not enabled.
+        """
+        if self.app_lock_status:
+            return self.app_lock_status.locked_app_package
+        return None
+
 
 IsReplan = bool
 
