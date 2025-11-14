@@ -19,11 +19,11 @@ class AppLockVerificationOutput(BaseModel):
         ..., description="Status of the decision"
     )
 
-    def to_message(self) -> str:
+    def to_optional_message(self) -> str | None:
         msg = f"App {self.package_name}"
         match self.status:
             case "already_in_foreground":
-                msg += " is already in foreground."
+                return None
             case "relaunched":
                 msg += " was relaunched."
             case "allowed_deviation":
