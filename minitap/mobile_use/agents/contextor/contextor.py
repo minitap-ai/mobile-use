@@ -22,14 +22,14 @@ class ContextorNode:
     )
     async def __call__(self, state: State):
         device_data = get_screen_data(self.ctx.screen_api_client)
-        focused_app_info = get_current_foreground_package(self.ctx)
+        current_app_package = get_current_foreground_package(self.ctx)
         device_date = get_device_date(self.ctx)
 
         return await state.asanitize_update(
             ctx=self.ctx,
             update={
                 "latest_ui_hierarchy": device_data.elements,
-                "focused_app_info": focused_app_info,
+                "focused_app_info": current_app_package,
                 "screen_size": (device_data.width, device_data.height),
                 "device_date": device_date,
             },
