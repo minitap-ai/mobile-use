@@ -21,15 +21,16 @@ class AppLockVerificationOutput(BaseModel):
 
     def to_optional_message(self) -> str | None:
         msg = f"App {self.package_name}"
+        if self.reasoning:
+            msg = f"{self.reasoning} {msg}"
         match self.status:
             case "already_in_foreground":
                 return None
             case "relaunched":
-                msg += " was relaunched."
+                msg += " was successfully relaunched ✅"
             case "allowed_deviation":
-                msg += " was allowed deviation."
+                msg += " was allowed deviation ⚠️"
             case "error":
                 msg = f"Could not verify app lock for {self.package_name}."
-        if self.reasoning:
-            msg += f" {self.reasoning}"
+
         return msg
