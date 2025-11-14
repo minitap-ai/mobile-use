@@ -6,6 +6,9 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from minitap.mobile_use.agents.planner.types import PlannerOutput, Subgoal, SubgoalStatus
 from minitap.mobile_use.agents.planner.utils import generate_id, one_of_them_is_failure
 from minitap.mobile_use.context import MobileUseContext
+from minitap.mobile_use.controllers.platform_specific_commands_controller import (
+    get_current_foreground_package,
+)
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message, with_fallback
 from minitap.mobile_use.tools.index import EXECUTOR_WRAPPERS_TOOLS, format_tools_list
@@ -30,12 +33,15 @@ class PlannerNode:
         current_locked_app_package = (
             self.ctx.execution_setup.get_locked_app_package() if self.ctx.execution_setup else None
         )
+        current_foreground_app = get_current_foreground_package(self.ctx)
+
         system_message = Template(
             Path(__file__).parent.joinpath("planner.md").read_text(encoding="utf-8")
         ).render(
             platform=self.ctx.device.mobile_platform.value,
             executor_tools_list=format_tools_list(ctx=self.ctx, wrappers=EXECUTOR_WRAPPERS_TOOLS),
             locked_app_package=current_locked_app_package,
+            current_foreground_app=current_foreground_app,
         )
         human_message = Template(
             Path(__file__).parent.joinpath("human.md").read_text(encoding="utf-8")
