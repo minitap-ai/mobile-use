@@ -8,7 +8,7 @@ that task execution remains within a specific application. This is useful for:
 - Improving task reliability by maintaining app context
 
 When an app is locked:
-- The system verifies the app is open before starting
+- The system ensures the app is open before starting
 - If the app is accidentally closed or navigated away from, the Contextor agent
   will attempt to relaunch it
 - The Planner and Cortex agents will prioritize in-app actions
