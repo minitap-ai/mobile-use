@@ -110,8 +110,6 @@ class ContextorNode:
             current_app_package=current_app_package,
         )
 
-        logger.info(f"Contextor decision: {decision.reasoning}")
-
         if decision.should_relaunch_app:
             logger.info(f"Relaunching locked app: {locked_app_package}")
             success, error = await launch_app_with_retries(self.ctx, app_package=locked_app_package)
