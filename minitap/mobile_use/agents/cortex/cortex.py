@@ -36,10 +36,9 @@ class CortexNode:
     async def __call__(self, state: State):
         executor_feedback = get_executor_agent_feedback(state)
 
-        if self.ctx.execution_setup and self.ctx.execution_setup.app_lock_status:
-            current_locked_app_package = self.ctx.execution_setup.app_lock_status.locked_app_package
-        else:
-            current_locked_app_package = None
+        current_locked_app_package = (
+            self.ctx.execution_setup.get_locked_app_package() if self.ctx.execution_setup else None
+        )
 
         system_message = Template(
             Path(__file__).parent.joinpath("cortex.md").read_text(encoding="utf-8")
