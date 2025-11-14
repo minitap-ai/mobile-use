@@ -71,8 +71,9 @@ class ContextorNode:
                 "focused_app_info": current_app_package,
                 "screen_size": (device_data.width, device_data.height),
                 "device_date": device_date,
-                "agents_thoughts": agent_outcome,
+                "agents_thoughts": [agent_outcome],
             },
+            agent="contextor",
         )
 
     async def _handle_app_lock_verification(
