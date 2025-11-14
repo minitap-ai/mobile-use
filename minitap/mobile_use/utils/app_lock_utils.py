@@ -47,7 +47,7 @@ async def launch_app_with_retries(
         logger.info(f"After launch attempt {attempt}, current foreground app: {current_package}")
 
         if current_package == app_package:
-            logger.success(f"✅ Successfully launched app {app_package}")
+            logger.success(f"Successfully launched app {app_package}")
             return True, None
 
         if attempt < max_retries:
