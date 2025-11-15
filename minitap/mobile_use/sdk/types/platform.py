@@ -88,6 +88,7 @@ class TaskRunResponse(BaseApiModel):
     created_at: datetime = Field(..., description="When the task run was created")
     started_at: datetime | None = Field(None, description="When the task run started")
     finished_at: datetime | None = Field(None, description="When the task run finished")
+    locked_app_package: str | None = Field(None, description="Locked app package")
 
 
 SubgoalState = Literal["pending", "started", "completed", "failed"]

@@ -113,6 +113,7 @@ class PlatformService:
                     output_description=request.task.output_description,
                     enable_remote_tracing=True,
                     profile=DEFAULT_PROFILE,
+                    locked_app_package=request.task.locked_app_package,
                     # Local configuration
                     record_trace=request.record_trace,
                     trace_path=request.trace_path,
@@ -126,6 +127,8 @@ class PlatformService:
                     profile=profile,
                     virtual_mobile_id=virtual_mobile_id,
                 )
+                # TO REMOVE: Very temporary fix to handle locked app package for manual task config
+                task_run.locked_app_package = request.task.locked_app_package
 
             return PlatformTaskInfo(
                 task_request=task_request,

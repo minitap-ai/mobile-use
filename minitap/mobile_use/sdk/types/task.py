@@ -119,6 +119,7 @@ class ManualTaskConfig(BaseModel):
     goal: str
     output_description: str | None = None
     task_name: str | None = None
+    locked_app_package: str | None = None
 
 
 class PlatformTaskRequest[TOutput](TaskRequestBase):
