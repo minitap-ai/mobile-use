@@ -489,24 +489,18 @@ def launch_app(ctx: MobileUseContext, package_name: str, dry_run: bool = False):
     adb_client = ctx.adb_client
     if adb_client:
         logger.info("Launching app with adb")
-        # Use am start with MAIN/LAUNCHER intent - more reliable than monkey
-        # First try to resolve the main activity, fallback to monkey if that fails
-        resolve_cmd = f"cmd package resolve-activity --brief {package_name}"
         device = _get_adb_device(ctx)
         result = str(
             device.shell(
-                f"am start -n $({resolve_cmd} | tail -n 1) 2>&1 "
-                f"|| monkey -p {package_name} -c android.intent.category.LAUNCHER 1"
+                f"monkey -p {package_name} -c android.intent.category.LAUNCHER 1 --pct-syskeys 0 1"
             )
         )
-        # Check if launch failed
         result_lower = result.lower()
         if "error" in result_lower or "not found" in result_lower:
             logger.error(f"Failed to launch {package_name}: {result}")
             return {"error": result}
         return None
 
-    # Fallback to Maestro
     flow_input = [{"launchApp": package_name}]
     return run_flow_with_wait_for_animation_to_end(
         ctx, flow_input, dry_run=dry_run, wait_for_animation_to_end=True
