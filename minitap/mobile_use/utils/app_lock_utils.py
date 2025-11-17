@@ -74,9 +74,6 @@ async def launch_app_with_retries(
     """
     Launch an app with retry logic and smart polling.
 
-    After launching, polls for the app to be ready, treating mCurrentFocus=null
-    as a normal loading state rather than a failure.
-
     Args:
         ctx: Mobile use context
         app_package: Package name (Android) or bundle ID (iOS) to launch
