@@ -14,18 +14,74 @@ from minitap.mobile_use.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
+async def _poll_for_app_ready(
+    ctx: MobileUseContext,
+    app_package: str,
+    max_poll_seconds: int = 15,
+    poll_interval: float = 1.0,
+) -> tuple[bool, str | None]:
+    """
+    Poll for app to be ready after launch.
+
+    Treats mCurrentFocus=null as a loading state and keeps polling.
+    Only fails if we get a different (non-null) package or timeout.
+
+    Args:
+        ctx: Mobile use context
+        app_package: Expected package name
+        max_poll_seconds: Maximum time to poll (default: 15s)
+        poll_interval: Time between polls (default: 1s)
+
+    Returns:
+        Tuple of (success: bool, error_message: str | None)
+    """
+    polls = int(max_poll_seconds / poll_interval)
+
+    for i in range(polls):
+        current_package = get_current_foreground_package(ctx)
+
+        if current_package == app_package:
+            logger.success(f"App {app_package} is ready (took ~{i * poll_interval:.1f}s)")
+            return True, None
+
+        if current_package is None:
+            logger.debug(f"Poll {i + 1}/{polls}: App loading (mCurrentFocus=null)...")
+        else:
+            error_msg = (
+                f"Wrong app in foreground: expected '{app_package}', got '{current_package}'"
+            )
+            logger.warning(error_msg)
+            return False, error_msg
+
+        if i < polls - 1:
+            await asyncio.sleep(poll_interval)
+
+    current_package = get_current_foreground_package(ctx)
+    error_msg = (
+        f"Timeout waiting for {app_package} to load after {max_poll_seconds}s. "
+        f"Current foreground: {current_package}"
+    )
+    logger.error(error_msg)
+    return False, error_msg
+
+
 async def launch_app_with_retries(
     ctx: MobileUseContext,
     app_package: str,
     max_retries: int = 3,
+    max_poll_seconds: int = 15,
 ) -> tuple[bool, str | None]:
     """
-    Launch an app with retry logic and verification.
+    Launch an app with retry logic and smart polling.
+
+    After launching, polls for the app to be ready, treating mCurrentFocus=null
+    as a normal loading state rather than a failure.
 
     Args:
         ctx: Mobile use context
         app_package: Package name (Android) or bundle ID (iOS) to launch
         max_retries: Maximum number of launch attempts (default: 3)
+        max_poll_seconds: Maximum time to wait for app to load per attempt (default: 15s)
 
     Returns:
         Tuple of (success: bool, error_message: str | None)
@@ -39,25 +95,21 @@ async def launch_app_with_retries(
             logger.error(error_msg)
             if attempt == max_retries:
                 return False, error_msg
+            await asyncio.sleep(2)
             continue
 
-        await asyncio.sleep(2)
+        await asyncio.sleep(1)
 
-        current_package = get_current_foreground_package(ctx)
-        logger.info(f"After launch attempt {attempt}, current foreground app: {current_package}")
+        success, error_msg = await _poll_for_app_ready(ctx, app_package, max_poll_seconds)
 
-        if current_package == app_package:
-            logger.success(f"Successfully launched app {app_package}")
+        if success:
             return True, None
 
         if attempt < max_retries:
-            logger.warning(f"App not in foreground after launch attempt {attempt}, retrying...")
+            logger.warning(f"Attempt {attempt} failed: {error_msg}. Retrying...")
+            await asyncio.sleep(1)
 
-    current_package = get_current_foreground_package(ctx)
-    error_msg = (
-        f"Failed to launch {app_package} after {max_retries} attempts. "
-        f'Current foreground app: "{current_package}"'
-    )
+    error_msg = f"Failed to launch {app_package} after {max_retries} attempts"
     logger.error(error_msg)
     return False, error_msg
 
