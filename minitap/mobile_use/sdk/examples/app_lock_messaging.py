@@ -3,8 +3,6 @@ import asyncio
 from pydantic import BaseModel, Field
 
 from minitap.mobile_use.sdk import Agent
-from minitap.mobile_use.sdk.builders import Builders
-from minitap.mobile_use.sdk.types import AgentProfile
 
 
 class MessageResult(BaseModel):
@@ -17,9 +15,7 @@ class MessageResult(BaseModel):
 
 async def main() -> None:
     # Create agent with default configuration
-    profile = AgentProfile(name="default", from_file="llm-config.defaults.jsonc")
-    config = Builders.AgentConfig.with_default_profile(profile).build()
-    agent = Agent(config=config)
+    agent = Agent()
 
     try:
         await agent.init()
