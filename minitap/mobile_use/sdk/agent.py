@@ -230,6 +230,7 @@ class Agent:
         output: type[TOutput],
         profile: str | AgentProfile | None = None,
         name: str | None = None,
+        locked_app_package: str | None = None,
     ) -> TOutput | None: ...
 
     @overload
@@ -240,6 +241,7 @@ class Agent:
         output: str,
         profile: str | AgentProfile | None = None,
         name: str | None = None,
+        locked_app_package: str | None = None,
     ) -> str | dict | None: ...
 
     @overload
@@ -250,19 +252,40 @@ class Agent:
         output=None,
         profile: str | AgentProfile | None = None,
         name: str | None = None,
+        locked_app_package: str | None = None,
     ) -> str | None: ...
 
     @overload
-    async def run_task(self, *, request: TaskRequest[None]) -> str | dict | None: ...
+    async def run_task(
+        self,
+        *,
+        request: TaskRequest[None],
+        locked_app_package: str | None = None,
+    ) -> str | dict | None: ...
 
     @overload
-    async def run_task(self, *, request: TaskRequest[TOutput]) -> TOutput | None: ...
+    async def run_task(
+        self,
+        *,
+        request: TaskRequest[TOutput],
+        locked_app_package: str | None = None,
+    ) -> TOutput | None: ...
 
     @overload
-    async def run_task(self, *, request: PlatformTaskRequest[None]) -> str | dict | None: ...
+    async def run_task(
+        self,
+        *,
+        request: PlatformTaskRequest[None],
+        locked_app_package: str | None = None,
+    ) -> str | dict | None: ...
 
     @overload
-    async def run_task(self, *, request: PlatformTaskRequest[TOutput]) -> TOutput | None: ...
+    async def run_task(
+        self,
+        *,
+        request: PlatformTaskRequest[TOutput],
+        locked_app_package: str | None = None,
+    ) -> TOutput | None: ...
 
     async def run_task(
         self,
@@ -270,6 +293,7 @@ class Agent:
         goal: str | None = None,
         output: type[TOutput] | str | None = None,
         profile: str | AgentProfile | None = None,
+        locked_app_package: str | None = None,
         name: str | None = None,
         request: TaskRequest[TOutput] | PlatformTaskRequest[TOutput] | None = None,
     ) -> str | dict | TOutput | None:
@@ -289,12 +313,21 @@ class Agent:
             if isinstance(request, PlatformTaskRequest):
                 if not self._platform_service:
                     raise PlatformServiceUninitializedError()
-                task_info = await self._platform_service.create_task_run(request=request)
+                task_info = await self._platform_service.create_task_run(
+                    request=request, locked_app_package=locked_app_package
+                )
                 if isinstance(request, CloudDevicePlatformTaskRequest):
                     request.task_run_id = task_info.task_run.id
                     request.task_run_id_available_event.set()
                 self._config.agent_profiles[task_info.llm_profile.name] = task_info.llm_profile
                 request = task_info.task_request
+            elif locked_app_package is not None:
+                if request.locked_app_package:
+                    logger.warning(
+                        "Locked app package specified both in the request and as a parameter. "
+                        "Using the parameter value."
+                    )
+                request.locked_app_package = locked_app_package
             return await self._run_task(
                 request=request, task_info=task_info, platform_service=self._platform_service
             )
@@ -310,6 +343,8 @@ class Agent:
             task_request.using_profile(profile=profile)
         if name is not None:
             task_request.with_name(name=name)
+        if locked_app_package is not None:
+            task_request.with_locked_app_package(package_name=locked_app_package)
         return await self._run_task(task_request.build())
 
     async def _run_cloud_mobile_task(
