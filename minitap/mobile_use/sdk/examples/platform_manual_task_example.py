@@ -53,10 +53,10 @@ async def main() -> None:
             task=ManualTaskConfig(
                 goal="Find the first 3 unread emails in Gmail",
                 output_description="A JSON array with sender and subject for each email",
-                # Lock gmail to ensure it is automatically started and locked during task execution
-                locked_app_package="com.google.android.gm",
             ),
-        )
+        ),
+        # Lock gmail to ensure it is automatically started and locked during task execution
+        locked_app_package="com.google.android.gm",
     )
     print("Result 2:", result)
 
