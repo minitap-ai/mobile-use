@@ -64,6 +64,7 @@ class CreateTaskRunRequest(BaseApiModel):
     task_id: str = Field(..., description="ID of the task to run")
     llm_profile_id: str = Field(..., description="LLM profile ID to use")
     virtual_mobile_id: str | None = Field(None, description="Virtual mobile ID to use")
+    locked_app_package: str | None = Field(None, description="App package to lock for the task run")
 
 
 class UpdateTaskRunStatusRequest(BaseApiModel):
@@ -88,7 +89,9 @@ class TaskRunResponse(BaseApiModel):
     created_at: datetime = Field(..., description="When the task run was created")
     started_at: datetime | None = Field(None, description="When the task run started")
     finished_at: datetime | None = Field(None, description="When the task run finished")
-    locked_app_package: str | None = Field(None, description="Locked app package")
+    locked_app_package: str | None = Field(
+        None, description="The app package to lock for the task run"
+    )
 
 
 SubgoalState = Literal["pending", "started", "completed", "failed"]
