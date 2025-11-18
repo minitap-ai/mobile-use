@@ -114,12 +114,12 @@ class ManualTaskConfig(BaseModel):
     Attributes:
         goal: Natural language description of the goal to achieve
         output_description: Optional natural language description of expected output format
+        task_name: Optional name for the task
     """
 
     goal: str
     output_description: str | None = None
     task_name: str | None = None
-    locked_app_package: str | None = None
 
 
 class PlatformTaskRequest[TOutput](TaskRequestBase):
