@@ -37,7 +37,8 @@ async def main() -> None:
         request=PlatformTaskRequest(
             task="<your-task-name>",
             profile="<your-profile-name>",
-        )
+        ),
+        locked_app_package="<locked-app-package>",  # optional
     )
     print(result)
     await agent.clean()
