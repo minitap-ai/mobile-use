@@ -59,13 +59,16 @@ class PlatformService:
             },
         )
 
-    async def create_task_run(self, request: PlatformTaskRequest) -> PlatformTaskInfo:
+    async def create_task_run(
+        self,
+        request: PlatformTaskRequest,
+        locked_app_package: str | None = None,
+    ) -> PlatformTaskInfo:
         try:
             virtual_mobile_id = None
             if isinstance(request, CloudDevicePlatformTaskRequest):
                 virtual_mobile_id = request.virtual_mobile_id
 
-            # Check if task is a string (fetch from platform) or ManualTaskConfig (create manually)
             if isinstance(request.task, str):
                 # Fetch task from platform
                 logger.info(f"Getting task: {request.task}")
@@ -91,12 +94,14 @@ class PlatformService:
                     llm_output_path=request.llm_output_path,
                     thoughts_output_path=request.thoughts_output_path,
                     task_name=task.name,
+                    locked_app_package=locked_app_package,
                 )
 
                 task_run = await self._create_task_run(
                     task=task,
                     profile=profile,
                     virtual_mobile_id=virtual_mobile_id,
+                    locked_app_package=locked_app_package,
                 )
             else:
                 # Create task manually from ManualTaskConfig
@@ -112,23 +117,22 @@ class PlatformService:
                     goal=request.task.goal,
                     output_description=request.task.output_description,
                     enable_remote_tracing=True,
-                    profile=DEFAULT_PROFILE,
-                    locked_app_package=request.task.locked_app_package,
+                    profile=profile.name,
                     # Local configuration
                     record_trace=request.record_trace,
                     trace_path=request.trace_path,
                     llm_output_path=request.llm_output_path,
                     thoughts_output_path=request.thoughts_output_path,
                     task_name=request.task.task_name,
+                    locked_app_package=locked_app_package,
                 )
 
                 task_run = await self._create_manual_task_run(
                     manual_config=request.task,
                     profile=profile,
                     virtual_mobile_id=virtual_mobile_id,
+                    locked_app_package=locked_app_package,
                 )
-                # TO REMOVE: Very temporary fix to handle locked app package for manual task config
-                task_run.locked_app_package = request.task.locked_app_package
 
             return PlatformTaskInfo(
                 task_request=task_request,
@@ -260,6 +264,7 @@ class PlatformService:
         task: TaskResponse,
         profile: LLMProfileResponse,
         virtual_mobile_id: str | None = None,
+        locked_app_package: str | None = None,
     ) -> TaskRunResponse:
         try:
             logger.info(f"Creating task run for task: {task.name}")
@@ -267,6 +272,7 @@ class PlatformService:
                 task_id=task.id,
                 llm_profile_id=profile.id,
                 virtual_mobile_id=virtual_mobile_id,
+                locked_app_package=locked_app_package,
             )
             response = await self._client.post(url="v1/task-runs", json=task_run.model_dump())
             response.raise_for_status()
@@ -282,6 +288,7 @@ class PlatformService:
         manual_config: ManualTaskConfig,
         profile: LLMProfileResponse,
         virtual_mobile_id: str | None = None,
+        locked_app_package: str | None = None,
     ) -> TaskRunResponse:
         """
         Create an orphan task run from a manual task configuration.
@@ -296,6 +303,7 @@ class PlatformService:
                 "outputDescription": manual_config.output_description,
                 "llmProfileId": profile.id,
                 "virtualMobileId": virtual_mobile_id,
+                "lockedAppPackage": locked_app_package,
             }
 
             response = await self._client.post(url="v1/task-runs/orphan", json=orphan_payload)
