@@ -1,5 +1,6 @@
 import json
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -17,6 +18,7 @@ from minitap.mobile_use.sdk.types.platform import (
     TaskRunPlanResponse,
     TaskRunResponse,
     TaskRunStatus,
+    TrajectoryGifUploadResponse,
     UpdateTaskRunStatusRequest,
     UpsertTaskRunAgentThoughtRequest,
     UpsertTaskRunPlanRequest,
@@ -230,6 +232,58 @@ class PlatformService:
             response.raise_for_status()
         except httpx.HTTPStatusError as e:
             raise PlatformServiceError(message=f"Failed to add agent thought: {e}")
+
+    async def upload_trace_gif(self, task_run_id: str, gif_path: Path) -> str | None:
+        """
+        Upload a trajectory GIF to the platform.
+
+        Args:
+            task_run_id: ID of the task run to upload the GIF for
+            gif_path: Path to the GIF file to upload
+
+        Returns:
+            Task run ID on success, None on failure
+
+        Raises:
+            PlatformServiceError: If there's a critical error during upload
+        """
+        try:
+            if not gif_path.exists():
+                logger.warning(f"GIF file not found at {gif_path}")
+                return None
+
+            logger.info(f"Getting signed upload URL for task run: {task_run_id}")
+            response = await self._client.post(
+                url=f"storage/trajectory-gif-upload/{task_run_id}",
+            )
+            response.raise_for_status()
+            gif_upload_data = TrajectoryGifUploadResponse(**response.json())
+
+            logger.info(f"Uploading GIF to signed URL for task run: {task_run_id}")
+
+            with open(gif_path, "rb") as gif_file:
+                gif_content = gif_file.read()
+
+            upload_response = await httpx.AsyncClient().put(
+                url=gif_upload_data.signed_url,
+                content=gif_content,
+                headers={
+                    "Content-Type": "image/gif",
+                },
+                timeout=httpx.Timeout(timeout=60.0),
+            )
+            upload_response.raise_for_status()
+
+            logger.info(f"Successfully uploaded trajectory GIF for task run: {task_run_id}")
+            return task_run_id
+
+        except Exception as e:
+            logger.warning(f"Failed to upload trace GIF: {e}")
+            try:
+                await self._client.delete(url=f"v1/task-runs/{task_run_id}/gif")
+            except Exception as clear_error:
+                logger.warning(f"Failed to delete GIF after upload failure: {clear_error}")
+            return None
 
     def _to_api_subgoals(self, subgoals: list[Subgoal]) -> tuple[bool, list[MobileUseSubgoal]]:
         """

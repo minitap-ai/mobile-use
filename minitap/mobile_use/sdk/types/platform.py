@@ -131,3 +131,11 @@ class UpsertTaskRunAgentThoughtRequest(BaseApiModel):
     agent: str = Field(..., description="Agent that produced the thought")
     content: str = Field(..., description="Content of the thought")
     timestamp: IsoDatetime = Field(..., description="Timestamp of the thought (UTC)")
+
+
+class TrajectoryGifUploadResponse(BaseApiModel):
+    """Response containing trajectory GIF signed upload URL."""
+
+    signed_url: str = Field(..., description="Signed upload URL for the trajectory GIF")
+    task_run_id: str = Field(..., description="Task run ID for which the GIF URL was generated")
+    file_path: str = Field(..., description="Path where the GIF will be stored")
