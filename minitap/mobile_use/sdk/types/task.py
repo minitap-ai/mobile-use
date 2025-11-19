@@ -2,6 +2,7 @@
 Task-related type definitions for the Mobile-use SDK.
 """
 
+import tempfile
 from asyncio import Event
 from collections.abc import Callable, Coroutine
 from datetime import datetime
@@ -131,11 +132,15 @@ class PlatformTaskRequest[TOutput](TaskRequestBase):
               ManualTaskConfig to create manually
         profile: Optional profile name specified by the user on the platform
         execution_origin: Origin of the task execution (default: "sdk")
+        record_trace: Whether to record traces (default: True for platform tasks)
+        trace_path: Path to save traces (default: temp directory)
     """
 
     task: str | ManualTaskConfig
     profile: str | None = None
     execution_origin: str = "sdk"
+    record_trace: bool = True
+    trace_path: Path = Path(tempfile.gettempdir()) / "mobile-use-traces"
 
 
 class CloudDevicePlatformTaskRequest[TOutput](PlatformTaskRequest[TOutput]):
