@@ -590,7 +590,7 @@ class Agent:
                 )
                 raise
             finally:
-                self._finalize_tracing(task=task, context=context)
+                await self._finalize_tracing(task=task, context=context)
 
         async with self._task_lock:
             if self._current_task and not self._current_task.done():
@@ -776,7 +776,7 @@ class Agent:
             enable_remote_tracing=task.request.enable_remote_tracing,
         )
 
-    def _finalize_tracing(self, task: Task, context: MobileUseContext):
+    async def _finalize_tracing(self, task: Task, context: MobileUseContext):
         exec_setup_ctx = context.execution_setup
         if not exec_setup_ctx:
             return
@@ -795,6 +795,19 @@ class Agent:
         logger.info(f"[{task_name}] Compiling trace FROM FOLDER: " + str(temp_trace_path))
         create_gif_from_trace_folder(temp_trace_path)
         create_steps_json_from_trace_folder(temp_trace_path)
+
+        if exec_setup_ctx.enable_remote_tracing:
+            gif_path = temp_trace_path / "trace.gif"
+            if gif_path.exists() and self._platform_service:
+                try:
+                    task_run_id = await self._platform_service.upload_trace_gif(
+                        task_run_id=task.id, gif_path=gif_path
+                    )
+                    if task_run_id:
+                        platform_url = f"{settings.MINITAP_BASE_URL}/task-runs/{task_run_id}"
+                        logger.info(f"[{task_name}] 🌐 View on platform: {platform_url}")
+                except Exception as e:
+                    logger.warning(f"[{task_name}] Failed to upload trace GIF: {e}")
 
         logger.info(f"[{task_name}] Video created, removing dust...")
         remove_images_from_trace_folder(temp_trace_path)
