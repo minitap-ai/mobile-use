@@ -36,6 +36,7 @@ from minitap.mobile_use.utils.logger import get_logger
 logger = get_logger(__name__)
 
 DEFAULT_PROFILE = "default"
+MAX_GIF_SIZE_BYTES = 300 * 1024 * 1024
 
 
 class PlatformService:
@@ -235,7 +236,7 @@ class PlatformService:
 
     async def upload_trace_gif(self, task_run_id: str, gif_path: Path) -> str | None:
         """
-        Upload a trajectory GIF to the platform.
+        Upload a trajectory GIF to the platform using streaming to avoid RAM overload.
 
         Args:
             task_run_id: ID of the task run to upload the GIF for
@@ -252,28 +253,44 @@ class PlatformService:
                 logger.warning(f"GIF file not found at {gif_path}")
                 return None
 
-            logger.info(f"Getting signed upload URL for task run: {task_run_id}")
+            file_size = gif_path.stat().st_size
+            if file_size > MAX_GIF_SIZE_BYTES:
+                logger.warning(
+                    f"GIF file size ({file_size / (1024 * 1024):.2f}MB) exceeds "
+                    f"maximum allowed size ({MAX_GIF_SIZE_BYTES / (1024 * 1024):.0f}MB)"
+                )
+                return None
+
+            logger.info(
+                f"Getting signed upload URL for task run: {task_run_id} "
+                f"(file size: {file_size / (1024 * 1024):.2f}MB)"
+            )
             response = await self._client.post(
                 url=f"storage/trajectory-gif-upload/{task_run_id}",
             )
             response.raise_for_status()
             gif_upload_data = TrajectoryGifUploadResponse(**response.json())
 
-            logger.info(f"Uploading GIF to signed URL for task run: {task_run_id}")
+            logger.info(f"Streaming GIF upload to signed URL for task run: {task_run_id}")
 
-            with open(gif_path, "rb") as gif_file:
-                gif_content = gif_file.read()
+            async def file_iterator():
+                chunk_size = 1024 * 1024  # 1MB chunks
+                with open(gif_path, "rb") as gif_file:
+                    while chunk := gif_file.read(chunk_size):
+                        yield chunk
 
             async with httpx.AsyncClient() as upload_client:
-                upload_response = await upload_client.put(
+                async with upload_client.stream(
+                    method="PUT",
                     url=gif_upload_data.signed_url,
-                    content=gif_content,
+                    content=file_iterator(),
                     headers={
                         "Content-Type": "image/gif",
                     },
                     timeout=httpx.Timeout(timeout=60.0),
-                )
-            upload_response.raise_for_status()
+                ) as upload_response:
+                    await upload_response.aread()
+                    upload_response.raise_for_status()
 
             logger.info(f"Successfully uploaded trajectory GIF for task run: {task_run_id}")
             return task_run_id
