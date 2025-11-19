@@ -264,14 +264,15 @@ class PlatformService:
             with open(gif_path, "rb") as gif_file:
                 gif_content = gif_file.read()
 
-            upload_response = await httpx.AsyncClient().put(
-                url=gif_upload_data.signed_url,
-                content=gif_content,
-                headers={
-                    "Content-Type": "image/gif",
-                },
-                timeout=httpx.Timeout(timeout=60.0),
-            )
+            async with httpx.AsyncClient() as upload_client:
+                upload_response = await upload_client.put(
+                    url=gif_upload_data.signed_url,
+                    content=gif_content,
+                    headers={
+                        "Content-Type": "image/gif",
+                    },
+                    timeout=httpx.Timeout(timeout=60.0),
+                )
             upload_response.raise_for_status()
 
             logger.info(f"Successfully uploaded trajectory GIF for task run: {task_run_id}")
