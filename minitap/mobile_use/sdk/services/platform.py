@@ -102,6 +102,7 @@ class PlatformService:
                     profile=profile,
                     virtual_mobile_id=virtual_mobile_id,
                     locked_app_package=locked_app_package,
+                    execution_origin=request.execution_origin,
                 )
             else:
                 # Create task manually from ManualTaskConfig
@@ -132,6 +133,7 @@ class PlatformService:
                     profile=profile,
                     virtual_mobile_id=virtual_mobile_id,
                     locked_app_package=locked_app_package,
+                    execution_origin=request.execution_origin,
                 )
 
             return PlatformTaskInfo(
@@ -265,6 +267,7 @@ class PlatformService:
         profile: LLMProfileResponse,
         virtual_mobile_id: str | None = None,
         locked_app_package: str | None = None,
+        execution_origin: str | None = None,
     ) -> TaskRunResponse:
         try:
             logger.info(f"Creating task run for task: {task.name}")
@@ -273,6 +276,7 @@ class PlatformService:
                 llm_profile_id=profile.id,
                 virtual_mobile_id=virtual_mobile_id,
                 locked_app_package=locked_app_package,
+                execution_origin=execution_origin,
             )
             response = await self._client.post(url="v1/task-runs", json=task_run.model_dump())
             response.raise_for_status()
@@ -289,6 +293,7 @@ class PlatformService:
         profile: LLMProfileResponse,
         virtual_mobile_id: str | None = None,
         locked_app_package: str | None = None,
+        execution_origin: str | None = None,
     ) -> TaskRunResponse:
         """
         Create an orphan task run from a manual task configuration.
@@ -304,6 +309,7 @@ class PlatformService:
                 "llmProfileId": profile.id,
                 "virtualMobileId": virtual_mobile_id,
                 "lockedAppPackage": locked_app_package,
+                "executionOrigin": execution_origin,
             }
 
             response = await self._client.post(url="v1/task-runs/orphan", json=orphan_payload)

@@ -305,7 +305,9 @@ class Agent:
                     "Use AgentConfigBuilder.for_cloud_mobile() only with PlatformTaskRequest."
                 )
             # Use cloud mobile execution path
-            return await self._run_cloud_mobile_task(request=request)
+            return await self._run_cloud_mobile_task(
+                request=request, locked_app_package=locked_app_package
+            )
 
         # Normal local execution path
         if request is not None:
@@ -350,6 +352,7 @@ class Agent:
     async def _run_cloud_mobile_task(
         self,
         request: PlatformTaskRequest[TOutput],
+        locked_app_package: str | None = None,
     ) -> str | dict | TOutput | None:
         """
         Execute a task on a cloud mobile.
@@ -391,6 +394,7 @@ class Agent:
                     request=request,
                     on_status_update=status_callback,
                     on_log=log_callback,
+                    locked_app_package=locked_app_package,
                 )
                 if final_status == "completed":
                     logger.success("Cloud mobile task completed successfully")

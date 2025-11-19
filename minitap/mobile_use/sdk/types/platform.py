@@ -65,6 +65,7 @@ class CreateTaskRunRequest(BaseApiModel):
     llm_profile_id: str = Field(..., description="LLM profile ID to use")
     virtual_mobile_id: str | None = Field(None, description="Virtual mobile ID to use")
     locked_app_package: str | None = Field(None, description="App package to lock for the task run")
+    execution_origin: str | None = Field(None, description="Origin of the task execution")
 
 
 class UpdateTaskRunStatusRequest(BaseApiModel):

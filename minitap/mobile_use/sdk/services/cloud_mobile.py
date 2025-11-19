@@ -1,11 +1,11 @@
 """Service for managing cloud device (virtual mobile) task execution."""
 
 import asyncio
+import json
+from collections.abc import Callable
 from datetime import UTC, datetime
 from io import BytesIO
-import json
 from typing import Any, Literal
-from collections.abc import Callable
 
 import httpx
 from PIL import Image
@@ -241,6 +241,7 @@ class CloudMobileService:
         on_log: Callable[[str], None] | None = None,
         poll_interval_seconds: float = 2.0,
         stall_timeout_seconds: float = 300.0,
+        locked_app_package: str | None = None,
     ) -> tuple[TaskRunStatus, str | None, Any | None]:
         """
         Run a task on a cloud mobile and wait for completion.
@@ -252,6 +253,7 @@ class CloudMobileService:
             on_log: Optional callback for log messages
             poll_interval_seconds: Seconds between status polls (default: 2.0)
             stall_timeout_seconds: Timeout if no new timeline activity (default: 300.0)
+            locked_app_package: Optional app package to lock for the task run
 
         Returns:
             Tuple of (final_status, error_message, output)
@@ -267,6 +269,7 @@ class CloudMobileService:
             task_run_id = await self._trigger_task_run(
                 cloud_mobile_id=cloud_mobile_id,
                 request=request,
+                locked_app_package=locked_app_package,
             )
             logger.info(f"Task run started: {task_run_id}")
 
@@ -295,7 +298,12 @@ class CloudMobileService:
             logger.error(f"Failed to run task on cloud device: {str(e)}")
             raise PlatformServiceError(message=f"Failed to run task on cloud device: {e}")
 
-    async def _trigger_task_run(self, cloud_mobile_id: str, request: PlatformTaskRequest) -> str:
+    async def _trigger_task_run(
+        self,
+        cloud_mobile_id: str,
+        request: PlatformTaskRequest,
+        locked_app_package: str | None = None,
+    ) -> str:
         """Trigger a task run on the Platform and return the task run ID."""
         try:
             # Build the task request payload
@@ -305,6 +313,8 @@ class CloudMobileService:
                     "task": (
                         request.task if isinstance(request.task, str) else request.task.model_dump()
                     ),
+                    "executionOrigin": request.execution_origin,
+                    "lockedAppPackage": locked_app_package,
                 }
             )
 

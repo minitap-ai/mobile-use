@@ -130,10 +130,12 @@ class PlatformTaskRequest[TOutput](TaskRequestBase):
         task: Either a task name to fetch from the platform, or a
               ManualTaskConfig to create manually
         profile: Optional profile name specified by the user on the platform
+        execution_origin: Origin of the task execution (default: "sdk")
     """
 
     task: str | ManualTaskConfig
     profile: str | None = None
+    execution_origin: str = "sdk"
 
 
 class CloudDevicePlatformTaskRequest[TOutput](PlatformTaskRequest[TOutput]):
