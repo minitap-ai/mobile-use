@@ -34,7 +34,13 @@ def quantize_and_save_gif(
         output_path: Path where the GIF will be saved
         colors: Number of colors to use in quantization (lower = smaller file)
         duration: Duration of each frame in milliseconds
+
+    Raises:
+        ValueError: If images list is empty
     """
+    if not images:
+        raise ValueError("images must not be empty")
+
     quantized_images = []
     for img in images:
         if img.mode != "RGB":
