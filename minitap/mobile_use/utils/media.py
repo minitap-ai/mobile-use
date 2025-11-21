@@ -20,6 +20,38 @@ def compress_base64_jpeg(base64_str: str, quality: int = 50) -> str:
     return compressed_base64
 
 
+def quantize_and_save_gif(
+    images: list[Image.Image],
+    output_path: Path,
+    colors: int = 128,
+    duration: int = 100,
+) -> None:
+    """
+    Quantize images and save as an optimized GIF.
+
+    Args:
+        images: List of PIL Image objects to convert to GIF
+        output_path: Path where the GIF will be saved
+        colors: Number of colors to use in quantization (lower = smaller file)
+        duration: Duration of each frame in milliseconds
+    """
+    quantized_images = []
+    for img in images:
+        if img.mode != "RGB":
+            img = img.convert("RGB")
+        quantized = img.quantize(colors=colors, method=2)
+        quantized_images.append(quantized)
+
+    quantized_images[0].save(
+        output_path,
+        save_all=True,
+        append_images=quantized_images[1:],
+        loop=0,
+        optimize=True,
+        duration=duration,
+    )
+
+
 def create_gif_from_trace_folder(trace_folder_path: Path):
     images = []
     image_files = []
@@ -41,7 +73,7 @@ def create_gif_from_trace_folder(trace_folder_path: Path):
         return
 
     gif_path = trace_folder_path / "trace.gif"
-    images[0].save(gif_path, save_all=True, append_images=images[1:], loop=0)
+    quantize_and_save_gif(images, gif_path)
     print("GIF created at " + str(gif_path))
 
 
