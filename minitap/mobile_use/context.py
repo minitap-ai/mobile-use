@@ -15,6 +15,7 @@ from pydantic import ConfigDict
 
 from minitap.mobile_use.agents.planner.types import Subgoal
 from minitap.mobile_use.clients.device_hardware_client import DeviceHardwareClient
+from minitap.mobile_use.clients.idb_client import IdbClientWrapper
 from minitap.mobile_use.clients.screen_api_client import ScreenApiClient
 from minitap.mobile_use.config import AgentNode, LLMConfig
 
@@ -83,6 +84,7 @@ class MobileUseContext(BaseModel):
     screen_api_client: ScreenApiClient
     llm_config: LLMConfig
     adb_client: AdbClient | None = None
+    idb_client: IdbClientWrapper | None = None
     execution_setup: ExecutionSetup | None = None
     on_agent_thought: Callable[[AgentNode, str], Coroutine] | None = None
     on_plan_changes: Callable[[list[Subgoal], IsReplan], Coroutine] | None = None
@@ -92,3 +94,8 @@ class MobileUseContext(BaseModel):
         if self.adb_client is None:
             raise ValueError("No ADB client in context.")
         return self.adb_client  # type: ignore
+
+    def get_idb_client(self) -> IdbClientWrapper:
+        if self.idb_client is None:
+            raise ValueError("No IDB client in context.")
+        return self.idb_client  # type: ignore
