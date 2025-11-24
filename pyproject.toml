@@ -35,6 +35,7 @@ dependencies = [
     "langchain-google-vertexai>=2.0.28",
     "httpx>=0.28.1",
     "uiautomator2>=3.5.0",
+    "fb-idb==1.1.7",
 ]
 
 [project.optional-dependencies]
