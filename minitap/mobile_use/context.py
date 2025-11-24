@@ -10,14 +10,14 @@ from pathlib import Path
 from typing import Literal
 
 from adbutils import AdbClient
-from openai import BaseModel
-from pydantic import ConfigDict
-
 from minitap.mobile_use.agents.planner.types import Subgoal
 from minitap.mobile_use.clients.device_hardware_client import DeviceHardwareClient
+from minitap.mobile_use.clients.idb_client import IdbClientWrapper
 from minitap.mobile_use.clients.screen_api_client import ScreenApiClient
 from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
 from minitap.mobile_use.config import AgentNode, LLMConfig
+from openai import BaseModel
+from pydantic import ConfigDict
 
 
 class AppLaunchResult(BaseModel):
@@ -85,6 +85,7 @@ class MobileUseContext(BaseModel):
     llm_config: LLMConfig
     adb_client: AdbClient | None = None
     ui_adb_client: UIAutomatorClient | None = None
+    idb_client: IdbClientWrapper | None = None
     execution_setup: ExecutionSetup | None = None
     on_agent_thought: Callable[[AgentNode, str], Coroutine] | None = None
     on_plan_changes: Callable[[list[Subgoal], IsReplan], Coroutine] | None = None
@@ -99,3 +100,8 @@ class MobileUseContext(BaseModel):
         if self.ui_adb_client is None:
             raise ValueError("No UIAutomator client in context.")
         return self.ui_adb_client
+
+    def get_idb_client(self) -> IdbClientWrapper:
+        if self.idb_client is None:
+            raise ValueError("No IDB client in context.")
+        return self.idb_client  # type: ignore
