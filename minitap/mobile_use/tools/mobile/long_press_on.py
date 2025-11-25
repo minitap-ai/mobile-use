@@ -8,15 +8,7 @@ from langgraph.types import Command
 
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
-from minitap.mobile_use.controllers.mobile_command_controller import (
-    CoordinatesSelectorRequest,
-    IdSelectorRequest,
-    SelectorRequestWithCoordinates,
-    TextSelectorRequest,
-)
-from minitap.mobile_use.controllers.mobile_command_controller import (
-    long_press_on as long_press_on_controller,
-)
+from minitap.mobile_use.controllers.unified_controller import UnifiedMobileController
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 from minitap.mobile_use.tools.types import Target
@@ -54,31 +46,30 @@ def get_long_press_on_tool(ctx: MobileUseContext) -> BaseTool:
         }  # Default to failure
         latest_selector_info: str | None = None
 
+        controller = UnifiedMobileController(ctx)
+
         # 1. Try with COORDINATES FIRST (visual approach)
         if target.coordinates:
             try:
                 center_point = target.coordinates.get_center()
-                selector = SelectorRequestWithCoordinates(
-                    coordinates=CoordinatesSelectorRequest(x=center_point.x, y=center_point.y)
-                )
                 logger.info(
                     f"Attempting to long press using coordinates: {center_point.x},{center_point.y}"
                 )
                 latest_selector_info = f"coordinates='{target.coordinates}'"
-                result = long_press_on_controller(
-                    ctx=ctx,
-                    selector_request=selector,
-                    ui_hierarchy=state.latest_ui_hierarchy,
+                result = await controller.tap_at(
+                    x=center_point.x,
+                    y=center_point.y,
+                    long_press=True,
                     long_press_duration=duration_ms,
                 )
-                if result is None:  # Success
+                if result.error is None:  # Success
                     error_obj = None
                 else:
                     logger.warning(
                         f"Long press with coordinates '{target.coordinates}' failed. "
-                        f"Error: {result}"
+                        f"Error: {result.error}"
                     )
-                    error_obj = {"error": result} if isinstance(result, str) else result
+                    error_obj = {"error": result.error}
             except Exception as e:
                 logger.warning(
                     f"Exception during long press with coordinates '{target.coordinates}': {e}"
@@ -88,7 +79,6 @@ def get_long_press_on_tool(ctx: MobileUseContext) -> BaseTool:
         # 2. If coordinates failed or weren't provided, try with resource_id
         if error_obj is not None and target.resource_id:
             try:
-                selector = IdSelectorRequest(id=target.resource_id)
                 logger.info(
                     f"Attempting to long press using resource_id: '{target.resource_id}' "
                     f"at index {target.resource_id_index}"
@@ -96,21 +86,20 @@ def get_long_press_on_tool(ctx: MobileUseContext) -> BaseTool:
                 latest_selector_info = (
                     f"resource_id='{target.resource_id}' (index={target.resource_id_index})"
                 )
-                result = long_press_on_controller(
-                    ctx=ctx,
-                    selector_request=selector,
-                    index=target.resource_id_index,
-                    ui_hierarchy=state.latest_ui_hierarchy,
+                result = await controller.tap_element(
+                    resource_id=target.resource_id,
+                    index=target.resource_id_index or 0,
+                    long_press=True,
                     long_press_duration=duration_ms,
                 )
-                if result is None:  # Success
+                if result.error is None:  # Success
                     error_obj = None
                 else:
                     logger.warning(
                         f"Long press with resource_id '{target.resource_id}' failed. "
-                        f"Error: {result}"
+                        f"Error: {result.error}"
                     )
-                    error_obj = {"error": result} if isinstance(result, str) else result
+                    error_obj = {"error": result.error}
             except Exception as e:
                 logger.warning(
                     f"Exception during long press with resource_id '{target.resource_id}': {e}"
@@ -120,24 +109,24 @@ def get_long_press_on_tool(ctx: MobileUseContext) -> BaseTool:
         # 3. If resource_id failed or wasn't provided, try with text (last resort)
         if error_obj is not None and target.text:
             try:
-                selector = TextSelectorRequest(text=target.text)
                 logger.info(
                     f"Attempting to long press using text: '{target.text}' "
                     f"at index {target.text_index}"
                 )
                 latest_selector_info = f"text='{target.text}' (index={target.text_index})"
-                result = long_press_on_controller(
-                    ctx=ctx,
-                    selector_request=selector,
-                    index=target.text_index,
-                    ui_hierarchy=state.latest_ui_hierarchy,
+                result = await controller.tap_element(
+                    text=target.text,
+                    index=target.text_index or 0,
+                    long_press=True,
                     long_press_duration=duration_ms,
                 )
-                if result is None:  # Success
+                if result.error is None:  # Success
                     error_obj = None
                 else:
-                    logger.warning(f"Long press with text '{target.text}' failed. Error: {result}")
-                    error_obj = {"error": result} if isinstance(result, str) else result
+                    logger.warning(
+                        f"Long press with text '{target.text}' failed. Error: {result.error}"
+                    )
+                    error_obj = {"error": result.error}
             except Exception as e:
                 logger.warning(f"Exception during long press with text '{target.text}': {e}")
                 error_obj = {"error": str(e)}

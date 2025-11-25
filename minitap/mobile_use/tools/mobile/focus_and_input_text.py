@@ -12,9 +12,7 @@ from pydantic import BaseModel
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.mobile_command_controller import get_screen_data
-from minitap.mobile_use.controllers.mobile_command_controller import (
-    input_text as input_text_controller,
-)
+from minitap.mobile_use.controllers.unified_controller import UnifiedMobileController
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 from minitap.mobile_use.tools.types import Target
@@ -32,14 +30,15 @@ class InputResult(BaseModel):
     error: str | None = None
 
 
-def _controller_input_text(ctx: MobileUseContext, text: str) -> InputResult:
+async def _controller_input_text(ctx: MobileUseContext, text: str) -> InputResult:
     """
     Thin wrapper to normalize the controller result.
     """
-    controller_out = input_text_controller(ctx=ctx, text=text)
-    if controller_out is None:
+    controller = UnifiedMobileController(ctx)
+    success = await controller.type_text(text)
+    if success:
         return InputResult(ok=True)
-    return InputResult(ok=False, error=str(controller_out))
+    return InputResult(ok=False, error="Failed to type text")
 
 
 def get_focus_and_input_text_tool(ctx: MobileUseContext) -> BaseTool:
@@ -87,7 +86,7 @@ def get_focus_and_input_text_tool(ctx: MobileUseContext) -> BaseTool:
 
         move_cursor_to_end_if_bounds(ctx=ctx, state=state, target=target)
 
-        result = _controller_input_text(ctx=ctx, text=text)
+        result = await _controller_input_text(ctx=ctx, text=text)
         status: Literal["success", "error"] = "success" if result.ok else "error"
 
         text_input_content = ""
