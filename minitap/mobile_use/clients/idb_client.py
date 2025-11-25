@@ -6,7 +6,7 @@ from functools import wraps
 from pathlib import Path
 from typing import Any
 
-from idb.common.types import HIDButtonType, InstalledAppInfo, TCPAddress
+from idb.common.types import HIDButtonType, InstalledAppInfo, InstalledArtifact, TCPAddress
 from idb.grpc.client import Client
 
 from minitap.mobile_use.utils.logger import get_logger
@@ -28,10 +28,24 @@ def _find_available_port(start_port: int = 10882, max_attempts: int = 100) -> in
 
 
 def with_idb_client(func):
+    """Decorator to handle idb client lifecycle.
+
+    Note: Function must have None or bool in return type.
+    """
+
     @wraps(func)
     async def wrapper(self, *args, **kwargs):
-        async with Client.build(address=self.address, logger=logger.logger) as client:
-            return await func(self, client, *args, **kwargs)
+        try:
+            async with Client.build(address=self.address, logger=logger.logger) as client:
+                return await func(self, client, *args, **kwargs)
+        except Exception as e:
+            method_name = func.__name__
+            logger.error(f"Failed to {method_name}: {e}")
+
+            return_type = func.__annotations__.get("return")
+            if return_type is bool:
+                return False
+            return None
 
     return wrapper
 
@@ -166,17 +180,25 @@ class IdbClientWrapper:
         return False
 
     @with_idb_client
-    async def tap(self, client: Client, x: int, y: int, duration: float | None = None):
+    async def tap(self, client: Client, x: int, y: int, duration: float | None = None) -> bool:
         await client.tap(x=x, y=y, duration=duration)
+        return True
 
     @with_idb_client
     async def swipe(
         self, client: Client, x_start: int, y_start: int, x_end: int, y_end: int, delta: int = 10
-    ):
+    ) -> bool:
         await client.swipe(p_start=(x_start, y_start), p_end=(x_end, y_end), delta=delta)
+        return True
 
     @with_idb_client
-    async def screenshot(self, client: Client, output_path: str | None = None):
+    async def screenshot(self, client: Client, output_path: str | None = None) -> bytes | None:
+        """
+        Take a screenshot and return raw image data.
+
+        Returns:
+            Raw image data (PNG bytes not base64 encoded)
+        """
         screenshot_data = await client.screenshot()
         if output_path:
             with open(output_path, "wb") as f:
@@ -191,124 +213,66 @@ class IdbClientWrapper:
         args: list[str] | None = None,
         env: dict[str, str] | None = None,
     ) -> bool:
-        try:
-            await client.launch(
-                bundle_id=bundle_id, args=args or [], env=env or {}, foreground_if_running=True
-            )
-            return True
-        except Exception as e:
-            logger.error(f"Failed to launch: {e}")
-            return False
+        await client.launch(
+            bundle_id=bundle_id, args=args or [], env=env or {}, foreground_if_running=True
+        )
+        return True
 
     @with_idb_client
     async def terminate(self, client: Client, bundle_id: str) -> bool:
-        try:
-            await client.terminate(bundle_id)
-            return True
-        except Exception as e:
-            logger.error(f"Failed to terminate: {e}")
-            return False
+        await client.terminate(bundle_id)
+        return True
 
     @with_idb_client
-    async def install(self, client: Client, app_path: str) -> bool:
-        try:
-            bundle_path = Path(app_path)
-            with open(bundle_path, "rb") as f:
-                async for _ in client.install(bundle=f):
-                    pass  # Consume the async iterator
-            return True
-        except Exception as e:
-            logger.error(f"Failed to install: {e}")
-            return False
+    async def install(self, client: Client, app_path: str) -> list[InstalledArtifact] | None:
+        bundle_path = Path(app_path)
+        artifacts = []
+        with open(bundle_path, "rb") as f:
+            async for artifact in client.install(bundle=f):
+                artifacts.append(artifact)
+        return artifacts
 
     @with_idb_client
     async def uninstall(self, client: Client, bundle_id: str) -> bool:
-        try:
-            await client.uninstall(bundle_id)
-            return True
-        except Exception as e:
-            logger.error(f"Failed to uninstall: {e}")
-            return False
+        await client.uninstall(bundle_id)
+        return True
 
     @with_idb_client
-    async def list_apps(self, client: Client) -> list[InstalledAppInfo]:
-        try:
-            apps = await client.list_apps()
-            return apps
-        except Exception as e:
-            logger.error(f"Failed to list apps: {e}")
-            return []
+    async def list_apps(self, client: Client) -> list[InstalledAppInfo] | None:
+        apps = await client.list_apps()
+        return apps
 
     @with_idb_client
     async def text(self, client: Client, text: str) -> bool:
-        try:
-            await client.text(text)
-            return True
-        except Exception as e:
-            logger.error(f"Failed to type: {e}")
-            return False
+        await client.text(text)
+        return True
 
     @with_idb_client
     async def key(self, client: Client, key_code: int) -> bool:
-        try:
-            await client.key(key_code)
-            return True
-        except Exception as e:
-            logger.error(f"Failed to press key: {e}")
-            return False
+        await client.key(key_code)
+        return True
 
     @with_idb_client
-    async def button(self, client: Client, button_type: str) -> bool:
-        try:
-            button_map = {
-                "HOME": HIDButtonType.HOME,
-                "LOCK": HIDButtonType.LOCK,
-                "SIDE_BUTTON": HIDButtonType.SIDE_BUTTON,
-                "APPLE_PAY": HIDButtonType.APPLE_PAY,
-                "SIRI": HIDButtonType.SIRI,
-            }
-            button_enum = button_map.get(button_type.upper())
-            if not button_enum:
-                return False
-
-            await client.button(button_type=button_enum)
-            return True
-        except Exception as e:
-            logger.error(f"Failed to press button: {e}")
-            return False
+    async def button(self, client: Client, button_type: HIDButtonType) -> bool:
+        await client.button(button_type=button_type)
+        return True
 
     @with_idb_client
     async def clear_keychain(self, client: Client) -> bool:
-        try:
-            await client.clear_keychain()
-            return True
-        except Exception as e:
-            logger.error(f"Failed to clear keychain: {e}")
-            return False
+        await client.clear_keychain()
+        return True
 
     @with_idb_client
     async def open_url(self, client: Client, url: str) -> bool:
-        try:
-            await client.open_url(url)
-            return True
-        except Exception as e:
-            logger.error(f"Failed to open URL: {e}")
-            return False
+        await client.open_url(url)
+        return True
 
     @with_idb_client
-    async def describe_all(self, client: Client) -> dict[str, Any]:
-        try:
-            accessibility_info = await client.accessibility_info(nested=True, point=None)
-            return json.loads(accessibility_info.json)
-        except Exception as e:
-            logger.error(f"Failed to describe all: {e}")
-            return {}
+    async def describe_all(self, client: Client) -> dict[str, Any] | None:
+        accessibility_info = await client.accessibility_info(nested=True, point=None)
+        return json.loads(accessibility_info.json)
 
     @with_idb_client
-    async def describe_point(self, client: Client, x: int, y: int) -> dict[str, Any]:
-        try:
-            accessibility_info = await client.accessibility_info(point=(x, y), nested=True)
-            return json.loads(accessibility_info.json)
-        except Exception as e:
-            logger.error(f"Failed to describe point: {e}")
-            return {}
+    async def describe_point(self, client: Client, x: int, y: int) -> dict[str, Any] | None:
+        accessibility_info = await client.accessibility_info(point=(x, y), nested=True)
+        return json.loads(accessibility_info.json)
