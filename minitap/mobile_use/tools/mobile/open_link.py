@@ -8,9 +8,7 @@ from langgraph.types import Command
 
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
-from minitap.mobile_use.controllers.mobile_command_controller import (
-    open_link as open_link_controller,
-)
+from minitap.mobile_use.controllers.unified_controller import UnifiedMobileController
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 
@@ -26,8 +24,10 @@ def get_open_link_tool(ctx: MobileUseContext):
         """
         Open a link on a device (i.e. a deep link).
         """
-        output = open_link_controller(ctx=ctx, url=url)
-        has_failed = output is not None
+        controller = UnifiedMobileController(ctx)
+        success = await controller.open_url(url)
+        has_failed = not success
+        output = "Failed to open URL" if has_failed else None
 
         agent_outcome = (
             open_link_wrapper.on_failure_fn()

@@ -9,7 +9,6 @@ from pydantic import Field
 
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
-from minitap.mobile_use.controllers.mobile_command_controller import swipe as swipe_controller
 from minitap.mobile_use.controllers.types import (
     CoordinatesSelectorRequest,
     PercentagesSelectorRequest,
@@ -17,6 +16,7 @@ from minitap.mobile_use.controllers.types import (
     SwipeStartEndCoordinatesRequest,
     SwipeStartEndPercentagesRequest,
 )
+from minitap.mobile_use.controllers.unified_controller import UnifiedMobileController
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import CompositeToolWrapper
 
@@ -33,7 +33,8 @@ def get_swipe_tool(ctx: MobileUseContext) -> BaseTool:
 
         Supports percentage-based or coordinate-based positioning.
         """
-        output = swipe_controller(ctx=ctx, swipe_request=swipe_request)
+        controller = UnifiedMobileController(ctx)
+        output = await controller.swipe_request(swipe_request)
         has_failed = output is not None
 
         agent_outcome = (
