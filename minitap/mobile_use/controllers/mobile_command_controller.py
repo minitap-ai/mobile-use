@@ -581,6 +581,11 @@ class Key(Enum):
 
 
 def press_key(ctx: MobileUseContext, key: Key, dry_run: bool = False):
+    ui_automator_client = ctx.ui_adb_client
+    if ui_automator_client:
+        logger.info("Pressing key with ui_automator")
+        ui_automator_client.press_key(key.value.lower())
+        return None
     flow_input = [{"pressKey": key.value}]
     return run_flow_with_wait_for_animation_to_end(ctx, flow_input, dry_run=dry_run)
 
