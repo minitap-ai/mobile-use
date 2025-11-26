@@ -68,7 +68,7 @@ from minitap.mobile_use.servers.start_servers import (
     start_device_screen_api,
 )
 from minitap.mobile_use.servers.stop_servers import stop_servers
-from minitap.mobile_use.utils.app_lock_utils import _handle_initial_app_launch
+from minitap.mobile_use.utils.app_launch_utils import _handle_initial_app_launch
 from minitap.mobile_use.utils.logger import get_logger
 from minitap.mobile_use.utils.media import (
     create_gif_from_trace_folder,

@@ -13,7 +13,7 @@ from minitap.mobile_use.controllers.platform_specific_commands_controller import
 )
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message, with_fallback
-from minitap.mobile_use.utils.app_lock_utils import launch_app_with_retries
+from minitap.mobile_use.utils.app_launch_utils import launch_app_with_retries
 from minitap.mobile_use.utils.decorators import wrap_with_callbacks
 from minitap.mobile_use.utils.logger import get_logger
 
