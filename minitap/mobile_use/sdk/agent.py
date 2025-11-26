@@ -19,6 +19,7 @@ from pydantic import BaseModel
 from minitap.mobile_use.agents.outputter.outputter import outputter
 from minitap.mobile_use.agents.planner.types import Subgoal
 from minitap.mobile_use.clients.device_hardware_client import DeviceHardwareClient
+from minitap.mobile_use.clients.idb_client import IdbClientWrapper
 from minitap.mobile_use.clients.screen_api_client import ScreenApiClient
 from minitap.mobile_use.config import AgentNode, OutputConfig, record_events, settings
 from minitap.mobile_use.context import (
@@ -94,6 +95,7 @@ class Agent:
     _screen_api_client: ScreenApiClient
     _hw_bridge_client: DeviceHardwareClient
     _adb_client: AdbClient | None
+    _idb_client: IdbClientWrapper | None
     _current_task: asyncio.Task | None = None
     _task_lock: asyncio.Lock
     _cloud_mobile_id: str | None = None
@@ -164,10 +166,22 @@ class Agent:
 
         # Initialize clients
         self._init_clients(
+            device_id=device_id,
             platform=platform,
             retry_count=retry_count,
             retry_wait_seconds=retry_wait_seconds,
         )
+
+        # Initialize IDB companion for iOS
+        if self._idb_client:
+            logger.info("Starting IDB companion for iOS device...")
+            companion_started = await self._idb_client.init_companion()
+            if not companion_started:
+                raise ServerStartupError(
+                    message="Failed to start IDB companion for iOS device. "
+                    "Please ensure fb-idb is installed: https://fbidb.io/docs/installation/"
+                )
+            logger.success("IDB companion started successfully")
 
         # Start necessary servers
         restart_attempt = 0
@@ -496,6 +510,7 @@ class Agent:
             hw_bridge_client=self._hw_bridge_client,
             screen_api_client=self._screen_api_client,
             adb_client=self._adb_client,
+            idb_client=self._idb_client,
             llm_config=agent_profile.llm_config,
             on_agent_thought=on_agent_thought,
             on_plan_changes=on_plan_changes,
@@ -725,6 +740,11 @@ class Agent:
             return
         if not self._initialized and not force:
             return
+
+        if self._idb_client:
+            await self._idb_client.cleanup()
+            self._idb_client = None
+
         screen_api_ok, hw_bridge_ok = stop_servers(
             should_stop_screen_api=self._is_default_screen_api,
             should_stop_hw_bridge=self._is_default_hw_bridge,
@@ -871,10 +891,17 @@ class Agent:
             cortex_last_thought=None,
         )
 
-    def _init_clients(self, platform: DevicePlatform, retry_count: int, retry_wait_seconds: int):
+    def _init_clients(
+        self, device_id: str, platform: DevicePlatform, retry_count: int, retry_wait_seconds: int
+    ):
         self._adb_client = (
             AdbClient(host=self._config.servers.adb_host, port=self._config.servers.adb_port)
             if platform == DevicePlatform.ANDROID
+            else None
+        )
+        self._idb_client = (
+            IdbClientWrapper(udid=device_id)
+            if platform == DevicePlatform.IOS
             else None
         )
         self._hw_bridge_client = DeviceHardwareClient(

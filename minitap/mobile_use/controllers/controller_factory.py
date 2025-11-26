@@ -1,6 +1,7 @@
 from minitap.mobile_use.context import DevicePlatform, MobileUseContext
 from minitap.mobile_use.controllers.android_controller import AndroidDeviceController
 from minitap.mobile_use.controllers.device_controller import MobileDeviceController
+from minitap.mobile_use.controllers.ios_controller import iOSDeviceController
 from minitap.mobile_use.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -23,12 +24,15 @@ def create_device_controller(ctx: MobileUseContext) -> MobileDeviceController:
         )
 
     elif platform == DevicePlatform.IOS:
-        # if ctx.idb_client is None:
-        #     raise ValueError("IDB client not initialized for iOS device")
+        if ctx.idb_client is None:
+            raise ValueError("IDB client not initialized for iOS device")
 
-        # logger.info(f"Creating iOS controller for device {ctx.device.device_id}")
-
-        raise NotImplementedError("iOS controller not implemented yet")
+        logger.info(f"Creating iOS controller for device {ctx.device.device_id}")
+        return iOSDeviceController(
+            idb_client=ctx.idb_client,
+            device_width=ctx.device.device_width,
+            device_height=ctx.device.device_height,
+        )
 
     else:
         raise ValueError(f"Unsupported platform: {platform}")
