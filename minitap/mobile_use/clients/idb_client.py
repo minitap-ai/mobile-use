@@ -129,6 +129,14 @@ class IdbClientWrapper:
             )
             return True
 
+        except FileNotFoundError:
+            logger.error(
+                "idb_companion not found. Please install fb-idb to use iOS devices.\n"
+                "Installation guide: https://fbidb.io/docs/installation/\n"
+                "On macOS with Homebrew: brew install idb-companion"
+            )
+            self.companion_process = None
+            return False
         except Exception as e:
             logger.error(f"Failed to start idb_companion: {e}")
             self.companion_process = None
