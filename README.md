@@ -158,13 +158,25 @@ Mobile-use currently supports the following devices:
 
 #### 2. Prerequisites
 
-For Android:
+**For Android:**
 
 - **[Android Debug Bridge (ADB)](https://developer.android.com/studio/releases/platform-tools)**: A tool to connect to your device.
 
-For iOS:
+**For iOS (macOS only):**
 
 - **[Xcode](https://developer.apple.com/xcode/)**: Apple's IDE for iOS development.
+- **[fb-idb](https://fbidb.io/docs/installation/)**: Facebook's iOS Development Bridge for device automation.
+
+  ```bash
+  # Install via Homebrew (macOS)
+  brew tap facebook/fb
+  brew install idb-companion
+  ```
+
+  > [!NOTE]
+  > `idb_companion` is required to communicate with iOS simulators. Make sure it's in your PATH after installation.
+
+**Common requirements:**
 
 Before you begin, ensure you have the following installed:
 
