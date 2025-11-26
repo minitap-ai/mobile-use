@@ -51,6 +51,36 @@ def get_screen_data(screen_api_client: ScreenApiClient):
     return ScreenDataResponse(**response.json())
 
 
+def get_screen_data_from_context(ctx: MobileUseContext) -> ScreenDataResponse:
+    """
+    Get screen data using the best available method based on platform.
+
+    For Android with UIAutomator client available, uses uiautomator2 for faster
+    hierarchy and screenshot retrieval. Falls back to screen API for iOS or
+    when UIAutomator is not available.
+
+    Args:
+        ctx: The MobileUseContext with device and client information
+
+    Returns:
+        ScreenDataResponse with screenshot, elements, and dimensions
+    """
+    # Use UIAutomator for Android when available
+    if ctx.device.mobile_platform == DevicePlatform.ANDROID and ctx.ui_adb_client:
+        logger.info("Using UIAutomator2 for screen data retrieval")
+        ui_data = ctx.ui_adb_client.get_screen_data()
+        return ScreenDataResponse(
+            base64=ui_data.base64,
+            elements=ui_data.elements,
+            width=ui_data.width,
+            height=ui_data.height,
+            platform="android",
+        )
+
+    # Fallback to screen API (for iOS or when UIAutomator not available)
+    return get_screen_data(ctx.screen_api_client)
+
+
 def take_screenshot(ctx: MobileUseContext):
     return get_screen_data(ctx.screen_api_client).base64
 

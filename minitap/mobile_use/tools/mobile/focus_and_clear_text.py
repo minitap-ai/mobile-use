@@ -12,7 +12,7 @@ from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.mobile_command_controller import (
     erase_text as erase_text_controller,
 )
-from minitap.mobile_use.controllers.mobile_command_controller import get_screen_data
+from minitap.mobile_use.controllers.mobile_command_controller import get_screen_data_from_context
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 from minitap.mobile_use.tools.types import Target
@@ -43,7 +43,7 @@ class TextClearer:
         self.state = state
 
     def _refresh_ui_hierarchy(self) -> None:
-        screen_data = get_screen_data(screen_api_client=self.ctx.screen_api_client)
+        screen_data = get_screen_data_from_context(self.ctx)
         self.state.latest_ui_hierarchy = screen_data.elements
 
     def _get_element_info(
