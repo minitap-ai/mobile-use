@@ -1,12 +1,16 @@
 """iOS-specific device controller implementation using IDB."""
 
+import asyncio
 import base64
 import re
 
 from idb.common.types import HIDButtonType
 
 from minitap.mobile_use.clients.idb_client import IdbClientWrapper
-from minitap.mobile_use.controllers.device_controller import MobileDeviceController
+from minitap.mobile_use.controllers.device_controller import (
+    MobileDeviceController,
+    ScreenDataResponse,
+)
 from minitap.mobile_use.controllers.types import Bounds, CoordinatesSelectorRequest, TapOutput
 from minitap.mobile_use.utils.logger import get_logger
 
@@ -60,6 +64,34 @@ class iOSDeviceController(MobileDeviceController):
             return None
         except Exception as e:
             return f"IDB swipe failed: {str(e)}"
+
+    async def get_screen_data(self) -> ScreenDataResponse:
+        """Get screen data using IDB (screenshot and hierarchy in parallel)."""
+        try:
+            # Run screenshot and hierarchy fetch in parallel
+            screenshot_bytes, accessibility_info = await asyncio.gather(
+                self.idb_client.screenshot(),  # type: ignore[call-arg]
+                self.idb_client.describe_all(),
+            )
+
+            if screenshot_bytes is None:
+                raise RuntimeError("Screenshot returned None")
+
+            base64_screenshot = base64.b64encode(screenshot_bytes).decode("utf-8")
+            elements = (
+                self._process_flat_ios_hierarchy(accessibility_info) if accessibility_info else []
+            )
+
+            return ScreenDataResponse(
+                base64=base64_screenshot,
+                elements=elements,
+                width=self.device_width,
+                height=self.device_height,
+                platform="ios",
+            )
+        except Exception as e:
+            logger.error(f"Failed to get screen data: {e}")
+            raise
 
     async def screenshot(self) -> str:
         """Take a screenshot using IDB and return base64 encoded string."""
@@ -130,33 +162,42 @@ class iOSDeviceController(MobileDeviceController):
     async def get_ui_hierarchy(self) -> list[dict]:
         """Get UI hierarchy using IDB accessibility info."""
         try:
-            accessibility_info = await self.idb_client.describe_all()  # type: ignore[call-arg]
-            return self._flatten_ios_hierarchy(accessibility_info)
+            accessibility_info = await asyncio.wait_for(
+                self.idb_client.describe_all(), timeout=40.0
+            )
+            if accessibility_info is None:
+                logger.warning("Accessibility info returned None")
+                return []
+
+            hierarchy = self._process_flat_ios_hierarchy(accessibility_info)
+            return hierarchy
+        except TimeoutError:
+            logger.error("Timeout waiting for UI hierarchy (40s)")
+            return []
         except Exception as e:
             logger.error(f"Failed to get UI hierarchy: {e}")
             return []
 
-    def _flatten_ios_hierarchy(self, accessibility_data: dict) -> list[dict]:
+    def _process_flat_ios_hierarchy(self, accessibility_data: list[dict]) -> list[dict]:
         """
-        Flatten iOS accessibility tree into a list of elements.
+        Process flat iOS accessibility info into our standard format.
 
-        iOS accessibility info is nested, so we flatten it for easier searching.
+        IDB with nested=False returns a flat list of all elements.
         """
         elements = []
 
-        def traverse(node: dict, depth: int = 0):
+        for node in accessibility_data:
             if not isinstance(node, dict):
-                return
+                continue
 
             # Extract element info
             element = {
                 "type": node.get("type", ""),
-                "value": node.get("value", ""),
-                "label": node.get("label", ""),
+                "value": node.get("AXValue", ""),
+                "label": node.get("AXLabel", node.get("label", "")),
                 "frame": node.get("frame", {}),
                 "enabled": node.get("enabled", False),
-                "visible": node.get("visible", False),
-                "depth": depth,
+                "visible": True,  # Elements in the list are generally visible
             }
 
             # Add bounds if frame is available
@@ -164,19 +205,12 @@ class iOSDeviceController(MobileDeviceController):
                 frame = node["frame"]
                 if all(k in frame for k in ["x", "y", "width", "height"]):
                     element["bounds"] = (
-                        f"[{frame['x']},{frame['y']}]"
-                        f"[{frame['x'] + frame['width']},{frame['y'] + frame['height']}]"
+                        f"[{int(frame['x'])},{int(frame['y'])}]"
+                        f"[{int(frame['x'] + frame['width'])},{int(frame['y'] + frame['height'])}]"
                     )
 
             elements.append(element)
 
-            # Traverse children
-            children = node.get("children", [])
-            if isinstance(children, list):
-                for child in children:
-                    traverse(child, depth + 1)
-
-        traverse(accessibility_data)
         return elements
 
     def find_element(

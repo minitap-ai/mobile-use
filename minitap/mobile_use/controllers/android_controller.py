@@ -67,13 +67,18 @@ class AndroidDeviceController(MobileDeviceController):
         except Exception as e:
             return f"ADB swipe failed: {str(e)}"
 
-    def _get_screen_data(self, screen_api_client: ScreenApiClient):
-        response = screen_api_client.get_with_retry("/screen-info")
-        return ScreenDataResponse(**response.json())
+    async def get_screen_data(self) -> ScreenDataResponse:
+        """Get screen data using the screen API client (Maestro for hierarchy)."""
+        try:
+            response = self.screen_api_client.get_with_retry("/screen-info")
+            return ScreenDataResponse(**response.json())
+        except Exception as e:
+            logger.error(f"Failed to get screen data: {e}")
+            raise
 
     async def screenshot(self) -> str:
         try:
-            return self._get_screen_data(self.screen_api_client).base64
+            return (await self.get_screen_data()).base64
         except Exception as e:
             logger.error(f"Failed to take screenshot: {e}")
             raise

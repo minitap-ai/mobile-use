@@ -126,3 +126,14 @@ class MobileDeviceController(Protocol):
         Returns True on success, False on failure.
         """
         raise NotImplementedError("Subclasses must implement this method")
+
+    @abstractmethod
+    async def get_screen_data(self) -> "ScreenDataResponse":
+        """
+        Get screen data including screenshot (base64), UI hierarchy elements,
+        screen dimensions, and platform.
+
+        Returns:
+            ScreenDataResponse with base64 screenshot, elements, width, height, platform
+        """
+        raise NotImplementedError("Subclasses must implement this method")

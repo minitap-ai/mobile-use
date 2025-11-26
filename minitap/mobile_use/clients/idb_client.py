@@ -35,12 +35,19 @@ def with_idb_client(func):
 
     @wraps(func)
     async def wrapper(self, *args, **kwargs):
+        method_name = func.__name__
         try:
+            logger.debug(f"Building IDB client connection for {method_name}...")
             async with Client.build(address=self.address, logger=logger.logger) as client:
-                return await func(self, client, *args, **kwargs)
+                logger.debug(f"Client built, calling {method_name}...")
+                result = await func(self, client, *args, **kwargs)
+                logger.debug(f"{method_name} completed successfully")
+                return result
         except Exception as e:
-            method_name = func.__name__
             logger.error(f"Failed to {method_name}: {e}")
+            import traceback
+
+            logger.debug(f"Traceback: {traceback.format_exc()}")
 
             return_type = func.__annotations__.get("return")
             if return_type is bool:
@@ -116,7 +123,9 @@ class IdbClientWrapper:
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
             )
 
-            await asyncio.sleep(2)
+            # Wait longer for gRPC server to be fully ready
+            logger.debug("Waiting for idb_companion gRPC server to be ready...")
+            await asyncio.sleep(5)
 
             if self.companion_process.poll() is not None:
                 stdout, stderr = self.companion_process.communicate()
@@ -281,10 +290,25 @@ class IdbClientWrapper:
         await client.open_url(url)
         return True
 
-    @with_idb_client
-    async def describe_all(self, client: Client) -> dict[str, Any] | None:
-        accessibility_info = await client.accessibility_info(nested=True, point=None)
-        return json.loads(accessibility_info.json)
+    async def describe_all(self) -> list[dict[str, Any]] | None:
+        try:
+            cmd = ["idb", "ui", "describe-all", "--udid", self.udid, "--json"]
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await process.communicate()
+
+            if process.returncode != 0:
+                logger.error(f"idb describe-all failed: {stderr.decode()}")
+                return None
+
+            parsed = json.loads(stdout.decode())
+            return parsed if isinstance(parsed, list) else [parsed]
+        except Exception as e:
+            logger.error(f"Failed to describe_all: {e}")
+            return None
 
     @with_idb_client
     async def describe_point(self, client: Client, x: int, y: int) -> dict[str, Any] | None:
