@@ -69,6 +69,7 @@ class ContextorNode:
             ctx=self.ctx,
             update={
                 "latest_ui_hierarchy": device_data.elements,
+                "latest_screenshot": device_data.base64,
                 "focused_app_info": current_app_package,
                 "screen_size": (device_data.width, device_data.height),
                 "device_date": device_date,
