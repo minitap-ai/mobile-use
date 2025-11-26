@@ -161,6 +161,10 @@ When you target a UI element (for a `tap`, `focus_and_input_text`, `focus_and_cl
 
 **This is NOT optional.** Providing all locators if we have, it is the foundation of the system's reliability. It allows next steps to use a fallback mechanism: if the ID fails, it tries the coordinates, etc. Failing to provide this complete context will lead to action failures.
 
+### Handling Tap Failures
+
+Tap errors show what failed for each selector. **"Out of bounds"** = coordinates stale, **"No element found"** = element not in hierarchy (screen changed or needs scrolling). **Never retry the same target blindly** - analyze why it failed and adapt.
+
 ### The Rule of Unpredictable Actions
 
 Certain actions have outcomes that can significantly and sometimes unpredictably change the UI. These include:
