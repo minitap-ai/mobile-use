@@ -10,9 +10,9 @@ from minitap.mobile_use.agents.hopper.hopper import HopperOutput, hopper
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.platform_specific_commands_controller import list_packages
-from minitap.mobile_use.controllers.unified_controller import UnifiedMobileController
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
+from minitap.mobile_use.utils.app_launch_utils import launch_app_with_retries
 
 
 async def find_package(ctx: MobileUseContext, app_name: str) -> str | None:
@@ -53,17 +53,14 @@ def get_launch_app_tool(ctx: MobileUseContext):
                 status="error",
             )
         else:
-            controller = UnifiedMobileController(ctx)
-            success = await controller.launch_app(package_name)
-            has_failed = not success
-            output = "Failed to launch app" if has_failed else None
+            success, error_msg = await launch_app_with_retries(ctx=ctx, app_package=package_name)
             tool_message = ToolMessage(
                 tool_call_id=tool_call_id,
-                content=launch_app_wrapper.on_failure_fn(app_name, output)
-                if has_failed
-                else launch_app_wrapper.on_success_fn(app_name),
-                additional_kwargs={"error": output} if has_failed else {},
-                status="error" if has_failed else "success",
+                content=launch_app_wrapper.on_success_fn(app_name)
+                if success
+                else launch_app_wrapper.on_failure_fn(app_name, error_msg),
+                additional_kwargs={} if success else {"error": error_msg},
+                status="success" if success else "error",
             )
 
         return Command(
