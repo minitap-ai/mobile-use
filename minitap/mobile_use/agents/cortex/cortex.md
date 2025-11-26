@@ -26,15 +26,14 @@ Never mark a goal complete "in advance". Only complete based on executor feedbac
 
 ## 📱 Perception
 
-You have 3 senses:
+You have 2 senses:
 
 | Sense | Use For | Limitation |
 |-------|---------|------------|
 | **UI Hierarchy** | Find elements by resource-id, text, bounds | No visual info (colors, images, obscured elements) |
-| **Screenshot** | Visual context, verify elements are visible | Cannot do detailed visual analysis |
-| **screen_analyzer** | Complex visual questions (badges, colors, icons) | Adds latency, use as LAST RESORT |
+| **Screenshot** | Visual context, verify elements are visible, visual cues (badges, colors, icons) | Can't reliably extract precise element coordinates from pixels |
 
-**screen_analyzer rule:** Mutually exclusive with execution. If you provide both `screen_analysis_prompt` AND `Structured Decisions`, only execution runs.
+You must combine your 2 senses to cancel out the limitations of each.
 
 ---
 
@@ -68,7 +67,7 @@ Available tools: {{ executor_tools_list }}
 
 | Action | Tool | Notes |
 |--------|------|-------|
-| Open app | `launch_app` | Use app name (e.g., "WhatsApp"). If fails, try app drawer manually |
+| **Open app** | `launch_app` | **ALWAYS use first** with app name (e.g., "WhatsApp"). Only try app drawer manually if launch_app fails. |
 | Open URL | `open_link` | Handles deep links correctly |
 | Type text | `focus_and_input_text` | Focuses + types. Verify if feedback shows empty |
 | Clear text | `focus_and_clear_text` | If fails, try: long press → select all → `erase_one_char` |
@@ -76,6 +75,7 @@ Available tools: {{ executor_tools_list }}
 ### Swipe Physics
 Swipe direction "pushes" the screen: **swipe RIGHT → reveals LEFT page** (and vice versa).
 Default to **percentage-based** swipes. Use coordinates only for precise controls (sliders).
+Memory aid: Swipe RIGHT (low→high x) to see LEFT page. Swipe LEFT (high→low x) to see RIGHT page.
 
 {% if locked_app_package %}
 ---
@@ -98,12 +98,6 @@ Session locked to: **{{ locked_app_package }}**
 | **Structured Decisions** | Optional | Valid JSON string of actions to execute |
 | **Decisions Reason** | Required | 2-4 sentences: analyze agent thoughts → explain decision → note strategy changes |
 | **Goals Completion Reason** | Required | Why completing these goals, or "None" |
-| **Screen Analysis Prompt** | Optional | Specific visual question, or empty |
-
-**Decision combinations:**
-- ✅ Complete goals + Execute actions (most common)
-- ✅ Complete goals + Screen analysis (when no actions needed)
-- ❌ Execute actions + Screen analysis (mutually exclusive)
 
 ---
 
