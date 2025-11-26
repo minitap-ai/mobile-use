@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
-from minitap.mobile_use.controllers.mobile_command_controller import get_screen_data
+from minitap.mobile_use.controllers.mobile_command_controller import get_screen_data_from_context
 from minitap.mobile_use.controllers.mobile_command_controller import (
     input_text as input_text_controller,
 )
@@ -92,7 +92,7 @@ def get_focus_and_input_text_tool(ctx: MobileUseContext) -> BaseTool:
 
         text_input_content = ""
         if status == "success" and target.resource_id:
-            screen_data = get_screen_data(screen_api_client=ctx.screen_api_client)
+            screen_data = get_screen_data_from_context(ctx)
             state.latest_ui_hierarchy = screen_data.elements
             element = find_element_by_resource_id(
                 ui_hierarchy=state.latest_ui_hierarchy,
