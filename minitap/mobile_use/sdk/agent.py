@@ -20,6 +20,7 @@ from minitap.mobile_use.agents.outputter.outputter import outputter
 from minitap.mobile_use.agents.planner.types import Subgoal
 from minitap.mobile_use.clients.device_hardware_client import DeviceHardwareClient
 from minitap.mobile_use.clients.screen_api_client import ScreenApiClient
+from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
 from minitap.mobile_use.config import AgentNode, OutputConfig, record_events, settings
 from minitap.mobile_use.context import (
     DeviceContext,
@@ -94,6 +95,7 @@ class Agent:
     _screen_api_client: ScreenApiClient
     _hw_bridge_client: DeviceHardwareClient
     _adb_client: AdbClient | None
+    _ui_adb_client: UIAutomatorClient | None
     _current_task: asyncio.Task | None = None
     _task_lock: asyncio.Lock
     _cloud_mobile_id: str | None = None
@@ -164,6 +166,7 @@ class Agent:
 
         # Initialize clients
         self._init_clients(
+            device_id=device_id,
             platform=platform,
             retry_count=retry_count,
             retry_wait_seconds=retry_wait_seconds,
@@ -496,6 +499,7 @@ class Agent:
             hw_bridge_client=self._hw_bridge_client,
             screen_api_client=self._screen_api_client,
             adb_client=self._adb_client,
+            ui_adb_client=self._ui_adb_client,
             llm_config=agent_profile.llm_config,
             on_agent_thought=on_agent_thought,
             on_plan_changes=on_plan_changes,
@@ -871,11 +875,20 @@ class Agent:
             cortex_last_thought=None,
         )
 
-    def _init_clients(self, platform: DevicePlatform, retry_count: int, retry_wait_seconds: int):
+    def _init_clients(
+        self,
+        device_id: str,
+        platform: DevicePlatform,
+        retry_count: int,
+        retry_wait_seconds: int,
+    ):
         self._adb_client = (
             AdbClient(host=self._config.servers.adb_host, port=self._config.servers.adb_port)
             if platform == DevicePlatform.ANDROID
             else None
+        )
+        self._ui_adb_client = (
+            UIAutomatorClient(device_id=device_id) if platform == DevicePlatform.ANDROID else None
         )
         self._hw_bridge_client = DeviceHardwareClient(
             base_url=self._config.servers.hw_bridge_base_url.to_url(),
