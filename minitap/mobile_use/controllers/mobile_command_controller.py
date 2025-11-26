@@ -631,6 +631,7 @@ if __name__ == "__main__":
 
     dummy_state = State(
         latest_ui_hierarchy=screen_data.elements,
+        latest_screenshot=screen_data.base64,
         messages=[],
         initial_goal="",
         subgoal_plan=[],

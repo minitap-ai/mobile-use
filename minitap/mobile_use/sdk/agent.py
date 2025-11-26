@@ -883,6 +883,7 @@ class Agent:
             initial_goal=task.request.goal,
             subgoal_plan=[],
             latest_ui_hierarchy=None,
+            latest_screenshot=None,
             focused_app_info=None,
             device_date=None,
             structured_decisions=None,

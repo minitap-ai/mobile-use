@@ -18,6 +18,7 @@ from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message, with_fallback
 from minitap.mobile_use.tools.index import EXECUTOR_WRAPPERS_TOOLS, format_tools_list
+from minitap.mobile_use.utils.conversations import get_screenshot_message_for_llm
 from minitap.mobile_use.utils.decorators import wrap_with_callbacks
 from minitap.mobile_use.utils.logger import get_logger
 
@@ -71,6 +72,9 @@ class CortexNode:
             ui_hierarchy_str = json.dumps(ui_hierarchy_dict, indent=2, ensure_ascii=False)
             messages.append(HumanMessage(content="Here is the UI hierarchy:\n" + ui_hierarchy_str))
 
+        if state.latest_screenshot:
+            messages.append(get_screenshot_message_for_llm(state.latest_screenshot))
+
         llm = get_llm(ctx=self.ctx, name="cortex", temperature=1).with_structured_output(
             CortexOutput
         )
@@ -118,6 +122,7 @@ class CortexNode:
                 "complete_subgoals_by_ids": response.complete_subgoals_by_ids,
                 "screen_analysis_prompt": response.screen_analysis_prompt,
                 "latest_ui_hierarchy": None,
+                "latest_screenshot": None,
                 "focused_app_info": None,
                 "device_date": None,
                 # Executor related fields

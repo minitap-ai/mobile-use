@@ -31,6 +31,7 @@ class State(BaseModel):
     latest_ui_hierarchy: Annotated[
         list[dict] | None, "Latest UI hierarchy of the device", take_last
     ]
+    latest_screenshot: Annotated[str | None, "Latest screenshot base64 of the device", take_last]
     focused_app_info: Annotated[str | None, "Focused app info", take_last]
     device_date: Annotated[str | None, "Date of the device", take_last]
 
