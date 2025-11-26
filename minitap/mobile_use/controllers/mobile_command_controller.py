@@ -176,7 +176,7 @@ SelectorRequest = (
 def get_bounds_for_element(element: dict) -> Bounds | None:
     """Extract bounds from a UI element."""
     bounds_str = element.get("bounds")
-    if not bounds_str:
+    if not bounds_str or not isinstance(bounds_str, str):
         return None
     try:
         # Parse bounds string like "[x1,y1][x2,y2]" using regex
