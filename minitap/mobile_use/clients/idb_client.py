@@ -194,9 +194,15 @@ class IdbClientWrapper:
 
     @with_idb_client
     async def swipe(
-        self, client: Client, x_start: int, y_start: int, x_end: int, y_end: int, delta: int = 10
+        self,
+        client: Client,
+        x_start: int,
+        y_start: int,
+        x_end: int,
+        y_end: int,
+        duration: float | None = None,
     ) -> bool:
-        await client.swipe(p_start=(x_start, y_start), p_end=(x_end, y_end), delta=delta)
+        await client.swipe(p_start=(x_start, y_start), p_end=(x_end, y_end), duration=duration)
         return True
 
     @with_idb_client
