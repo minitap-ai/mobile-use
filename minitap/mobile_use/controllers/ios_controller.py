@@ -3,6 +3,8 @@
 import base64
 import re
 
+from idb.common.types import HIDButtonType
+
 from minitap.mobile_use.clients.idb_client import IdbClientWrapper
 from minitap.mobile_use.controllers.device_controller import MobileDeviceController
 from minitap.mobile_use.controllers.types import Bounds, CoordinatesSelectorRequest, TapOutput
@@ -47,13 +49,13 @@ class iOSDeviceController(MobileDeviceController):
         """Swipe from start to end coordinates using IDB."""
         try:
             # IDB delta is the number of steps, approximating from duration
-            delta = max(10, duration // 40)
+            ms_duration_to_percentage = duration / 1000.0
             await self.idb_client.swipe(  # type: ignore[call-arg]
                 x_start=start.x,
                 y_start=start.y,
                 x_end=end.x,
                 y_end=end.y,
-                delta=delta,
+                duration=ms_duration_to_percentage,
             )
             return None
         except Exception as e:
@@ -109,9 +111,9 @@ class iOSDeviceController(MobileDeviceController):
         """iOS doesn't have a back button - swipe from left edge."""
         try:
             # Simulate back gesture by swiping from left edge
-            start = CoordinatesSelectorRequest(x=10, y=self.device_height // 2)
-            end = CoordinatesSelectorRequest(x=self.device_width // 2, y=self.device_height // 2)
-            result = await self.swipe(start, end, duration=200)
+            start = CoordinatesSelectorRequest(x=10, y=self.device_height // 4)
+            end = CoordinatesSelectorRequest(x=300, y=self.device_height // 4)
+            result = await self.swipe(start, end, duration=300)
             return result is None
         except Exception as e:
             logger.error(f"Failed to press back: {e}")
@@ -120,7 +122,7 @@ class iOSDeviceController(MobileDeviceController):
     async def press_home(self) -> bool:
         """Press the home button using IDB."""
         try:
-            return await self.idb_client.button(button_type="HOME")  # type: ignore[call-arg]
+            return await self.idb_client.button(button_type=HIDButtonType.HOME)  # type: ignore[call-arg]
         except Exception as e:
             logger.error(f"Failed to press home: {e}")
             return False
@@ -137,7 +139,7 @@ class iOSDeviceController(MobileDeviceController):
     def _flatten_ios_hierarchy(self, accessibility_data: dict) -> list[dict]:
         """
         Flatten iOS accessibility tree into a list of elements.
-        
+
         iOS accessibility info is nested, so we flatten it for easier searching.
         """
         elements = []
