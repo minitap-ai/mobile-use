@@ -21,6 +21,7 @@ from minitap.mobile_use.tools.index import EXECUTOR_WRAPPERS_TOOLS, format_tools
 from minitap.mobile_use.utils.conversations import get_screenshot_message_for_llm
 from minitap.mobile_use.utils.decorators import wrap_with_callbacks
 from minitap.mobile_use.utils.logger import get_logger
+from minitap.mobile_use.utils.media import compress_base64_jpeg
 
 logger = get_logger(__name__)
 
@@ -73,7 +74,8 @@ class CortexNode:
             messages.append(HumanMessage(content="Here is the UI hierarchy:\n" + ui_hierarchy_str))
 
         if state.latest_screenshot:
-            messages.append(get_screenshot_message_for_llm(state.latest_screenshot))
+            compressed_image_base64 = compress_base64_jpeg(state.latest_screenshot)
+            messages.append(get_screenshot_message_for_llm(compressed_image_base64))
 
         llm = get_llm(ctx=self.ctx, name="cortex", temperature=1).with_structured_output(
             CortexOutput
