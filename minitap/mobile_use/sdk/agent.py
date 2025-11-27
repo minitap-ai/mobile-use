@@ -910,9 +910,7 @@ class Agent:
             UIAutomatorClient(device_id=device_id) if platform == DevicePlatform.ANDROID else None
         )
         self._idb_client = (
-            IdbClientWrapper(udid=device_id)
-            if platform == DevicePlatform.IOS
-            else None
+            IdbClientWrapper(udid=device_id) if platform == DevicePlatform.IOS else None
         )
         self._hw_bridge_client = DeviceHardwareClient(
             base_url=self._config.servers.hw_bridge_base_url.to_url(),
