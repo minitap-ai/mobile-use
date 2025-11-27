@@ -189,7 +189,8 @@ class IdbClientWrapper:
                     pass
 
     async def __aenter__(self):
-        await self.init_companion()
+        if not await self.init_companion():
+            raise RuntimeError(f"Failed to initialize idb_companion for device {self.udid}")
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
