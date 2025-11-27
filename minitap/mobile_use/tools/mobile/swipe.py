@@ -63,12 +63,44 @@ def get_swipe_tool(ctx: MobileUseContext) -> BaseTool:
 
 def get_composite_swipe_tools(ctx: MobileUseContext) -> list[BaseTool]:
     """
-    Returns composite swipe tools for use with Vertex AI LLMs.
+    Returns composite swipe tools with flattened arguments.
     Each tool handles a specific swipe mode to avoid complex Union type issues.
     """
 
+    async def _execute_swipe(
+        tool_call_id: str,
+        state: State,
+        agent_thought: str,
+        swipe_request: SwipeRequest,
+    ) -> Command:
+        """Shared swipe execution logic."""
+        output = swipe_controller(ctx=ctx, swipe_request=swipe_request)
+        has_failed = output is not None
+
+        agent_outcome = (
+            swipe_wrapper.on_success_fn() if not has_failed else swipe_wrapper.on_failure_fn()
+        )
+
+        tool_message = ToolMessage(
+            tool_call_id=tool_call_id,
+            content=agent_outcome,
+            additional_kwargs={"error": output} if has_failed else {},
+            status="error" if has_failed else "success",
+        )
+
+        return Command(
+            update=await state.asanitize_update(
+                ctx=ctx,
+                update={
+                    "agents_thoughts": [agent_thought, agent_outcome],
+                    EXECUTOR_MESSAGES_KEY: [tool_message],
+                },
+                agent="executor",
+            ),
+        )
+
     @tool
-    def swipe_coordinates(
+    async def swipe_coordinates(
         agent_thought: str,
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
@@ -77,7 +109,7 @@ def get_composite_swipe_tools(ctx: MobileUseContext) -> list[BaseTool]:
         end_x: int = Field(description="End X coordinate in pixels"),
         end_y: int = Field(description="End Y coordinate in pixels"),
         duration: int = Field(description="Duration in ms", ge=1, le=10000, default=400),
-    ):
+    ) -> Command:
         """Swipe using pixel coordinates from start position to end position."""
         swipe_request = SwipeRequest(
             swipe_mode=SwipeStartEndCoordinatesRequest(
@@ -86,17 +118,10 @@ def get_composite_swipe_tools(ctx: MobileUseContext) -> list[BaseTool]:
             ),
             duration=duration,
         )
-        return get_swipe_tool(ctx=ctx).invoke(
-            input={
-                "tool_call_id": tool_call_id,
-                "state": state,
-                "agent_thought": agent_thought,
-                "swipe_request": swipe_request,
-            }
-        )
+        return await _execute_swipe(tool_call_id, state, agent_thought, swipe_request)
 
     @tool
-    def swipe_percentages(
+    async def swipe_percentages(
         agent_thought: str,
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
@@ -105,7 +130,7 @@ def get_composite_swipe_tools(ctx: MobileUseContext) -> list[BaseTool]:
         end_x_percent: int = Field(description="End X percent (0-100)", ge=0, le=100),
         end_y_percent: int = Field(description="End Y percent (0-100)", ge=0, le=100),
         duration: int = Field(description="Duration in ms", ge=1, le=10000, default=400),
-    ):
+    ) -> Command:
         """Swipe using percentage coordinates from start position to end position."""
         swipe_request = SwipeRequest(
             swipe_mode=SwipeStartEndPercentagesRequest(
@@ -116,14 +141,7 @@ def get_composite_swipe_tools(ctx: MobileUseContext) -> list[BaseTool]:
             ),
             duration=duration,
         )
-        return get_swipe_tool(ctx=ctx).invoke(
-            input={
-                "tool_call_id": tool_call_id,
-                "state": state,
-                "agent_thought": agent_thought,
-                "swipe_request": swipe_request,
-            }
-        )
+        return await _execute_swipe(tool_call_id, state, agent_thought, swipe_request)
 
     return [swipe_coordinates, swipe_percentages]
 

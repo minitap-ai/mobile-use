@@ -12,9 +12,7 @@ from minitap.mobile_use.tools.mobile.press_key import press_key_wrapper
 from minitap.mobile_use.tools.mobile.stop_app import stop_app_wrapper
 from minitap.mobile_use.tools.mobile.swipe import swipe_wrapper
 from minitap.mobile_use.tools.mobile.tap import tap_wrapper
-from minitap.mobile_use.tools.mobile.wait_for_delay import (
-    wait_for_delay_wrapper,
-)
+from minitap.mobile_use.tools.mobile.wait_for_delay import wait_for_delay_wrapper
 from minitap.mobile_use.tools.tool_wrapper import CompositeToolWrapper, ToolWrapper
 
 EXECUTOR_WRAPPERS_TOOLS = [
@@ -39,14 +37,9 @@ def get_tools_from_wrappers(
 ) -> list[BaseTool]:
     tools: list[BaseTool] = []
     for wrapper in wrappers:
-        if ctx.llm_config.get_agent("executor").provider == "vertexai":
-            # The main swipe tool argument structure is not supported by vertexai, we need to split
-            # this tool into multiple tools
-            if wrapper.tool_fn_getter == swipe_wrapper.tool_fn_getter and isinstance(
-                wrapper, CompositeToolWrapper
-            ):
-                tools.extend(wrapper.composite_tools_fn_getter(ctx))
-                continue
+        if isinstance(wrapper, CompositeToolWrapper):
+            tools.extend(wrapper.composite_tools_fn_getter(ctx))
+            continue
 
         tools.append(wrapper.tool_fn_getter(ctx))
     return tools

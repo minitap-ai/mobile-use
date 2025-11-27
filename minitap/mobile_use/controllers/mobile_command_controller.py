@@ -176,7 +176,7 @@ SelectorRequest = (
 def get_bounds_for_element(element: dict) -> Bounds | None:
     """Extract bounds from a UI element."""
     bounds_str = element.get("bounds")
-    if not bounds_str:
+    if not bounds_str or not isinstance(bounds_str, str):
         return None
     try:
         # Parse bounds string like "[x1,y1][x2,y2]" using regex
@@ -631,6 +631,7 @@ if __name__ == "__main__":
 
     dummy_state = State(
         latest_ui_hierarchy=screen_data.elements,
+        latest_screenshot=screen_data.base64,
         messages=[],
         initial_goal="",
         subgoal_plan=[],

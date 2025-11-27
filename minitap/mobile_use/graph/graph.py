@@ -35,19 +35,10 @@ def convergence_node(state: State):
 
 def convergence_gate(
     state: State,
-) -> Literal["continue", "end"]:
+) -> Literal["continue", "replan", "end"]:
     """Check if all subgoals are completed at convergence point."""
     logger.info("Starting convergence_gate")
-    if all_completed(state.subgoal_plan):
-        logger.info("All subgoals are completed, ending the goal")
-        return "end"
-    return "continue"
 
-
-def post_orchestrator_gate(
-    state: State,
-) -> Literal["continue", "replan", "end"]:
-    logger.info("Starting post_orchestrator_gate")
     if one_of_them_is_failure(state.subgoal_plan):
         logger.info("One of the subgoals is in failure state, asking to replan")
         return "replan"
@@ -60,7 +51,6 @@ def post_orchestrator_gate(
         logger.info("No subgoal running, ending the goal")
         return "end"
 
-    logger.info("Goal is not achieved, continuing")
     return "continue"
 
 
@@ -134,15 +124,7 @@ async def get_graph(ctx: MobileUseContext) -> CompiledStateGraph:
     ## Linking nodes
     graph_builder.add_edge(START, "planner")
     graph_builder.add_edge("planner", "orchestrator")
-    graph_builder.add_conditional_edges(
-        "orchestrator",
-        post_orchestrator_gate,
-        {
-            "continue": "contextor",
-            "replan": "planner",
-            "end": END,
-        },
-    )
+    graph_builder.add_edge("orchestrator", "convergence")
     graph_builder.add_edge("contextor", "cortex")
     graph_builder.add_conditional_edges(
         "cortex",
@@ -160,7 +142,6 @@ async def get_graph(ctx: MobileUseContext) -> CompiledStateGraph:
     )
     graph_builder.add_edge("executor_tools", "summarizer")
 
-    graph_builder.add_edge("orchestrator", "convergence")
     graph_builder.add_edge("screen_analyzer", "convergence")
     graph_builder.add_edge("summarizer", "convergence")
 
@@ -169,6 +150,7 @@ async def get_graph(ctx: MobileUseContext) -> CompiledStateGraph:
         path=convergence_gate,
         path_map={
             "continue": "contextor",
+            "replan": "planner",
             "end": END,
         },
     )

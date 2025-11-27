@@ -9,17 +9,16 @@ from langgraph.types import Command
 from minitap.mobile_use.agents.hopper.hopper import HopperOutput, hopper
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
-from minitap.mobile_use.controllers.mobile_command_controller import (
-    launch_app as launch_app_controller,
-)
 from minitap.mobile_use.controllers.platform_specific_commands_controller import list_packages
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
+from minitap.mobile_use.utils.app_launch_utils import launch_app_with_retries
 
 
 async def find_package(ctx: MobileUseContext, app_name: str) -> str | None:
     """
     Finds the package name for a given application name.
+    Returns None if package not found or on error.
     """
     all_packages = list_packages(ctx=ctx)
     try:
@@ -28,7 +27,8 @@ async def find_package(ctx: MobileUseContext, app_name: str) -> str | None:
             request=f"I'm looking for the package name of the following app: '{app_name}'",
             data=all_packages,
         )
-        # Assuming hopper_output.output directly contains the package name
+        if not hopper_output.found:
+            return None
         return hopper_output.output
     except Exception as e:
         print(f"Failed to find package for '{app_name}': {e}")
@@ -55,15 +55,14 @@ def get_launch_app_tool(ctx: MobileUseContext):
                 status="error",
             )
         else:
-            output = launch_app_controller(ctx=ctx, package_name=package_name)
-            has_failed = output is not None
+            success, error_msg = await launch_app_with_retries(ctx=ctx, app_package=package_name)
             tool_message = ToolMessage(
                 tool_call_id=tool_call_id,
-                content=launch_app_wrapper.on_failure_fn(app_name, output)
-                if has_failed
-                else launch_app_wrapper.on_success_fn(app_name),
-                additional_kwargs={"error": output} if has_failed else {},
-                status="error" if has_failed else "success",
+                content=launch_app_wrapper.on_success_fn(app_name)
+                if success
+                else launch_app_wrapper.on_failure_fn(app_name, error_msg),
+                additional_kwargs={} if success else {"error": error_msg},
+                status="success" if success else "error",
             )
 
         return Command(

@@ -44,7 +44,11 @@ def find_element_by_text(
         for element in elements:
             if isinstance(element, dict):
                 src = element.get("attributes", element)
-                if text and text.lower() == src.get("text", "").lower():
+                element_text = src.get("text", "")
+                # Guard against non-string text values (e.g., dict)
+                if not isinstance(element_text, str):
+                    element_text = ""
+                if text and text.lower() == element_text.lower():
                     idx = index or 0
                     if idx == 0:
                         return element
@@ -198,3 +202,32 @@ def focus_element_if_needed(
         "Failed to focus element. No valid locator (resource_id, coordinates, or text) succeeded."
     )
     return None
+
+
+def validate_coordinates_bounds(
+    target: Target, screen_width: int, screen_height: int
+) -> str | None:
+    """
+    Validate that coordinates are within screen bounds.
+    Returns error message if invalid, None if valid.
+    """
+    if not target.coordinates:
+        return None
+
+    center = target.coordinates.get_center()
+    errors = []
+
+    if center.x < 0 or center.x > screen_width:
+        errors.append(f"x={center.x} is outside screen width (0-{screen_width})")
+    if center.y < 0 or center.y > screen_height:
+        errors.append(f"y={center.y} is outside screen height (0-{screen_height})")
+
+    return "; ".join(errors) if errors else None
+
+
+def has_valid_selectors(target: Target) -> bool:
+    """Check if target has at least one valid selector."""
+    has_coordinates = target.coordinates is not None
+    has_resource_id = target.resource_id is not None and target.resource_id != ""
+    has_text = target.text is not None and target.text != ""
+    return has_coordinates or has_resource_id or has_text

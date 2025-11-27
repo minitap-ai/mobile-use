@@ -130,6 +130,14 @@ async def _handle_initial_app_launch(
     Returns:
         AppLaunchResult with launch status and error information
     """
+    if not locked_app_package:
+        error_msg = f"Invalid locked_app_package: '{locked_app_package}'"
+        logger.error(error_msg)
+        return AppLaunchResult(
+            locked_app_package=locked_app_package,
+            locked_app_initial_launch_success=False,
+            locked_app_initial_launch_error=error_msg,
+        )
 
     logger.info(f"Starting initial app launch for package: {locked_app_package}")
 

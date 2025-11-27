@@ -18,6 +18,7 @@ from minitap.mobile_use.controllers.mobile_command_controller import tap as tap_
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 from minitap.mobile_use.tools.types import Target
+from minitap.mobile_use.tools.utils import has_valid_selectors, validate_coordinates_bounds
 from minitap.mobile_use.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -38,102 +39,128 @@ def get_tap_tool(ctx: MobileUseContext) -> BaseTool:
         (with an optional index), its coordinates, or its text content (with an optional index).
         The tool uses a fallback strategy, trying the locators in that order.
         """
-        output = {
-            "error": "No valid selector provided or all selectors failed."
-        }  # Default to failure
-        latest_selector_info: str | None = None
+        # Track all attempts for better error reporting
+        attempts: list[dict] = []
+        success = False
+        successful_selector: str | None = None
+
+        # Validate target has at least one selector
+        if not has_valid_selectors(target):
+            attempts.append(
+                {
+                    "selector": "none",
+                    "error": "No valid selector provided (need coordinates, resource_id, or text)",
+                }
+            )
 
         # 1. Try with COORDINATES FIRST (visual approach)
-        if target.coordinates:
-            try:
-                center_point = target.coordinates.get_center()
-                selector = SelectorRequestWithCoordinates(
-                    coordinates=CoordinatesSelectorRequest(x=center_point.x, y=center_point.y)
+        if not success and target.coordinates:
+            center = target.coordinates.get_center()
+            selector_info = f"coordinates ({center.x}, {center.y})"
+
+            # Validate bounds before attempting
+            bounds_error = validate_coordinates_bounds(
+                target, ctx.device.device_width, ctx.device.device_height
+            )
+            if bounds_error:
+                logger.warning(f"Coordinates out of bounds: {bounds_error}")
+                attempts.append(
+                    {"selector": selector_info, "error": f"Out of bounds: {bounds_error}"}
                 )
-                logger.info(
-                    f"Attempting to tap using coordinates: {center_point.x},{center_point.y}"
-                )
-                latest_selector_info = f"coordinates='{target.coordinates}'"
-                result = tap_controller(
-                    ctx=ctx,
-                    selector_request=selector,
-                    ui_hierarchy=state.latest_ui_hierarchy,
-                )
-                if result is None:  # Success
-                    output = None
-                else:
-                    logger.warning(
-                        f"Tap with coordinates '{target.coordinates}' failed. Error: {result}"
+            else:
+                try:
+                    center_point = target.coordinates.get_center()
+                    selector = SelectorRequestWithCoordinates(
+                        coordinates=CoordinatesSelectorRequest(x=center_point.x, y=center_point.y)
                     )
-                    output = result
-            except Exception as e:
-                logger.warning(f"Exception during tap with coordinates '{target.coordinates}': {e}")
-                output = {"error": str(e)}
+                    logger.info(f"Attempting tap with {selector_info}")
+                    result = tap_controller(
+                        ctx=ctx,
+                        selector_request=selector,
+                        ui_hierarchy=state.latest_ui_hierarchy,
+                    )
+                    if result is None:
+                        success = True
+                        successful_selector = selector_info
+                    else:
+                        error_msg = (
+                            result.get("error", str(result))
+                            if isinstance(result, dict)
+                            else str(result)
+                        )
+                        logger.warning(f"Tap with {selector_info} failed: {error_msg}")
+                        attempts.append({"selector": selector_info, "error": error_msg})
+                except Exception as e:
+                    logger.warning(f"Exception during tap with {selector_info}: {e}")
+                    attempts.append({"selector": selector_info, "error": str(e)})
 
         # 2. If coordinates failed or weren't provided, try with resource_id
-        if output is not None and target.resource_id:
+        if not success and target.resource_id:
+            selector_info = f"resource_id='{target.resource_id}' (index={target.resource_id_index})"
             try:
                 selector = IdSelectorRequest(id=target.resource_id)
-                logger.info(
-                    f"Attempting to tap using resource_id: '{target.resource_id}' "
-                    f"at index {target.resource_id_index}"
-                )
-                latest_selector_info = (
-                    f"resource_id='{target.resource_id}' (index={target.resource_id_index})"
-                )
+                logger.info(f"Attempting tap with {selector_info}")
                 result = tap_controller(
                     ctx=ctx,
                     selector_request=selector,
                     index=target.resource_id_index,
                     ui_hierarchy=state.latest_ui_hierarchy,
                 )
-                if result is None:  # Success
-                    output = None
+                if result is None:
+                    success = True
+                    successful_selector = selector_info
                 else:
-                    logger.warning(
-                        f"Tap with resource_id '{target.resource_id}' failed. Error: {result}"
+                    error_msg = (
+                        result.get("error", str(result))
+                        if isinstance(result, dict)
+                        else str(result)
                     )
-                    output = result
+                    logger.warning(f"Tap with {selector_info} failed: {error_msg}")
+                    attempts.append({"selector": selector_info, "error": error_msg})
             except Exception as e:
-                logger.warning(f"Exception during tap with resource_id '{target.resource_id}': {e}")
-                output = {"error": str(e)}
+                logger.warning(f"Exception during tap with {selector_info}: {e}")
+                attempts.append({"selector": selector_info, "error": str(e)})
 
         # 3. If resource_id failed or wasn't provided, try with text (last resort)
-        if output is not None and target.text:
+        if not success and target.text:
+            selector_info = f"text='{target.text}' (index={target.text_index})"
             try:
                 selector = TextSelectorRequest(text=target.text)
-                logger.info(
-                    f"Attempting to tap using text: '{target.text}' at index {target.text_index}"
-                )
-                latest_selector_info = f"text='{target.text}' (index={target.text_index})"
+                logger.info(f"Attempting tap with {selector_info}")
                 result = tap_controller(
                     ctx=ctx,
                     selector_request=selector,
                     index=target.text_index,
                     ui_hierarchy=state.latest_ui_hierarchy,
                 )
-                if result is None:  # Success
-                    output = None
+                if result is None:
+                    success = True
+                    successful_selector = selector_info
                 else:
-                    logger.warning(f"Tap with text '{target.text}' failed. Error: {result}")
-                    output = result
+                    error_msg = (
+                        result.get("error", str(result))
+                        if isinstance(result, dict)
+                        else str(result)
+                    )
+                    logger.warning(f"Tap with {selector_info} failed: {error_msg}")
+                    attempts.append({"selector": selector_info, "error": error_msg})
             except Exception as e:
-                logger.warning(f"Exception during tap with text '{target.text}': {e}")
-                output = {"error": str(e)}
+                logger.warning(f"Exception during tap with {selector_info}: {e}")
+                attempts.append({"selector": selector_info, "error": str(e)})
 
-        has_failed = output is not None
-        final_selector_info = latest_selector_info if latest_selector_info else "N/A"
-        agent_outcome = (
-            tap_wrapper.on_failure_fn(final_selector_info)
-            if has_failed
-            else tap_wrapper.on_success_fn(final_selector_info)
-        )
+        # Build result message
+        if success:
+            agent_outcome = tap_wrapper.on_success_fn(successful_selector)
+        else:
+            # Build detailed failure message with all attempts
+            failure_details = "; ".join([f"{a['selector']}: {a['error']}" for a in attempts])
+            agent_outcome = tap_wrapper.on_failure_fn(failure_details)
 
         tool_message = ToolMessage(
             tool_call_id=tool_call_id,
             content=agent_outcome,
-            additional_kwargs={"error": output} if has_failed else {},
-            status="error" if has_failed else "success",
+            additional_kwargs={"attempts": attempts} if not success else {},
+            status="success" if success else "error",
         )
         return Command(
             update=await state.asanitize_update(
@@ -152,6 +179,5 @@ def get_tap_tool(ctx: MobileUseContext) -> BaseTool:
 tap_wrapper = ToolWrapper(
     tool_fn_getter=get_tap_tool,
     on_success_fn=lambda selector_info: f"Tap on element with {selector_info} was successful.",
-    on_failure_fn=lambda selector_info: "Failed to tap on element. "
-    + f"Last attempt was with {selector_info}.",
+    on_failure_fn=lambda failure_details: f"Failed to tap on element. Attempts: {failure_details}",
 )
