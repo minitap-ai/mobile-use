@@ -3,7 +3,8 @@
 Extract relevant information from batch data. **Keep extracted data exactly as-is** - no reformatting.
 
 ## Output
-- **output**: Extracted information (or `None` if not found)
+- **found**: `true` if data was found, `false` otherwise
+- **output**: Extracted information if found, `null` otherwise
 - **reason**: Brief explanation of search logic
 
 ## Rules
@@ -11,4 +12,4 @@ Extract relevant information from batch data. **Keep extracted data exactly as-i
 2. **For app package lookup**: Match app name (or variations) in package identifier
    - Common patterns: lowercase app name, company+app, brand name, codenames
 3. **Prefer direct matches** over partial matches
-4. **Return `None`** if not found or if multiple ambiguous matches exist - don't guess
+4. **Return `null`** if not found or if multiple ambiguous matches exist - don't guess

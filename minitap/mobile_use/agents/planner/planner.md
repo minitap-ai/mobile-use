@@ -25,7 +25,7 @@ All actions must stay within this app (except OAuth flows).
 - **Not too granular**: High-level milestones, not button-by-button
 - **No loops**: Instead of "repeat 3 times", write 3 separate subgoals
 
-**Shortcuts**: Use tools like `launch_app`, `open_link` instead of manual navigation.
+**Shortcuts**: Always prefer `launch_app` to open apps (not manual app drawer navigation), `open_link` for URLs.
 
 Available tools: {{ executor_tools_list }}
 

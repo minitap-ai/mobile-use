@@ -9,7 +9,8 @@ from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_mes
 
 
 class HopperOutput(BaseModel):
-    output: str = Field(description="The interesting data extracted from the input data.")
+    found: bool = Field(description="True if the requested data was found, False otherwise.")
+    output: str | None = Field(description="The extracted data if found, null otherwise.")
     reason: str = Field(
         description="A short explanation of what you looked for"
         + " and how you decided what to extract."
