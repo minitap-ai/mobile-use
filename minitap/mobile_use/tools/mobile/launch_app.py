@@ -18,6 +18,7 @@ from minitap.mobile_use.utils.app_launch_utils import launch_app_with_retries
 async def find_package(ctx: MobileUseContext, app_name: str) -> str | None:
     """
     Finds the package name for a given application name.
+    Returns None if package not found or on error.
     """
     all_packages = list_packages(ctx=ctx)
     try:
@@ -26,7 +27,8 @@ async def find_package(ctx: MobileUseContext, app_name: str) -> str | None:
             request=f"I'm looking for the package name of the following app: '{app_name}'",
             data=all_packages,
         )
-        # Assuming hopper_output.output directly contains the package name
+        if not hopper_output.found:
+            return None
         return hopper_output.output
     except Exception as e:
         print(f"Failed to find package for '{app_name}': {e}")
