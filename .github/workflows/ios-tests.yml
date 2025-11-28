@@ -1,0 +1,62 @@
+name: iOS Simulator Tests 📱
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ios-tests:
+    runs-on: macos-14  # macos-14 includes Xcode 15+ with iOS 17 simulators
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: List available simulators
+        run: make simulator-list
+
+      - name: Select Xcode version
+        run: sudo xcode-select -s /Applications/Xcode_15.2.app/Contents/Developer
+
+      - name: Create and boot iOS Simulator
+        run: |
+          # Create a new iOS 17.2 simulator for CI
+          UDID=$(xcrun simctl create "CI-iPhone-15" "iPhone 15" "iOS17.2")
+          echo "Created simulator with UDID: $UDID"
+          
+          # Boot the simulator
+          xcrun simctl boot $UDID
+          xcrun simctl bootstatus $UDID -b
+          echo "Simulator booted successfully"
+          
+          # Save UDID for make test-ios
+          echo "$UDID" > .ios_udid
+          echo "SIMULATOR_UDID=$UDID" >> $GITHUB_ENV
+
+      - name: Install Homebrew dependencies
+        run: |
+          brew tap facebook/fb
+          brew install idb-companion
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install Python dependencies
+        run: make install
+
+      - name: Run iOS simulator tests
+        run: make test-ios
+
+      - name: Cleanup
+        if: always()
+        run: |
+          # Shutdown and delete CI simulator
+          make simulator-down
+          if [ -n "$SIMULATOR_UDID" ]; then
+            xcrun simctl delete $SIMULATOR_UDID || true
+          fi

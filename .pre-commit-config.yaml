@@ -1,0 +1,28 @@
+# Pre-commit hooks configuration
+# Install with: make precommit-install
+# Run manually: make precommit
+
+repos:
+  # Ruff formatter and linter
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.5.3
+    hooks:
+      # Run the formatter
+      - id: ruff-format
+        name: Ruff Format
+        description: Format Python code with Ruff
+
+      # Run the linter
+      - id: ruff
+        name: Ruff Lint
+        description: Lint Python code with Ruff
+        args: [--fix]
+
+  - repo: local
+    hooks:
+      - id: pyright
+        name: Pyright Type Checker
+        entry: uv run pyright
+        language: system
+        types: [python]
+        pass_filenames: false

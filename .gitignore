@@ -6,3 +6,6 @@ __pycache__
 
 # User config
 llm-config.override.jsonc
+
+# iOS simulator UDID cache
+.ios_udid
