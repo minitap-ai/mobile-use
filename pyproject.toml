@@ -134,7 +134,8 @@ pythonpath = [
 ]
 # Specify test discovery patterns
 testpaths = [
-    "minitap"
+    "minitap",
+    "tests"
 ]
 python_files = [
     "*.test.py",
@@ -154,10 +155,18 @@ addopts = [
     "--strict-markers",     # strict marker checking
     "--disable-warnings",   # disable warnings for cleaner output
 ]
+# Define custom markers
+markers = [
+    "ios_simulator: tests requiring iOS simulator (run on macOS with IDB)",
+    "android: tests requiring Android device or emulator",
+]
 
 [dependency-groups]
 dev = [
+    "ruff>=0.5.3",
     "pytest>=8.4.1",
     "pytest-asyncio>=1.2.0",
+    "pytest-cov>=5.0.0",
     "pyright>=1.1.389",
+    "pre-commit>=3.5.0",
 ]

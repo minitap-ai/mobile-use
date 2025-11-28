@@ -1,13 +1,14 @@
 """Test script to debug IDB screenshot and accessibility hierarchy."""
 
 import asyncio
+import os
 import time
 
 from minitap.mobile_use.clients.idb_client import IdbClientWrapper
 
 
 async def test_idb():
-    udid = "8EDAF7E4-5924-44B0-8126-5659EE079359"
+    udid = os.getenv("IOS_UDID", "8EDAF7E4-5924-44B0-8126-5659EE079359")
 
     print(f"Creating IDB client for device: {udid}")
     idb = IdbClientWrapper(udid=udid)

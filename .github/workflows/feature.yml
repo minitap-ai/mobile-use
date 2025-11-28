@@ -47,7 +47,7 @@ jobs:
         run: uv sync --dev
 
       - name: Run tests
-        run: uv run pytest
+        run: uv run pytest -m "not ios_simulator"
 
   build:
     runs-on: ubuntu-latest
