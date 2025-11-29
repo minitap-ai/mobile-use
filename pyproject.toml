@@ -155,7 +155,7 @@ addopts = [
     "--strict-markers",     # strict marker checking
     "--disable-warnings",   # disable warnings for cleaner output
 ]
-# Define custom markers
+
 markers = [
     "ios_simulator: tests requiring iOS simulator (run on macOS with IDB)",
     "android: tests requiring Android device or emulator",
