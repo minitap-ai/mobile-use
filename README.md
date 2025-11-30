@@ -11,6 +11,9 @@
 [![Discord](https://img.shields.io/discord/1403058278342201394?color=7289DA&label=Discord&logo=discord&logoColor=white&style=for-the-badge)](https://discord.gg/6nSqmQ9pQs)
 [![GitHub stars](https://img.shields.io/github/stars/minitap-ai/mobile-use?style=for-the-badge&color=e0a8dd)](https://github.com/minitap-ai/mobile-use/stargazers)
 
+<h3>
+    <a href="https://docs.minitap.ai/v2/mcp-server/introduction"><b>📚 Official Documentation</b></a>
+</h3>
 <p align="center">
     <a href="https://discord.gg/6nSqmQ9pQs"><b>Discord</b></a> •
     <a href="https://x.com/minitap_ai?t=iRWtI497UhRGLeCKYQekig&s=09"><b>Twitter / X</b></a>
@@ -48,6 +51,13 @@ The official leaderboard is available [here](https://docs.google.com/spreadsheet
 ## 🚀 Getting Started
 
 Ready to automate your mobile experience? Follow these steps to get mobile-use up and running.
+
+### 🌐 From our Platform
+
+Easiest way to get started is to use our Platform.
+Follow our [Platform quickstart](https://docs.minitap.ai/v2/platform-quickstart) to get started.
+
+### 🛠️ From source
 
 1.  **Set up Environment Variables:**
     Copy the example `.env.example` file to `.env` and add your API keys.
