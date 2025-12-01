@@ -39,12 +39,13 @@ Mobile-use is a powerful, open-source AI agent that controls your Android or IOS
 ## Benchmarks
 
 <p align="center">
-  <img src="./doc/benchmark.jpg" alt="Project banner" />
+  <a href="https://minitap.ai/benchmark">
+    <img src="https://files.peachworlds.com/website/753680a0-c383-451e-9800-703d04489ea9/comparison.png" alt="Project banner" />
+  </a>
 </p>
 
-We are global number 1 Opensource pass@1 on the AndroidWorld benchmark.
-
-More info here: https://minitap.ai/research/mobile-ai-agents-benchmark
+We stand among the top performers in the AndroidWorld benchmark.
+More info here: https://minitap.ai/benchmark
 
 The official leaderboard is available [here](https://docs.google.com/spreadsheets/d/1cchzP9dlTZ3WXQTfYNhh3avxoLipqHN75v1Tb86uhHo/edit?pli=1&gid=0#gid=0)
 
