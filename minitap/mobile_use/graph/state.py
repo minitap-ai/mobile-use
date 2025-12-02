@@ -84,17 +84,14 @@ class State(BaseModel):
             else:
                 raise ValueError("agents_thoughts must be a str or list[str]")
 
-            if updated_agents_thoughts:
-                if agent is None:
-                    raise ValueError("Agent is required when updating the 'agents_thoughts' key")
-                update["agents_thoughts"] = await _add_agent_thoughts(
-                    ctx=ctx,
-                    old=self.agents_thoughts,
-                    new=updated_agents_thoughts,
-                    agent=agent,
-                )
-            else:
-                update["agents_thoughts"] = []
+            if agent is None:
+                raise ValueError("Agent is required when updating the 'agents_thoughts' key")
+            update["agents_thoughts"] = await _add_agent_thoughts(
+                ctx=ctx,
+                old=self.agents_thoughts,
+                new=updated_agents_thoughts,
+                agent=agent,
+            )
         return update
 
 

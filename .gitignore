@@ -9,3 +9,5 @@ llm-config.override.jsonc
 
 # iOS simulator UDID cache
 .ios_udid
+
+*.DS_Store
