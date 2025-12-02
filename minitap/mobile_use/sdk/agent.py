@@ -888,7 +888,6 @@ class Agent:
             device_date=None,
             structured_decisions=None,
             complete_subgoals_by_ids=[],
-            screen_analysis_prompt=None,
             agents_thoughts=[],
             remaining_steps=task.request.max_steps,
             executor_messages=[],

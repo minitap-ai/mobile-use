@@ -100,7 +100,6 @@ AgentNode = Literal[
     "orchestrator",
     "contextor",
     "cortex",
-    "screen_analyzer",
     "executor",
 ]
 AgentNodeWithFallback = AgentNode
@@ -166,7 +165,6 @@ class LLMConfig(BaseModel):
     orchestrator: LLMWithFallback
     contextor: LLMWithFallback
     cortex: LLMWithFallback
-    screen_analyzer: LLMWithFallback
     executor: LLMWithFallback
     utils: LLMConfigUtils
 
@@ -175,7 +173,6 @@ class LLMConfig(BaseModel):
         self.orchestrator.validate_provider("Orchestrator")
         self.contextor.validate_provider("Contextor")
         self.cortex.validate_provider("Cortex")
-        self.screen_analyzer.validate_provider("ScreenAnalyzer")
         self.executor.validate_provider("Executor")
         self.utils.outputter.validate_provider("Outputter")
         self.utils.hopper.validate_provider("Hopper")
@@ -186,7 +183,6 @@ class LLMConfig(BaseModel):
 🎯 Orchestrator: {self.orchestrator}
 🔍 Contextor: {self.contextor}
 🧠 Cortex: {self.cortex}
-👁️ ScreenAnalyzer: {self.screen_analyzer}
 🛠️ Executor: {self.executor}
 🧩 Utils:
     🔽 Hopper: {self.utils.hopper}
@@ -229,11 +225,6 @@ def get_default_llm_config() -> LLMConfig:
                 provider="openai",
                 model="gpt-5",
                 fallback=LLM(provider="openai", model="o4-mini"),
-            ),
-            screen_analyzer=LLMWithFallback(
-                provider="openai",
-                model="gpt-4o",
-                fallback=LLM(provider="openai", model="gpt-5-mini"),
             ),
             executor=LLMWithFallback(
                 provider="openai",
@@ -286,11 +277,6 @@ def get_default_minitap_llm_config(validate: bool = True) -> LLMConfig | None:
             provider="minitap",
             model="google/gemini-2.5-pro",
             fallback=LLM(provider="minitap", model="openai/gpt-5"),
-        ),
-        screen_analyzer=LLMWithFallback(
-            provider="minitap",
-            model="meta-llama/llama-3.2-90b-vision-instruct",
-            fallback=LLM(provider="minitap", model="openai/gpt-4o"),
         ),
         executor=LLMWithFallback(
             provider="minitap",

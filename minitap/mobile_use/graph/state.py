@@ -47,13 +47,6 @@ class State(BaseModel):
         take_last,
     ]
 
-    # screen_analyzer related keys
-    screen_analysis_prompt: Annotated[
-        str | None,
-        "Prompt for the screen_analyzer agent to analyze the screen",
-        take_last,
-    ]
-
     # executor related keys
     executor_messages: Annotated[list[AnyMessage], "Sequential Executor messages", add_messages]
     cortex_last_thought: Annotated[str | None, "Last thought of the cortex for the executor"]

@@ -83,11 +83,6 @@ def get_agent() -> Agent:
                 model="o4-mini",
                 fallback=LLM(provider="openai", model="gpt-5"),
             ),
-            screen_analyzer=LLMWithFallback(
-                provider="openai",
-                model="gpt-4o",
-                fallback=LLM(provider="openai", model="gpt-5-nano"),
-            ),
             executor=LLMWithFallback(
                 provider="openai",
                 model="gpt-5-nano",
@@ -130,11 +125,6 @@ def get_agent() -> Agent:
                 provider="openai",
                 model="o4-mini",
                 fallback=LLM(provider="openai", model="gpt-5"),
-            ),
-            screen_analyzer=LLMWithFallback(
-                provider="openai",
-                model="gpt-4o",
-                fallback=LLM(provider="openai", model="gpt-5-nano"),
             ),
             executor=LLMWithFallback(
                 provider="openai",

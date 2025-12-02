@@ -639,7 +639,6 @@ if __name__ == "__main__":
         device_date="",
         structured_decisions=None,
         complete_subgoals_by_ids=[],
-        screen_analysis_prompt=None,
         executor_messages=[],
         cortex_last_thought="",
         agents_thoughts=[],

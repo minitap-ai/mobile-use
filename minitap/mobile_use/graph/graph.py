@@ -17,7 +17,6 @@ from minitap.mobile_use.agents.planner.utils import (
     get_current_subgoal,
     one_of_them_is_failure,
 )
-from minitap.mobile_use.agents.screen_analyzer.screen_analyzer import ScreenAnalyzerNode
 from minitap.mobile_use.agents.summarizer.summarizer import SummarizerNode
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
@@ -68,9 +67,6 @@ def post_cortex_gate(
     if state.structured_decisions:
         node_sequence.append("execute_decisions")
 
-    if state.screen_analysis_prompt:
-        node_sequence.append("analyze_screen")
-
     return node_sequence
 
 
@@ -117,8 +113,6 @@ async def get_graph(ctx: MobileUseContext) -> CompiledStateGraph:
 
     graph_builder.add_node("summarizer", SummarizerNode(ctx))
 
-    graph_builder.add_node("screen_analyzer", ScreenAnalyzerNode(ctx))
-
     graph_builder.add_node(node="convergence", action=convergence_node, defer=True)
 
     ## Linking nodes
@@ -131,7 +125,6 @@ async def get_graph(ctx: MobileUseContext) -> CompiledStateGraph:
         post_cortex_gate,
         {
             "review_subgoals": "orchestrator",
-            "analyze_screen": "screen_analyzer",
             "execute_decisions": "executor",
         },
     )
@@ -142,7 +135,6 @@ async def get_graph(ctx: MobileUseContext) -> CompiledStateGraph:
     )
     graph_builder.add_edge("executor_tools", "summarizer")
 
-    graph_builder.add_edge("screen_analyzer", "convergence")
     graph_builder.add_edge("summarizer", "convergence")
 
     graph_builder.add_conditional_edges(
