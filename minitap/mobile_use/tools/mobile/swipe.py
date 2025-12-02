@@ -75,7 +75,8 @@ def get_composite_swipe_tools(ctx: MobileUseContext) -> list[BaseTool]:
         swipe_request: SwipeRequest,
     ) -> Command:
         """Shared swipe execution logic."""
-        output = swipe_controller(ctx=ctx, swipe_request=swipe_request)
+        controller = UnifiedMobileController(ctx)
+        output = await controller.swipe_request(swipe_request)
         has_failed = output is not None
 
         agent_outcome = (
