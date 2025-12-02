@@ -94,25 +94,12 @@ class CortexNode:
             response.decisions = None
         if response.goals_completion_reason in EMPTY_STRING_TOKENS:
             response.goals_completion_reason = None
-        if response.screen_analysis_prompt in EMPTY_STRING_TOKENS:
-            response.screen_analysis_prompt = None
-
-        # Enforce mutual exclusivity: screen_analysis_prompt and decisions cannot coexist
-        # If both are provided, prioritize decisions and discard screen_analysis_prompt
-        if response.decisions is not None and response.screen_analysis_prompt is not None:
-            logger.warning(
-                "Both 'decisions' and 'screen_analysis_prompt' were provided. "
-                "Prioritizing execution decisions and discarding screen analysis request."
-            )
-            response.screen_analysis_prompt = None
 
         thought_parts = []
         if response.decisions_reason:
             thought_parts.append(f"Decisions reason: {response.decisions_reason}")
         if response.goals_completion_reason:
             thought_parts.append(f"Goals completion reason: {response.goals_completion_reason}")
-        if response.screen_analysis_prompt:
-            thought_parts.append(f"Screen analysis query: {response.screen_analysis_prompt}")
 
         agent_thought = "\n\n".join(thought_parts)
 
@@ -122,7 +109,6 @@ class CortexNode:
                 "agents_thoughts": [agent_thought],
                 "structured_decisions": response.decisions,
                 "complete_subgoals_by_ids": response.complete_subgoals_by_ids,
-                "screen_analysis_prompt": response.screen_analysis_prompt,
                 "latest_ui_hierarchy": None,
                 "latest_screenshot": None,
                 "focused_app_info": None,
