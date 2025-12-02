@@ -29,7 +29,6 @@ class Settings(BaseSettings):
     MINITAP_BASE_URL: str = "https://platform.minitap.ai"
 
     DEVICE_SCREEN_API_BASE_URL: str | None = None
-    DEVICE_HARDWARE_BRIDGE_BASE_URL: str | None = None
     ADB_HOST: str | None = None
     ADB_PORT: int | None = None
 

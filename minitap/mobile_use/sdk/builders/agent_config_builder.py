@@ -135,18 +135,6 @@ class AgentConfigBuilder:
         self._task_request_defaults = copy.deepcopy(config)
         return self
 
-    def with_hw_bridge(self, url: str | ApiBaseUrl) -> "AgentConfigBuilder":
-        """
-        Set the base URL for the device HW bridge API.
-
-        Args:
-            url: The base URL for the HW bridge API
-        """
-        if isinstance(url, str):
-            url = ApiBaseUrl.from_url(url)
-        self._servers.hw_bridge_base_url = url
-        return self
-
     def with_screen_api(self, url: str | ApiBaseUrl) -> "AgentConfigBuilder":
         """
         Set the base URL for the device screen API.

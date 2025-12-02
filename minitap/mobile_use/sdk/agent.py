@@ -1,7 +1,6 @@
 import asyncio
 import sys
 import tempfile
-import time
 import uuid
 from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime
@@ -39,7 +38,7 @@ from minitap.mobile_use.graph.graph import get_graph
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.sdk.builders.agent_config_builder import get_default_agent_config
 from minitap.mobile_use.sdk.builders.task_request_builder import TaskRequestBuilder
-from minitap.mobile_use.sdk.constants import DEFAULT_HW_BRIDGE_BASE_URL, DEFAULT_SCREEN_API_BASE_URL
+from minitap.mobile_use.sdk.constants import DEFAULT_SCREEN_API_BASE_URL
 from minitap.mobile_use.sdk.services.cloud_mobile import CloudMobileService
 from minitap.mobile_use.sdk.services.platform import PlatformService
 from minitap.mobile_use.sdk.types.agent import AgentConfig
@@ -62,11 +61,7 @@ from minitap.mobile_use.sdk.types.task import (
     Task,
     TaskRequest,
 )
-from minitap.mobile_use.servers.device_hardware_bridge import BridgeStatus
-from minitap.mobile_use.servers.start_servers import (
-    start_device_hardware_bridge,
-    start_device_screen_api,
-)
+from minitap.mobile_use.servers.start_servers import start_device_screen_api
 from minitap.mobile_use.servers.stop_servers import stop_servers
 from minitap.mobile_use.utils.app_launch_utils import _handle_initial_app_launch
 from minitap.mobile_use.utils.logger import get_logger
@@ -91,7 +86,6 @@ class Agent:
     _tmp_traces_dir: Path
     _initialized: bool = False
     _is_default_screen_api: bool
-    _is_default_hw_bridge: bool
     _device_context: DeviceContext
     _screen_api_client: ScreenApiClient
     _hw_bridge_client: DeviceHardwareClient
@@ -107,9 +101,6 @@ class Agent:
         self._tasks = []
         self._tmp_traces_dir = Path(tempfile.gettempdir()) / "mobile-use-traces"
         self._initialized = False
-        self._is_default_hw_bridge = (
-            self._config.servers.hw_bridge_base_url == DEFAULT_HW_BRIDGE_BASE_URL
-        )
         self._is_default_screen_api = (
             self._config.servers.screen_api_base_url == DEFAULT_SCREEN_API_BASE_URL
         )
@@ -148,8 +139,6 @@ class Agent:
 
         if not which("adb") and not which("xcrun"):
             raise ExecutableNotFoundError("cli_tools")
-        if self._is_default_hw_bridge and not which("maestro"):
-            raise ExecutableNotFoundError("maestro")
 
         if self._initialized:
             logger.warning("Agent is already initialized. Skipping...")
@@ -203,7 +192,6 @@ class Agent:
                 )
                 stop_servers(
                     should_stop_screen_api=self._is_default_screen_api,
-                    should_stop_hw_bridge=self._is_default_hw_bridge,
                 )
             else:
                 error_msg = "Mobile-use servers failed to start after all restart attempts."
@@ -748,14 +736,11 @@ class Agent:
             await self._idb_client.cleanup()
             self._idb_client = None
 
-        screen_api_ok, hw_bridge_ok = stop_servers(
+        screen_api_ok = stop_servers(
             should_stop_screen_api=self._is_default_screen_api,
-            should_stop_hw_bridge=self._is_default_hw_bridge,
         )
         if not screen_api_ok:
             logger.warning("Failed to stop Device Screen API.")
-        if not hw_bridge_ok:
-            logger.warning("Failed to stop Device Hardware Bridge.")
         self._initialized = False
         logger.info("✅ Mobile-use agent stopped.")
 
@@ -922,44 +907,6 @@ class Agent:
         )
 
     def _run_servers(self, device_id: str, platform: DevicePlatform) -> bool:
-        if self._is_default_hw_bridge:
-            bridge_instance = start_device_hardware_bridge(
-                device_id=device_id,
-                platform=platform,
-                adb_host=self._config.servers.adb_host,
-            )
-            if not bridge_instance:
-                logger.warning("Failed to start Device Hardware Bridge.")
-                return False
-
-            logger.info("Waiting for Device Hardware Bridge to connect to a device...")
-            while True:
-                status_info = bridge_instance.get_status()
-                status = status_info.get("status")
-                output = status_info.get("output")
-
-                if status == BridgeStatus.RUNNING.value:
-                    logger.success(
-                        "Device Hardware Bridge is running. "
-                        + f"Connected to device: {device_id} [{platform.value}]"
-                    )
-                    break
-
-                failed_statuses = [
-                    BridgeStatus.NO_DEVICE.value,
-                    BridgeStatus.FAILED.value,
-                    BridgeStatus.PORT_IN_USE.value,
-                    BridgeStatus.STOPPED.value,
-                ]
-                if status in failed_statuses:
-                    logger.error(
-                        f"Device Hardware Bridge failed to connect. "
-                        f"Status: {status} - Output: {output}"
-                    )
-                    return False
-
-                time.sleep(1)
-
         # Start Device Screen API if not already running
         if self._is_default_screen_api:
             api_process = start_device_screen_api(use_process=True)

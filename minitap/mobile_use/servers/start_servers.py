@@ -8,17 +8,15 @@ from typing import Annotated
 
 import requests
 import typer
+
 from minitap.mobile_use.context import DevicePlatform
 from minitap.mobile_use.servers.config import server_settings
-from minitap.mobile_use.servers.device_hardware_bridge import DeviceHardwareBridge
-from minitap.mobile_use.servers.device_screen_api import start as _start_device_screen_api
 from minitap.mobile_use.servers.stop_servers import stop_servers
 from minitap.mobile_use.utils.logger import get_server_logger
 
 logger = get_server_logger()
 
 running_processes = []
-bridge_instance = None
 shutdown_requested = False
 
 
@@ -59,31 +57,6 @@ def _start_device_screen_api_process() -> multiprocessing.Process | None:
         return None
 
 
-def start_device_hardware_bridge(
-    device_id: str, platform: DevicePlatform, adb_host: str | None = None
-) -> DeviceHardwareBridge | None:
-    logger.info("Starting Device Hardware Bridge...")
-
-    try:
-        bridge = DeviceHardwareBridge(
-            device_id=device_id,
-            platform=platform,
-            adb_host=adb_host or server_settings.ADB_HOST,
-        )
-        success = bridge.start()
-
-        if success:
-            logger.info("Device Hardware Bridge started successfully")
-            return bridge
-        else:
-            logger.error("Failed to start Device Hardware Bridge. Exiting.")
-            return None
-
-    except Exception as e:
-        logger.error(f"Error starting Device Hardware Bridge: {e}")
-        return None
-
-
 def start_device_screen_api(use_process: bool = False):
     logger.info("Starting Device Screen API...")
     if use_process:
@@ -93,15 +66,12 @@ def start_device_screen_api(use_process: bool = False):
             return False
         logger.info("Device Screen API started successfully")
         return api_process
-    else:
-        return _start_device_screen_api()
 
 
 cli = typer.Typer(add_completion=False, pretty_exceptions_enable=False)
 
 
 class SupportedServers(str, Enum):
-    DEVICE_HARDWARE_BRIDGE = "hardware_bridge"
     DEVICE_SCREEN_API = "screen_api"
     ALL = "all"
 
@@ -114,7 +84,7 @@ def start(
         SupportedServers, typer.Option("--only", help="Start only one server")
     ] = SupportedServers.ALL,
 ):
-    servers_to_stop = {"device_screen_api": False, "device_hardware_bridge": False}
+    servers_to_stop = {"device_screen_api": False}
 
     def signal_handler(signum, frame):
         logger.info("Signal received, stopping servers...")
@@ -127,16 +97,7 @@ def start(
 
     try:
         if only == SupportedServers.ALL:
-            hardware_bridge = start_device_hardware_bridge(device_id=device_id, platform=platform)
-            if hardware_bridge:
-                servers_to_stop["device_hardware_bridge"] = True
             start_device_screen_api(use_process=False)
-
-        elif only == SupportedServers.DEVICE_HARDWARE_BRIDGE:
-            hardware_bridge = start_device_hardware_bridge(device_id=device_id, platform=platform)
-            if hardware_bridge:
-                servers_to_stop["device_hardware_bridge"] = True
-                hardware_bridge.wait()
 
         elif only == SupportedServers.DEVICE_SCREEN_API:
             start_device_screen_api(use_process=False)
