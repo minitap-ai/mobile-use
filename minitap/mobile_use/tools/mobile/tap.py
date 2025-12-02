@@ -8,13 +8,7 @@ from langgraph.types import Command
 
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
-from minitap.mobile_use.controllers.mobile_command_controller import (
-    CoordinatesSelectorRequest,
-    IdSelectorRequest,
-    SelectorRequestWithCoordinates,
-    TextSelectorRequest,
-)
-from minitap.mobile_use.controllers.mobile_command_controller import tap as tap_controller
+from minitap.mobile_use.controllers.unified_controller import UnifiedMobileController
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 from minitap.mobile_use.tools.types import Target
@@ -53,6 +47,8 @@ def get_tap_tool(ctx: MobileUseContext) -> BaseTool:
                 }
             )
 
+        controller = UnifiedMobileController(ctx)
+
         # 1. Try with COORDINATES FIRST (visual approach)
         if not success and target.coordinates:
             center = target.coordinates.get_center()
@@ -70,15 +66,8 @@ def get_tap_tool(ctx: MobileUseContext) -> BaseTool:
             else:
                 try:
                     center_point = target.coordinates.get_center()
-                    selector = SelectorRequestWithCoordinates(
-                        coordinates=CoordinatesSelectorRequest(x=center_point.x, y=center_point.y)
-                    )
                     logger.info(f"Attempting tap with {selector_info}")
-                    result = tap_controller(
-                        ctx=ctx,
-                        selector_request=selector,
-                        ui_hierarchy=state.latest_ui_hierarchy,
-                    )
+                    result = await controller.tap_at(x=center_point.x, y=center_point.y)
                     if result is None:
                         success = True
                         successful_selector = selector_info
@@ -98,13 +87,10 @@ def get_tap_tool(ctx: MobileUseContext) -> BaseTool:
         if not success and target.resource_id:
             selector_info = f"resource_id='{target.resource_id}' (index={target.resource_id_index})"
             try:
-                selector = IdSelectorRequest(id=target.resource_id)
                 logger.info(f"Attempting tap with {selector_info}")
-                result = tap_controller(
-                    ctx=ctx,
-                    selector_request=selector,
-                    index=target.resource_id_index,
-                    ui_hierarchy=state.latest_ui_hierarchy,
+                result = await controller.tap_element(
+                    resource_id=target.resource_id,
+                    index=target.resource_id_index or 0,
                 )
                 if result is None:
                     success = True
@@ -125,13 +111,10 @@ def get_tap_tool(ctx: MobileUseContext) -> BaseTool:
         if not success and target.text:
             selector_info = f"text='{target.text}' (index={target.text_index})"
             try:
-                selector = TextSelectorRequest(text=target.text)
                 logger.info(f"Attempting tap with {selector_info}")
-                result = tap_controller(
-                    ctx=ctx,
-                    selector_request=selector,
-                    index=target.text_index,
-                    ui_hierarchy=state.latest_ui_hierarchy,
+                result = await controller.tap_element(
+                    text=target.text,
+                    index=target.text_index or 0,
                 )
                 if result is None:
                     success = True
