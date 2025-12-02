@@ -82,7 +82,7 @@ def get_screen_data_from_context(ctx: MobileUseContext) -> ScreenDataResponse:
 
 
 def take_screenshot(ctx: MobileUseContext):
-    return get_screen_data(ctx.screen_api_client).base64
+    return get_screen_data_from_context(ctx).base64
 
 
 class RunFlowRequest(BaseModel):
