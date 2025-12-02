@@ -1,7 +1,7 @@
 from typing import Annotated
 
 from langchain_core.messages import ToolMessage
-from langchain_core.tools import tool
+from langchain_core.tools import BaseTool, tool
 from langchain_core.tools.base import InjectedToolCallId
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
@@ -238,7 +238,7 @@ class TextClearer:
         )
 
 
-def get_focus_and_clear_text_tool(ctx: MobileUseContext):
+def get_focus_and_clear_text_tool(ctx: MobileUseContext) -> BaseTool:
     @tool
     async def focus_and_clear_text(
         tool_call_id: Annotated[str, InjectedToolCallId],
