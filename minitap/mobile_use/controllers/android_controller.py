@@ -71,7 +71,7 @@ class AndroidDeviceController(MobileDeviceController):
             return f"ADB swipe failed: {str(e)}"
 
     async def get_screen_data(self) -> ScreenDataResponse:
-        """Get screen data using the screen API client (Maestro for hierarchy)."""
+        """Get screen data using the UIAutomator2 client"""
         try:
             logger.info("Using UIAutomator2 for screen data retrieval")
             ui_data = self.ui_adb_client.get_screen_data()

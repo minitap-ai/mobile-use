@@ -28,7 +28,6 @@ class Settings(BaseSettings):
     OPENAI_BASE_URL: str | None = None
     MINITAP_BASE_URL: str = "https://platform.minitap.ai"
 
-    DEVICE_SCREEN_API_BASE_URL: str | None = None
     ADB_HOST: str | None = None
     ADB_PORT: int | None = None
 

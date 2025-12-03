@@ -8,12 +8,8 @@ from langchain_core.callbacks.base import Callbacks
 
 from minitap.mobile_use.config import get_default_llm_config, get_default_minitap_llm_config
 from minitap.mobile_use.context import DevicePlatform
-from minitap.mobile_use.sdk.constants import (
-    DEFAULT_HW_BRIDGE_BASE_URL,
-    DEFAULT_PROFILE_NAME,
-    DEFAULT_SCREEN_API_BASE_URL,
-)
-from minitap.mobile_use.sdk.types.agent import AgentConfig, AgentProfile, ApiBaseUrl, ServerConfig
+from minitap.mobile_use.sdk.constants import DEFAULT_PROFILE_NAME
+from minitap.mobile_use.sdk.types.agent import AgentConfig, AgentProfile, ServerConfig
 from minitap.mobile_use.sdk.types.task import TaskRequestCommon
 
 
@@ -135,18 +131,6 @@ class AgentConfigBuilder:
         self._task_request_defaults = copy.deepcopy(config)
         return self
 
-    def with_screen_api(self, url: str | ApiBaseUrl) -> "AgentConfigBuilder":
-        """
-        Set the base URL for the device screen API.
-
-        Args:
-            url: The base URL for the screen API
-        """
-        if isinstance(url, str):
-            url = ApiBaseUrl.from_url(url)
-        self._servers.screen_api_base_url = url
-        return self
-
     def with_adb_server(self, host: str, port: int | None = None) -> "AgentConfigBuilder":
         """
         Set the ADB server host and port.
@@ -241,8 +225,6 @@ def get_default_agent_config():
 
 def get_default_servers():
     return ServerConfig(
-        hw_bridge_base_url=copy.deepcopy(DEFAULT_HW_BRIDGE_BASE_URL),
-        screen_api_base_url=copy.deepcopy(DEFAULT_SCREEN_API_BASE_URL),
         adb_host="localhost",
         adb_port=5037,
     )
