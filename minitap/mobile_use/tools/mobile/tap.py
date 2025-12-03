@@ -68,15 +68,11 @@ def get_tap_tool(ctx: MobileUseContext) -> BaseTool:
                     center_point = target.coordinates.get_center()
                     logger.info(f"Attempting tap with {selector_info}")
                     result = await controller.tap_at(x=center_point.x, y=center_point.y)
-                    if result is None:
+                    if result.error is None:
                         success = True
                         successful_selector = selector_info
                     else:
-                        error_msg = (
-                            result.get("error", str(result))
-                            if isinstance(result, dict)
-                            else str(result)
-                        )
+                        error_msg = result.error
                         logger.warning(f"Tap with {selector_info} failed: {error_msg}")
                         attempts.append({"selector": selector_info, "error": error_msg})
                 except Exception as e:
@@ -92,15 +88,11 @@ def get_tap_tool(ctx: MobileUseContext) -> BaseTool:
                     resource_id=target.resource_id,
                     index=target.resource_id_index or 0,
                 )
-                if result is None:
+                if result.error is None:
                     success = True
                     successful_selector = selector_info
                 else:
-                    error_msg = (
-                        result.get("error", str(result))
-                        if isinstance(result, dict)
-                        else str(result)
-                    )
+                    error_msg = result.error
                     logger.warning(f"Tap with {selector_info} failed: {error_msg}")
                     attempts.append({"selector": selector_info, "error": error_msg})
             except Exception as e:
@@ -116,15 +108,11 @@ def get_tap_tool(ctx: MobileUseContext) -> BaseTool:
                     text=target.text,
                     index=target.text_index or 0,
                 )
-                if result is None:
+                if result.error is None:
                     success = True
                     successful_selector = selector_info
                 else:
-                    error_msg = (
-                        result.get("error", str(result))
-                        if isinstance(result, dict)
-                        else str(result)
-                    )
+                    error_msg = result.error
                     logger.warning(f"Tap with {selector_info} failed: {error_msg}")
                     attempts.append({"selector": selector_info, "error": error_msg})
             except Exception as e:
