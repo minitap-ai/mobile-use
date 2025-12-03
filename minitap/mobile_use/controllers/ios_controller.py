@@ -253,7 +253,7 @@ class iOSDeviceController(MobileDeviceController):
     def _extract_bounds(self, element: dict) -> Bounds | None:
         """Extract bounds from an iOS UI element."""
         bounds_str = element.get("bounds")
-        if not bounds_str:
+        if not bounds_str or not isinstance(bounds_str, str):
             return None
 
         try:
