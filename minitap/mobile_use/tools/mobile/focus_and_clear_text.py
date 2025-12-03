@@ -182,13 +182,22 @@ class TextClearer:
         )
 
     async def _handle_element_not_found(
-        self, resource_id: str | None, hint_text: str | None
+        self, target: Target, hint_text: str | None
     ) -> ClearTextResult:
+        if not await self._prepare_element_for_clearing(target=target):
+            return self._create_result(
+                success=False,
+                error_message="Failed to focus element",
+                chars_erased=0,
+                final_text=None,
+                hint_text=None,
+            )
+
         controller = UnifiedMobileController(self.ctx)
         output = await controller.erase_text()
         await self._refresh_ui_hierarchy()
 
-        _, final_text, _ = await self._get_element_info(resource_id)
+        _, final_text, _ = await self._get_element_info(target.resource_id)
 
         return self._create_result(
             success=output,
@@ -207,14 +216,12 @@ class TextClearer:
         )
 
         if not element:
-            return await self._handle_element_not_found(target.resource_id, hint_text)
+            return await self._handle_element_not_found(target=target, hint_text=hint_text)
 
         if not self._should_clear_text(current_text, hint_text):
             return self._handle_no_clearing_needed(current_text, hint_text)
 
-        if not await self._prepare_element_for_clearing(
-            target=target,
-        ):
+        if not await self._prepare_element_for_clearing(target=target):
             return self._create_result(
                 success=False,
                 error_message="Failed to focus element",
@@ -256,9 +263,7 @@ def get_focus_and_clear_text_tool(ctx: MobileUseContext) -> BaseTool:
             target: The target text field to clear.
         """
         clearer = TextClearer(ctx, state)
-        result = await clearer.clear_input_text(
-            target=target,
-        )
+        result = await clearer.clear_input_text(target=target)
 
         agent_outcome = (
             focus_and_clear_text_wrapper.on_failure_fn(result.error_message)
