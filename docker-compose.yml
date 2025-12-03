@@ -42,7 +42,6 @@ services:
       - .env
     environment:
       ADB_CONNECT_ADDR: "${ADB_CONNECT_ADDR}"
-      DEVICE_HARDWARE_BRIDGE_BASE_URL: "http://maestro:9999"
       DEVICE_SCREEN_API_BASE_URL: "http://screen-api:9998"
       RESULTS_OUTPUT_PATH: "/home/mobile-use/results.txt"
       EVENTS_OUTPUT_PATH: "/home/mobile-use/events.json"
@@ -52,22 +51,7 @@ services:
       - mobile-use-adb-keys:/home/mobile-use/.android
       - ./llm-config.override.jsonc:/app/llm-config.override.jsonc
     depends_on:
-      - maestro
       - screen-api
-
-  maestro:
-    container_name: maestro
-    user: "mobile-use:mobile-use"
-    restart: unless-stopped
-    build:
-      context: ./assets/maestro
-      dockerfile: Dockerfile
-    environment:
-      ADB_CONNECT_ADDR: "${ADB_CONNECT_ADDR}"
-    volumes:
-      - maestro-adb-keys:/home/mobile-use/.android
-    ports:
-      - "9999:9999"
 
   screen-api:
     container_name: screen-api
@@ -79,11 +63,7 @@ services:
     entrypoint: ["python", "/app/minitap/mobile_use/servers/start_servers.py"]
     command: ["--only", "screen_api", "--device", "None", "--platform", "android"]
     environment:
-      DEVICE_HARDWARE_BRIDGE_BASE_URL: "http://maestro:9999"
       DEVICE_SCREEN_API_PORT: "9998"
-    depends_on:
-      - maestro
 
 volumes:
   mobile-use-adb-keys:
-  maestro-adb-keys:

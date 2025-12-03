@@ -31,8 +31,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # =================
 FROM debian:bookworm-slim
 
-ARG MAESTRO_VERSION=1.41.0
-
 # Install required dependencies for UV & adb
 RUN apt-get update && \
     apt-get install -y --no-install-recommends curl ca-certificates adb unzip wget && \
@@ -49,13 +47,6 @@ RUN useradd -m -s /bin/bash --create-home mobile-use && \
     mkdir -p /home/mobile-use/.android && \
     chown -R mobile-use:mobile-use /home/mobile-use/.android
 USER mobile-use
-
-# Download & install Maestro
-RUN mkdir -p /opt/maestro && \
-    wget -q -O /tmp/${MAESTRO_VERSION} "https://github.com/mobile-dev-inc/maestro/releases/download/cli-${MAESTRO_VERSION}/maestro.zip" && \
-    unzip -q /tmp/${MAESTRO_VERSION} -d /opt/ && \
-    rm /tmp/${MAESTRO_VERSION}
-ENV PATH="/opt/maestro/bin:${PATH}"
 
 WORKDIR /app
 

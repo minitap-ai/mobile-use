@@ -99,10 +99,6 @@ First:
 - Either plug your Android device and enable USB-debugging via the Developer Options
 - Or launch an Android emulator
 
-> [!IMPORTANT]  
-> At some point, the terminal will HANG, and Maestro will ask you `Maestro CLI would like to collect anonymous usage data to improve the product.`
-> It's up to you whether you accept (i.e enter 'Y') or not (i.e. enter 'n').
-
 Then run in your terminal:
 
 1. For Linux/macOS:
@@ -124,7 +120,6 @@ powershell.exe -ExecutionPolicy Bypass -File mobile-use.ps1 `
 
 > [!NOTE]  
 > If using your own device, make sure to accept the ADB-related connection requests that will pop up on your device.
-> Similarly, Maestro will need to install its APK on your device, which will also require you to accept the installation request.
 
 #### 🧰 Troubleshooting
 
@@ -192,7 +187,6 @@ Mobile-use currently supports the following devices:
 Before you begin, ensure you have the following installed:
 
 - **[uv](https://github.com/astral-sh/uv)**: A lightning-fast Python package manager.
-- **[Maestro](https://maestro.mobile.dev/getting-started/installing-maestro)**: The framework we use to interact with your device.
 
 #### 3. Installation
 
