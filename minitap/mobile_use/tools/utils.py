@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
