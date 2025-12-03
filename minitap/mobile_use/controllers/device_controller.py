@@ -137,3 +137,11 @@ class MobileDeviceController(Protocol):
             ScreenDataResponse with base64 screenshot, elements, width, height, platform
         """
         raise NotImplementedError("Subclasses must implement this method")
+
+    @abstractmethod
+    def get_compressed_b64_screenshot(self, image_base64: str, quality: int = 50) -> str:
+        """
+        Compress a base64 image.
+        Returns the compressed base64 image.
+        """
+        raise NotImplementedError("Subclasses must implement this method")

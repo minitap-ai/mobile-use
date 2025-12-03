@@ -1,23 +1,7 @@
-import base64
 import json
-from io import BytesIO
 from pathlib import Path
 
 from PIL import Image
-
-
-def compress_base64_jpeg(base64_str: str, quality: int = 50) -> str:
-    if base64_str.startswith("data:image"):
-        base64_str = base64_str.split(",")[1]
-
-    image_data = base64.b64decode(base64_str)
-    image = Image.open(BytesIO(image_data))
-
-    compressed_io = BytesIO()
-    image.save(compressed_io, format="JPEG", quality=quality, optimize=True)
-
-    compressed_base64 = base64.b64encode(compressed_io.getvalue()).decode("utf-8")
-    return compressed_base64
 
 
 def quantize_and_save_gif(
