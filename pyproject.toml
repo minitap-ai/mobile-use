@@ -1,6 +1,6 @@
 [project]
 name = "minitap-mobile-use"
-version = "2.11.0"
+version = "3.0.0"
 description = "AI-powered multi-agent system that automates real Android and iOS devices through low-level control using LangGraph."
 readme = "README.md"
 license = { file = "LICENSE" }
