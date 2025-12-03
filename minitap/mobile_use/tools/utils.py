@@ -217,9 +217,9 @@ def validate_coordinates_bounds(
     center = target.coordinates.get_center()
     errors = []
 
-    if center.x < 0 or center.x > screen_width:
+    if center.x < 0 or center.x >= screen_width:
         errors.append(f"x={center.x} is outside screen width (0-{screen_width})")
-    if center.y < 0 or center.y > screen_height:
+    if center.y < 0 or center.y >= screen_height:
         errors.append(f"y={center.y} is outside screen height (0-{screen_height})")
 
     return "; ".join(errors) if errors else None
