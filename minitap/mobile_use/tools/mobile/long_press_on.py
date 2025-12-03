@@ -22,9 +22,9 @@ def get_long_press_on_tool(ctx: MobileUseContext) -> BaseTool:
     async def long_press_on(
         agent_thought: str,
         target: Target,
+        tool_call_id: Annotated[str, InjectedToolCallId],
+        state: Annotated[State, InjectedState],
         duration_ms: int = 1000,
-        tool_call_id: Annotated[str, InjectedToolCallId] = None,  # type: ignore
-        state: Annotated[State, InjectedState] = None,  # type: ignore
     ):
         """
         Long presses on a UI element identified by the 'target' object.

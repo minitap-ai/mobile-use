@@ -324,7 +324,7 @@ async def tap(
             width=ctx.device.device_width,
             height=ctx.device.device_height,
         )
-        return await controller.tap_percentage(coords.x, coords.y)
+        return await controller.tap_at(coords.x, coords.y)
 
     # For other selectors, we need the UI hierarchy
     resource_id, text = _extract_resource_id_and_text_from_selector(selector_request)
