@@ -38,10 +38,10 @@ async def find_package(ctx: MobileUseContext, app_name: str) -> str | None:
 def get_launch_app_tool(ctx: MobileUseContext):
     @tool
     async def launch_app(
-        tool_call_id: Annotated[str, InjectedToolCallId],
-        state: Annotated[State, InjectedState],
         app_name: str,
         agent_thought: str,
+        tool_call_id: Annotated[str, InjectedToolCallId],
+        state: Annotated[State, InjectedState],
     ) -> Command:
         """
         Finds and launches an application on the device using its natural language name.

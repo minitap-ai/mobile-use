@@ -1,3 +1,4 @@
+import asyncio
 import sys
 from unittest.mock import Mock, patch
 
@@ -31,6 +32,8 @@ def mock_context():
     ctx.device.device_height = 2340
     ctx.device.host_platform = "LINUX"
 
+    ctx.ui_adb_client = Mock()
+
     # Mock the ADB client for Android
     ctx.adb_client = Mock()
     mock_device = Mock()
@@ -41,7 +44,7 @@ def mock_context():
     ctx.screen_api_client = Mock()
     mock_response = Mock()
     mock_response.json.return_value = {"elements": []}
-    ctx.screen_api_client.get_with_retry = Mock(return_value=mock_response)
+    ctx.ui_adb_client.get_screen_data = Mock(return_value=mock_response)
 
     return ctx
 
@@ -98,7 +101,9 @@ class TestMoveCursorToEndIfBounds:
             text_index=None,
             coordinates=None,
         )
-        result = move_cursor_to_end_if_bounds(ctx=mock_context, state=mock_state, target=target)
+        result = asyncio.run(
+            move_cursor_to_end_if_bounds(ctx=mock_context, state=mock_state, target=target)
+        )
 
         mock_find_element.assert_called_once_with(
             ui_hierarchy=[sample_element],
@@ -129,7 +134,9 @@ class TestMoveCursorToEndIfBounds:
             coordinates=bounds,
         )
 
-        result = move_cursor_to_end_if_bounds(ctx=mock_context, state=mock_state, target=target)
+        result = asyncio.run(
+            move_cursor_to_end_if_bounds(ctx=mock_context, state=mock_state, target=target)
+        )
 
         mock_find_element.assert_not_called()
         mock_tap.assert_called_once()
@@ -156,7 +163,9 @@ class TestMoveCursorToEndIfBounds:
             text_index=0,
             coordinates=None,
         )
-        result = move_cursor_to_end_if_bounds(ctx=mock_context, state=mock_state, target=target)
+        result = asyncio.run(
+            move_cursor_to_end_if_bounds(ctx=mock_context, state=mock_state, target=target)
+        )
 
         mock_find_text.assert_called_once_with([sample_element], "Sample text", index=0)
         mock_tap.assert_called_once()
@@ -178,7 +187,9 @@ class TestMoveCursorToEndIfBounds:
             text_index=None,
             coordinates=None,
         )
-        result = move_cursor_to_end_if_bounds(ctx=mock_context, state=mock_state, target=target)
+        result = asyncio.run(
+            move_cursor_to_end_if_bounds(ctx=mock_context, state=mock_state, target=target)
+        )
 
         mock_tap.assert_not_called()
         assert result is None
@@ -200,7 +211,9 @@ class TestMoveCursorToEndIfBounds:
             text_index=None,
             coordinates=None,
         )
-        result = move_cursor_to_end_if_bounds(ctx=mock_context, state=mock_state, target=target)
+        result = asyncio.run(
+            move_cursor_to_end_if_bounds(ctx=mock_context, state=mock_state, target=target)
+        )
 
         mock_tap.assert_not_called()
         assert result is None  # Should return None as no action was taken
@@ -217,7 +230,9 @@ class TestMoveCursorToEndIfBounds:
             text_index=None,
             coordinates=None,
         )
-        result = move_cursor_to_end_if_bounds(ctx=mock_context, state=mock_state, target=target)
+        result = asyncio.run(
+            move_cursor_to_end_if_bounds(ctx=mock_context, state=mock_state, target=target)
+        )
 
         assert result is None
 
@@ -236,7 +251,7 @@ class TestFocusElementIfNeeded:
 
         mock_response = Mock()
         mock_response.json.return_value = {"elements": [focused_element]}
-        mock_context.screen_api_client.get_with_retry = Mock(return_value=mock_response)
+        mock_context.ui_adb_client.get_screen_data = Mock(return_value=mock_response)
         mock_find_element.return_value = focused_element["attributes"]
 
         target = Target(
@@ -246,11 +261,11 @@ class TestFocusElementIfNeeded:
             text_index=None,
             coordinates=None,
         )
-        result = focus_element_if_needed(ctx=mock_context, target=target)
+        result = asyncio.run(focus_element_if_needed(ctx=mock_context, target=target))
 
         mock_tap.assert_not_called()
         assert result == "resource_id"
-        mock_context.screen_api_client.get_with_retry.assert_called_once()
+        mock_context.ui_adb_client.get_screen_data.assert_called_once()
 
     @patch("minitap.mobile_use.tools.utils.tap")
     @patch("minitap.mobile_use.tools.utils.find_element_by_resource_id")
@@ -267,10 +282,6 @@ class TestFocusElementIfNeeded:
             "children": [],
         }
 
-        mock_context.screen_api_client.get_with_retry.side_effect = [
-            [unfocused_element],
-            [focused_element],
-        ]
         mock_find_element.side_effect = [
             unfocused_element["attributes"],
             focused_element["attributes"],
@@ -283,14 +294,14 @@ class TestFocusElementIfNeeded:
             text_index=None,
             coordinates=None,
         )
-        result = focus_element_if_needed(ctx=mock_context, target=target)
+        result = asyncio.run(focus_element_if_needed(ctx=mock_context, target=target))
 
         mock_tap.assert_called_once_with(
             ctx=mock_context,
             selector_request=IdSelectorRequest(id="com.example:id/text_input"),
             index=0,
         )
-        assert mock_context.screen_api_client.get_with_retry.call_count == 2
+        assert mock_context.ui_adb_client.get_screen_data.call_count == 2
         assert result == "resource_id"
 
     @patch("minitap.mobile_use.tools.utils.tap")
@@ -313,7 +324,7 @@ class TestFocusElementIfNeeded:
 
         mock_response = Mock()
         mock_response.json.return_value = {"elements": [element_from_text]}
-        mock_context.screen_api_client.get_with_retry = Mock(return_value=mock_response)
+        mock_context.ui_adb_client.get_screen_data = Mock(return_value=mock_response)
         mock_find_id.return_value = element_from_id
 
         with patch("minitap.mobile_use.tools.utils.find_element_by_text") as mock_find_text:
@@ -326,7 +337,7 @@ class TestFocusElementIfNeeded:
                 text_index=None,
                 coordinates=None,
             )
-            result = focus_element_if_needed(ctx=mock_context, target=target)
+            result = asyncio.run(focus_element_if_needed(ctx=mock_context, target=target))
 
             mock_logger.warning.assert_called_once()
             mock_tap.assert_called_once()
@@ -348,7 +359,7 @@ class TestFocusElementIfNeeded:
 
         mock_response = Mock()
         mock_response.json.return_value = {"elements": [element_with_bounds]}
-        mock_context.screen_api_client.get_with_retry = Mock(return_value=mock_response)
+        mock_context.ui_adb_client.get_screen_data = Mock(return_value=mock_response)
         mock_find_text.return_value = element_with_bounds["attributes"]
 
         target = Target(
@@ -358,7 +369,7 @@ class TestFocusElementIfNeeded:
             text_index=None,
             coordinates=None,
         )
-        result = focus_element_if_needed(ctx=mock_context, target=target)
+        result = asyncio.run(focus_element_if_needed(ctx=mock_context, target=target))
 
         mock_find_text.assert_called_once()
         mock_tap.assert_called_once()
@@ -375,7 +386,7 @@ class TestFocusElementIfNeeded:
 
         mock_response = Mock()
         mock_response.json.return_value = {"elements": []}
-        mock_context.screen_api_client.get_with_retry = Mock(return_value=mock_response)
+        mock_context.ui_adb_client.get_screen_data = Mock(return_value=mock_response)
         with (
             patch("minitap.mobile_use.tools.utils.find_element_by_resource_id") as mock_find_id,
             patch("minitap.mobile_use.tools.utils.find_element_by_text") as mock_find_text,
@@ -390,7 +401,7 @@ class TestFocusElementIfNeeded:
                 text_index=None,
                 coordinates=None,
             )
-            result = focus_element_if_needed(ctx=mock_context, target=target)
+            result = asyncio.run(focus_element_if_needed(ctx=mock_context, target=target))
 
         mock_logger.error.assert_called_once_with(
             "Failed to focus element."

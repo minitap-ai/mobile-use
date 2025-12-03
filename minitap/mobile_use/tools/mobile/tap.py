@@ -21,10 +21,10 @@ logger = get_logger(__name__)
 def get_tap_tool(ctx: MobileUseContext) -> BaseTool:
     @tool
     async def tap(
-        tool_call_id: Annotated[str, InjectedToolCallId],
-        state: Annotated[State, InjectedState],
         agent_thought: str,
         target: Target,
+        tool_call_id: Annotated[str, InjectedToolCallId],
+        state: Annotated[State, InjectedState],
     ):
         """
         Taps on a UI element identified by the 'target' object.

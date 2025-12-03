@@ -4,6 +4,7 @@ import tempfile
 import uuid
 from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime
+from io import BytesIO
 from pathlib import Path
 from shutil import which
 from types import NoneType
@@ -911,10 +912,6 @@ class Agent:
                     # Use IDB to take a screenshot and get dimensions
                     screenshot_data = await self._idb_client.screenshot()  # type: ignore[call-arg]
                     if screenshot_data:
-                        from io import BytesIO
-
-                        from PIL import Image
-
                         img = Image.open(BytesIO(screenshot_data))
                         device_width = img.width
                         device_height = img.height

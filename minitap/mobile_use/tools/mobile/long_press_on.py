@@ -20,11 +20,11 @@ logger = get_logger(__name__)
 def get_long_press_on_tool(ctx: MobileUseContext) -> BaseTool:
     @tool
     async def long_press_on(
-        tool_call_id: Annotated[str, InjectedToolCallId],
-        state: Annotated[State, InjectedState],
         agent_thought: str,
         target: Target,
         duration_ms: int = 1000,
+        tool_call_id: Annotated[str, InjectedToolCallId] = None,  # type: ignore
+        state: Annotated[State, InjectedState] = None,  # type: ignore
     ):
         """
         Long presses on a UI element identified by the 'target' object.

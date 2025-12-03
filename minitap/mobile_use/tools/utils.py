@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
@@ -65,9 +64,9 @@ def find_element_by_text(
     return search_recursive(ui_hierarchy)
 
 
-def tap_bottom_right_of_element(bounds: ElementBounds, ctx: MobileUseContext):
+async def tap_bottom_right_of_element(bounds: ElementBounds, ctx: MobileUseContext):
     bottom_right: Point = bounds.get_relative_point(x_percent=0.99, y_percent=0.99)
-    tap(
+    await tap(
         ctx=ctx,
         selector_request=SelectorRequestWithCoordinates(
             coordinates=CoordinatesSelectorRequest(
@@ -78,7 +77,7 @@ def tap_bottom_right_of_element(bounds: ElementBounds, ctx: MobileUseContext):
     )
 
 
-def move_cursor_to_end_if_bounds(
+async def move_cursor_to_end_if_bounds(
     ctx: MobileUseContext,
     state: State,
     target: Target,
@@ -103,12 +102,12 @@ def move_cursor_to_end_if_bounds(
             return elt
 
         logger.debug("Tapping near the end of the input to move the cursor")
-        tap_bottom_right_of_element(bounds=bounds, ctx=ctx)
+        await tap_bottom_right_of_element(bounds=bounds, ctx=ctx)
         logger.debug(f"Tapped end of input {target.resource_id}")
         return elt
 
     if target.coordinates:
-        tap_bottom_right_of_element(target.coordinates, ctx=ctx)
+        await tap_bottom_right_of_element(target.coordinates, ctx=ctx)
         logger.debug("Tapped end of input by coordinates")
         return elt
 
@@ -119,7 +118,7 @@ def move_cursor_to_end_if_bounds(
         if text_elt:
             bounds = get_bounds_for_element(text_elt)
             if bounds:
-                tap_bottom_right_of_element(bounds=bounds, ctx=ctx)
+                await tap_bottom_right_of_element(bounds=bounds, ctx=ctx)
                 logger.debug(f"Tapped end of input that had text'{target.text}'")
                 return text_elt
         return None
@@ -127,14 +126,14 @@ def move_cursor_to_end_if_bounds(
     return None
 
 
-def focus_element_if_needed(
+async def focus_element_if_needed(
     ctx: MobileUseContext, target: Target
 ) -> Literal["resource_id", "coordinates", "text"] | None:
     """
     Ensures the element is focused, with a sanity check to prevent trusting misleading IDs.
     """
     controller = UnifiedMobileController(ctx)
-    rich_hierarchy = asyncio.run(controller.get_ui_elements())
+    rich_hierarchy = await controller.get_ui_elements()
     elt_from_id = None
     if target.resource_id:
         elt_from_id = find_element_by_resource_id(
@@ -161,7 +160,7 @@ def focus_element_if_needed(
                 index=target.resource_id_index,
             )
             logger.debug(f"Focused (tap) on resource_id={target.resource_id}")
-            rich_hierarchy = asyncio.run(controller.get_ui_elements())
+            rich_hierarchy = await controller.get_ui_elements()
             elt_from_id = find_element_by_resource_id(
                 ui_hierarchy=rich_hierarchy,
                 resource_id=target.resource_id,  # type: ignore
@@ -175,7 +174,7 @@ def focus_element_if_needed(
 
     if target.coordinates:
         relative_point = target.coordinates.get_center()
-        tap(
+        await tap(
             ctx=ctx,
             selector_request=SelectorRequestWithCoordinates(
                 coordinates=CoordinatesSelectorRequest(x=relative_point.x, y=relative_point.y)
@@ -190,7 +189,7 @@ def focus_element_if_needed(
             bounds = get_bounds_for_element(text_elt)
             if bounds:
                 relative_point = bounds.get_center()
-                tap(
+                await tap(
                     ctx=ctx,
                     selector_request=SelectorRequestWithCoordinates(
                         coordinates=CoordinatesSelectorRequest(
@@ -304,7 +303,7 @@ def _extract_resource_id_and_text_from_selector(
     return resource_id, text
 
 
-def tap(
+async def tap(
     ctx: MobileUseContext,
     selector_request: SelectorRequest,
     index: int | None = None,
@@ -316,8 +315,8 @@ def tap(
     """
     controller = UnifiedMobileController(ctx)
     if isinstance(selector_request, SelectorRequestWithCoordinates):
-        result = asyncio.run(
-            controller.tap_at(x=selector_request.coordinates.x, y=selector_request.coordinates.y)
+        result = await controller.tap_at(
+            x=selector_request.coordinates.x, y=selector_request.coordinates.y
         )
         return result.error if result.error else None
     if isinstance(selector_request, SelectorRequestWithPercentages):
@@ -325,15 +324,13 @@ def tap(
             width=ctx.device.device_width,
             height=ctx.device.device_height,
         )
-        return asyncio.run(controller.tap_percentage(coords.x, coords.y))
+        return await controller.tap_percentage(coords.x, coords.y)
 
     # For other selectors, we need the UI hierarchy
     resource_id, text = _extract_resource_id_and_text_from_selector(selector_request)
 
-    return asyncio.run(
-        controller.tap_element(
-            resource_id=resource_id,
-            text=text,
-            index=index if index is not None else 0,
-        )
+    return await controller.tap_element(
+        resource_id=resource_id,
+        text=text,
+        index=index if index is not None else 0,
     )
