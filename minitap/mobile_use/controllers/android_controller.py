@@ -5,7 +5,6 @@ from io import BytesIO
 from adbutils import AdbClient, AdbDevice
 from PIL import Image
 
-from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
 from minitap.mobile_use.controllers.device_controller import (
     MobileDeviceController,
     ScreenDataResponse,
@@ -21,13 +20,11 @@ class AndroidDeviceController(MobileDeviceController):
         self,
         device_id: str,
         adb_client: AdbClient,
-        ui_adb_client: UIAutomatorClient,
         device_width: int,
         device_height: int,
     ):
         self.device_id = device_id
         self.adb_client = adb_client
-        self.ui_adb_client = ui_adb_client
         self.device_width = device_width
         self.device_height = device_height
         self._device: AdbDevice | None = None
@@ -69,29 +66,6 @@ class AndroidDeviceController(MobileDeviceController):
             return None
         except Exception as e:
             return f"ADB swipe failed: {str(e)}"
-
-    async def get_screen_data(self) -> ScreenDataResponse:
-        """Get screen data using the screen API client (Maestro for hierarchy)."""
-        try:
-            logger.info("Using UIAutomator2 for screen data retrieval")
-            ui_data = self.ui_adb_client.get_screen_data()
-            return ScreenDataResponse(
-                base64=ui_data.base64,
-                elements=ui_data.elements,
-                width=ui_data.width,
-                height=ui_data.height,
-                platform="android",
-            )
-        except Exception as e:
-            logger.error(f"Failed to get screen data: {e}")
-            raise
-
-    async def screenshot(self) -> str:
-        try:
-            return (await self.get_screen_data()).base64
-        except Exception as e:
-            logger.error(f"Failed to take screenshot: {e}")
-            raise
 
     async def input_text(self, text: str) -> bool:
         try:
@@ -167,12 +141,10 @@ class AndroidDeviceController(MobileDeviceController):
             return False
 
     async def get_ui_hierarchy(self) -> list[dict]:
-        try:
-            device_data = await self.get_screen_data()
-            return device_data.elements
-        except Exception as e:
-            logger.error(f"Failed to get UI hierarchy: {e}")
-            return []
+        # For Android, UI hierarchy should be obtained via UIAutomator
+        # This is a fallback that returns empty list
+        logger.warning("get_ui_hierarchy called on Android controller - use UIAutomator instead")
+        return []
 
     def find_element(
         self,
@@ -258,6 +230,22 @@ class AndroidDeviceController(MobileDeviceController):
         except Exception as e:
             logger.error(f"Failed to erase text: {e}")
             return False
+
+    async def screenshot(self) -> str:
+        """Android screenshots should be obtained via UIAutomator or ADB screencap."""
+        logger.warning("screenshot called on Android controller - use UIAutomator instead")
+        return ""
+
+    async def get_screen_data(self) -> ScreenDataResponse:
+        """Android screen data should be obtained via UIAutomator."""
+        logger.warning("get_screen_data called on Android controller - use UIAutomator instead")
+        return ScreenDataResponse(
+            base64="",
+            elements=[],
+            width=self.device_width,
+            height=self.device_height,
+            platform="android",
+        )
 
     async def cleanup(self) -> None:
         pass
