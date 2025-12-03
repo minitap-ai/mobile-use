@@ -40,8 +40,7 @@ def mock_context():
     mock_device.shell = Mock(return_value="")
     ctx.adb_client.device = Mock(return_value=mock_device)
 
-    # Mock the screen API client
-    ctx.screen_api_client = Mock()
+    # Mock the ADB client for Android
     mock_response = Mock()
     mock_response.json.return_value = {"elements": []}
     ctx.ui_adb_client.get_screen_data = Mock(return_value=mock_response)

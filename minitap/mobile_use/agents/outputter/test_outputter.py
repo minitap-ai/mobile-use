@@ -64,7 +64,6 @@ def mock_context():
         "orchestrator": LLM(provider="openai", model="gpt-5-nano"),
     }
     ctx.device = Mock()
-    ctx.screen_api_client = Mock()
     return ctx
 
 

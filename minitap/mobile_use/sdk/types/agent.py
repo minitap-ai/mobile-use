@@ -48,8 +48,6 @@ class ServerConfig(BaseModel):
     Configuration for the required servers.
     """
 
-    hw_bridge_base_url: ApiBaseUrl
-    screen_api_base_url: ApiBaseUrl
     adb_host: str
     adb_port: int
 

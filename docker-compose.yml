@@ -42,7 +42,6 @@ services:
       - .env
     environment:
       ADB_CONNECT_ADDR: "${ADB_CONNECT_ADDR}"
-      DEVICE_SCREEN_API_BASE_URL: "http://screen-api:9998"
       RESULTS_OUTPUT_PATH: "/home/mobile-use/results.txt"
       EVENTS_OUTPUT_PATH: "/home/mobile-use/events.json"
       MOBILE_USE_HEALTH_RETRIES: "150"
@@ -50,20 +49,6 @@ services:
     volumes:
       - mobile-use-adb-keys:/home/mobile-use/.android
       - ./llm-config.override.jsonc:/app/llm-config.override.jsonc
-    depends_on:
-      - screen-api
-
-  screen-api:
-    container_name: screen-api
-    user: "mobile-use:mobile-use"
-    restart: unless-stopped
-    build:
-      context: .
-      dockerfile: slim.Dockerfile
-    entrypoint: ["python", "/app/minitap/mobile_use/servers/start_servers.py"]
-    command: ["--only", "screen_api", "--device", "None", "--platform", "android"]
-    environment:
-      DEVICE_SCREEN_API_PORT: "9998"
 
 volumes:
   mobile-use-adb-keys:
