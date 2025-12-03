@@ -16,9 +16,9 @@ from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 def get_back_tool(ctx: MobileUseContext):
     @tool
     async def back(
+        agent_thought: str,
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
-        agent_thought: str,
     ) -> Command:
         """Navigates to the previous screen. (Only works on Android for the moment)"""
         controller = UnifiedMobileController(ctx)

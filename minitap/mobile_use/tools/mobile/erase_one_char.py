@@ -16,9 +16,9 @@ from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 def get_erase_one_char_tool(ctx: MobileUseContext):
     @tool
     async def erase_one_char(
+        agent_thought: str,
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
-        agent_thought: str,
     ) -> Command:
         """
         Erase one character from a text area.

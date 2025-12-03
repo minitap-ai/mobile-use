@@ -23,10 +23,10 @@ class Key(Enum):
 def get_press_key_tool(ctx: MobileUseContext):
     @tool
     async def press_key(
-        tool_call_id: Annotated[str, InjectedToolCallId],
-        state: Annotated[State, InjectedState],
         agent_thought: str,
         key: Key,
+        tool_call_id: Annotated[str, InjectedToolCallId],
+        state: Annotated[State, InjectedState],
     ) -> Command:
         """Press a key on the device."""
         controller = UnifiedMobileController(ctx)

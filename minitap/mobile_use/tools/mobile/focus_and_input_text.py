@@ -43,11 +43,11 @@ async def _controller_input_text(ctx: MobileUseContext, text: str) -> InputResul
 def get_focus_and_input_text_tool(ctx: MobileUseContext) -> BaseTool:
     @tool
     async def focus_and_input_text(
-        tool_call_id: Annotated[str, InjectedToolCallId],
-        state: Annotated[State, InjectedState],
         agent_thought: str,
         text: str,
         target: Target,
+        tool_call_id: Annotated[str, InjectedToolCallId],
+        state: Annotated[State, InjectedState],
     ):
         """
         Focus a text field and type text into it.
@@ -57,13 +57,11 @@ def get_focus_and_input_text_tool(ctx: MobileUseContext) -> BaseTool:
         - Type the provided `text` using the controller.
 
         Args:
-            tool_call_id: The ID of the tool call.
-            state: The state of the agent.
             agent_thought: The thought of the agent.
             text: The text to type.
             target: The target of the text input (if available).
         """
-        focus_method = focus_element_if_needed(ctx=ctx, target=target)
+        focus_method = await focus_element_if_needed(ctx=ctx, target=target)
         if not focus_method:
             error_message = "Failed to focus the text input element before typing."
             tool_message = ToolMessage(
@@ -83,7 +81,7 @@ def get_focus_and_input_text_tool(ctx: MobileUseContext) -> BaseTool:
                 ),
             )
 
-        move_cursor_to_end_if_bounds(ctx=ctx, state=state, target=target)
+        await move_cursor_to_end_if_bounds(ctx=ctx, state=state, target=target)
 
         result = await _controller_input_text(ctx=ctx, text=text)
         status: Literal["success", "error"] = "success" if result.ok else "error"

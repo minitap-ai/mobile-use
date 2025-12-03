@@ -16,10 +16,10 @@ from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 def get_stop_app_tool(ctx: MobileUseContext):
     @tool
     async def stop_app(
-        tool_call_id: Annotated[str, InjectedToolCallId],
-        state: Annotated[State, InjectedState],
         agent_thought: str,
         package_name: str | None = None,
+        tool_call_id: Annotated[str, InjectedToolCallId] = None,  # type: ignore
+        state: Annotated[State, InjectedState] = None,  # type: ignore
     ) -> Command:
         """
         Stops current application if it is running.

@@ -18,10 +18,10 @@ MAX_DELAY_MS = 60000
 def get_wait_for_delay_tool(ctx: MobileUseContext):
     @tool
     async def wait_for_delay(
-        tool_call_id: Annotated[str, InjectedToolCallId],
-        state: Annotated[State, InjectedState],
         agent_thought: str,
         time_in_ms: int,
+        tool_call_id: Annotated[str, InjectedToolCallId],
+        state: Annotated[State, InjectedState],
     ) -> Command:
         """
         Wait for a delay in milliseconds.

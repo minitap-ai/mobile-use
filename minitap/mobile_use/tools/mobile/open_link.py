@@ -16,10 +16,10 @@ from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 def get_open_link_tool(ctx: MobileUseContext):
     @tool
     async def open_link(
-        tool_call_id: Annotated[str, InjectedToolCallId],
-        state: Annotated[State, InjectedState],
         agent_thought: str,
         url: str,
+        tool_call_id: Annotated[str, InjectedToolCallId],
+        state: Annotated[State, InjectedState],
     ) -> Command:
         """
         Open a link on a device (i.e. a deep link).

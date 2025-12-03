@@ -1,4 +1,3 @@
-import asyncio
 from typing import Annotated
 
 from langchain_core.messages import ToolMessage
@@ -10,6 +9,7 @@ from pydantic import BaseModel
 
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
+from minitap.mobile_use.controllers.controller_factory import create_device_controller
 from minitap.mobile_use.controllers.unified_controller import UnifiedMobileController
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
@@ -21,7 +21,6 @@ from minitap.mobile_use.utils.ui_hierarchy import (
     get_element_text,
     text_input_is_empty,
 )
-from minitap.mobile_use.controllers.controller_factory import create_device_controller
 
 logger = get_logger(__name__)
 
@@ -83,29 +82,29 @@ class TextClearer:
     def _should_clear_text(self, current_text: str | None, hint_text: str | None) -> bool:
         return current_text is not None and current_text != "" and current_text != hint_text
 
-    def _prepare_element_for_clearing(
+    async def _prepare_element_for_clearing(
         self,
         target: Target,
     ) -> bool:
-        if not focus_element_if_needed(
+        if not await focus_element_if_needed(
             ctx=self.ctx,
             target=target,
         ):
             return False
 
-        move_cursor_to_end_if_bounds(
+        await move_cursor_to_end_if_bounds(
             ctx=self.ctx,
             state=self.state,
             target=target,
         )
         return True
 
-    def _erase_text_attempt(self, text_length: int) -> str | None:
+    async def _erase_text_attempt(self, text_length: int) -> str | None:
         chars_to_erase = text_length + 1
         logger.info(f"Erasing {chars_to_erase} characters from the input")
 
         controller = UnifiedMobileController(self.ctx)
-        result = asyncio.run(controller.erase_text())
+        result = await controller.erase_text()
 
         if not result:
             logger.error("Failed to erase text")
@@ -126,7 +125,7 @@ class TextClearer:
             logger.info(f"Clear attempt {attempt}/{MAX_CLEAR_TRIES}")
 
             chars_to_erase = len(current_text) if current_text else DEFAULT_CHARS_TO_ERASE
-            error = self._erase_text_attempt(text_length=chars_to_erase)
+            error = await self._erase_text_attempt(text_length=chars_to_erase)
 
             if error:
                 return False, current_text, 0
@@ -145,7 +144,7 @@ class TextClearer:
                     if text_input_is_empty(text=current_text, hint_text=hint_text):
                         break
 
-            move_cursor_to_end_if_bounds(
+            await move_cursor_to_end_if_bounds(
                 ctx=self.ctx,
                 state=self.state,
                 target=target,
@@ -186,7 +185,7 @@ class TextClearer:
         self, resource_id: str | None, hint_text: str | None
     ) -> ClearTextResult:
         controller = UnifiedMobileController(self.ctx)
-        output = asyncio.run(controller.erase_text())
+        output = await controller.erase_text()
         await self._refresh_ui_hierarchy()
 
         _, final_text, _ = await self._get_element_info(resource_id)
@@ -213,7 +212,7 @@ class TextClearer:
         if not self._should_clear_text(current_text, hint_text):
             return self._handle_no_clearing_needed(current_text, hint_text)
 
-        if not self._prepare_element_for_clearing(
+        if not await self._prepare_element_for_clearing(
             target=target,
         ):
             return self._create_result(
@@ -244,13 +243,17 @@ class TextClearer:
 def get_focus_and_clear_text_tool(ctx: MobileUseContext) -> BaseTool:
     @tool
     async def focus_and_clear_text(
-        tool_call_id: Annotated[str, InjectedToolCallId],
-        state: Annotated[State, InjectedState],
         agent_thought: str,
         target: Target,
+        tool_call_id: Annotated[str, InjectedToolCallId],
+        state: Annotated[State, InjectedState],
     ):
         """
         Clears all the text from the text field, by focusing it if needed.
+
+        Args:
+            agent_thought: The thought of the agent.
+            target: The target text field to clear.
         """
         clearer = TextClearer(ctx, state)
         result = await clearer.clear_input_text(
