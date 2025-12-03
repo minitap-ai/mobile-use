@@ -76,7 +76,7 @@ class AgentProfileNotFoundError(AgentTaskRequestError):
         super().__init__(f"Agent profile {profile_name} not found")
 
 
-EXECUTABLES = Literal["adb", "maestro", "xcrun", "cli_tools"]
+EXECUTABLES = Literal["adb", "xcrun", "idb", "cli_tools"]
 
 
 class ExecutableNotFoundError(MobileUseError):
@@ -85,7 +85,7 @@ class ExecutableNotFoundError(MobileUseError):
     def __init__(self, executable_name: EXECUTABLES):
         install_instructions: dict[EXECUTABLES, str] = {
             "adb": "https://developer.android.com/tools/adb",
-            "maestro": "https://docs.maestro.dev/getting-started/installing-maestro",
+            "idb": "https://fbidb.io/docs/installation/",
             "xcrun": "Install with: xcode-select --install",
         }
         if executable_name == "cli_tools":

@@ -6,7 +6,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from minitap.mobile_use.agents.contextor.types import AppLockVerificationOutput, ContextorOutput
 from minitap.mobile_use.agents.planner.types import Subgoal
 from minitap.mobile_use.context import MobileUseContext
-from minitap.mobile_use.controllers.mobile_command_controller import get_screen_data_from_context
+from minitap.mobile_use.controllers.controller_factory import create_device_controller
 from minitap.mobile_use.controllers.platform_specific_commands_controller import (
     get_current_foreground_package,
     get_device_date,
@@ -30,7 +30,8 @@ class ContextorNode:
         on_failure=lambda _: logger.error("Contextor Agent"),
     )
     async def __call__(self, state: State):
-        device_data = get_screen_data_from_context(self.ctx)
+        device_controller = create_device_controller(self.ctx)
+        device_data = await device_controller.get_screen_data()
         current_app_package = get_current_foreground_package(self.ctx)
         device_date = get_device_date(self.ctx)
         agent_outcome: str | None = None

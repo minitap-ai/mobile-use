@@ -21,6 +21,7 @@ def create_device_controller(ctx: MobileUseContext) -> MobileDeviceController:
         return AndroidDeviceController(
             device_id=ctx.device.device_id,
             adb_client=ctx.adb_client,
+            ui_adb_client=ctx.ui_adb_client,
             device_width=ctx.device.device_width,
             device_height=ctx.device.device_height,
         )
