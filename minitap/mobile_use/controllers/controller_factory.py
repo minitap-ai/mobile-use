@@ -14,11 +14,14 @@ def create_device_controller(ctx: MobileUseContext) -> MobileDeviceController:
         if ctx.adb_client is None:
             raise ValueError("ADB client not initialized for Android device")
 
+        if ctx.ui_adb_client is None:
+            raise ValueError("UIAutomator client not initialized for Android device")
+
         logger.info(f"Creating Android controller for device {ctx.device.device_id}")
         return AndroidDeviceController(
             device_id=ctx.device.device_id,
             adb_client=ctx.adb_client,
-            screen_api_client=ctx.screen_api_client,
+            ui_adb_client=ctx.ui_adb_client,
             device_width=ctx.device.device_width,
             device_height=ctx.device.device_height,
         )

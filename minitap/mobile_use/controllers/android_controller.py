@@ -2,7 +2,7 @@ import re
 
 from adbutils import AdbClient, AdbDevice
 
-from minitap.mobile_use.clients.screen_api_client import ScreenApiClient
+from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
 from minitap.mobile_use.controllers.device_controller import (
     MobileDeviceController,
     ScreenDataResponse,
@@ -18,13 +18,13 @@ class AndroidDeviceController(MobileDeviceController):
         self,
         device_id: str,
         adb_client: AdbClient,
-        screen_api_client: ScreenApiClient,
+        ui_adb_client: UIAutomatorClient,
         device_width: int,
         device_height: int,
     ):
         self.device_id = device_id
         self.adb_client = adb_client
-        self.screen_api_client = screen_api_client
+        self.ui_adb_client = ui_adb_client
         self.device_width = device_width
         self.device_height = device_height
         self._device: AdbDevice | None = None
@@ -70,8 +70,15 @@ class AndroidDeviceController(MobileDeviceController):
     async def get_screen_data(self) -> ScreenDataResponse:
         """Get screen data using the screen API client (Maestro for hierarchy)."""
         try:
-            response = self.screen_api_client.get_with_retry("/screen-info")
-            return ScreenDataResponse(**response.json())
+            logger.info("Using UIAutomator2 for screen data retrieval")
+            ui_data = self.ui_adb_client.get_screen_data()
+            return ScreenDataResponse(
+                base64=ui_data.base64,
+                elements=ui_data.elements,
+                width=ui_data.width,
+                height=ui_data.height,
+                platform="android",
+            )
         except Exception as e:
             logger.error(f"Failed to get screen data: {e}")
             raise
@@ -158,8 +165,8 @@ class AndroidDeviceController(MobileDeviceController):
 
     async def get_ui_hierarchy(self) -> list[dict]:
         try:
-            response = self.screen_api_client.get_with_retry("/screen-info")
-            return response.json().get("elements", [])
+            device_data = await self.get_screen_data()
+            return device_data.elements
         except Exception as e:
             logger.error(f"Failed to get UI hierarchy: {e}")
             return []
