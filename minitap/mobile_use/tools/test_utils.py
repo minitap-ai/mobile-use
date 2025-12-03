@@ -11,8 +11,6 @@ sys.modules["minitap.mobile_use.graph.state"] = Mock()
 from minitap.mobile_use.context import DeviceContext, DevicePlatform, MobileUseContext  # noqa: E402
 from minitap.mobile_use.tools.types import Target  # noqa: E402
 from minitap.mobile_use.tools.utils import (  # noqa: E402
-    IdSelectorRequest,
-    SelectorRequestWithCoordinates,
     focus_element_if_needed,
     move_cursor_to_end_if_bounds,
 )
