@@ -13,13 +13,8 @@ from langchain_core.runnables.graph import CurveStyle, MermaidDrawMethod, NodeSt
 from langchain_core.runnables.graph_mermaid import draw_mermaid_png
 from langgraph.graph.state import CompiledStateGraph
 
-from minitap.mobile_use.clients.device_hardware_client import DeviceHardwareClient
-from minitap.mobile_use.clients.screen_api_client import ScreenApiClient
 from minitap.mobile_use.config import get_default_llm_config
-from minitap.mobile_use.context import (
-    DeviceContext,
-    DevicePlatform,
-)
+from minitap.mobile_use.context import DeviceContext, DevicePlatform
 
 sys.path.append(str(Path(__file__).parent.parent))
 
@@ -39,8 +34,6 @@ async def generate_graph_docs():
             device_width=1080,
             device_height=1920,
         ),
-        hw_bridge_client=DeviceHardwareClient(base_url="http://localhost:8000"),
-        screen_api_client=ScreenApiClient(base_url="http://localhost:8000"),
         llm_config=get_default_llm_config(),
     )
 

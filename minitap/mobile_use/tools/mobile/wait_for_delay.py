@@ -1,4 +1,4 @@
-import asyncio
+import time
 from typing import Annotated
 
 from langchain_core.messages import ToolMessage
@@ -9,9 +9,6 @@ from langgraph.types import Command
 
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
-from minitap.mobile_use.controllers.mobile_command_controller import (
-    wait_for_delay as wait_for_delay_controller,
-)
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 
@@ -46,7 +43,7 @@ def get_wait_for_delay_tool(ctx: MobileUseContext):
         if time_in_ms > MAX_DELAY_MS:
             time_in_ms = MAX_DELAY_MS
         try:
-            await asyncio.to_thread(wait_for_delay_controller, time_in_ms)
+            time.sleep(time_in_ms / 1000)
             output = None
             has_failed = False
         except Exception as e:

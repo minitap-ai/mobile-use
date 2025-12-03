@@ -104,5 +104,5 @@ async def _add_agent_thoughts(
         and ctx.execution_setup.traces_path is not None
         and ctx.execution_setup.trace_name is not None
     ):
-        record_interaction(ctx, response=AIMessage(content=str(named_thoughts)))
+        await record_interaction(ctx, response=AIMessage(content=str(named_thoughts)))
     return old + named_thoughts

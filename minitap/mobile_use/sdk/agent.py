@@ -17,9 +17,7 @@ from pydantic import BaseModel
 
 from minitap.mobile_use.agents.outputter.outputter import outputter
 from minitap.mobile_use.agents.planner.types import Subgoal
-from minitap.mobile_use.clients.device_hardware_client import DeviceHardwareClient
 from minitap.mobile_use.clients.idb_client import IdbClientWrapper
-from minitap.mobile_use.clients.screen_api_client import ScreenApiClient
 from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
 from minitap.mobile_use.config import AgentNode, OutputConfig, record_events, settings
 from minitap.mobile_use.context import (
@@ -29,16 +27,11 @@ from minitap.mobile_use.context import (
     IsReplan,
     MobileUseContext,
 )
-from minitap.mobile_use.controllers.mobile_command_controller import (
-    ScreenDataResponse,
-    get_screen_data,
-)
 from minitap.mobile_use.controllers.platform_specific_commands_controller import get_first_device
 from minitap.mobile_use.graph.graph import get_graph
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.sdk.builders.agent_config_builder import get_default_agent_config
 from minitap.mobile_use.sdk.builders.task_request_builder import TaskRequestBuilder
-from minitap.mobile_use.sdk.constants import DEFAULT_SCREEN_API_BASE_URL
 from minitap.mobile_use.sdk.services.cloud_mobile import CloudMobileService
 from minitap.mobile_use.sdk.services.platform import PlatformService
 from minitap.mobile_use.sdk.types.agent import AgentConfig
@@ -61,8 +54,6 @@ from minitap.mobile_use.sdk.types.task import (
     Task,
     TaskRequest,
 )
-from minitap.mobile_use.servers.start_servers import start_device_screen_api
-from minitap.mobile_use.servers.stop_servers import stop_servers
 from minitap.mobile_use.utils.app_launch_utils import _handle_initial_app_launch
 from minitap.mobile_use.utils.logger import get_logger
 from minitap.mobile_use.utils.media import (
@@ -85,10 +76,7 @@ class Agent:
     _tasks: list[Task] = []
     _tmp_traces_dir: Path
     _initialized: bool = False
-    _is_default_screen_api: bool
     _device_context: DeviceContext
-    _screen_api_client: ScreenApiClient
-    _hw_bridge_client: DeviceHardwareClient
     _adb_client: AdbClient | None
     _ui_adb_client: UIAutomatorClient | None
     _idb_client: IdbClientWrapper | None
@@ -101,9 +89,6 @@ class Agent:
         self._tasks = []
         self._tmp_traces_dir = Path(tempfile.gettempdir()) / "mobile-use-traces"
         self._initialized = False
-        self._is_default_screen_api = (
-            self._config.servers.screen_api_base_url == DEFAULT_SCREEN_API_BASE_URL
-        )
         self._task_lock = asyncio.Lock()
 
         # Initialize platform service if API key is available in environment
@@ -190,15 +175,14 @@ class Agent:
                     f"Server start failed, attempting restart "
                     f"{restart_attempt}/{server_restart_attempts}"
                 )
-                stop_servers(
-                    should_stop_screen_api=self._is_default_screen_api,
-                )
             else:
                 error_msg = "Mobile-use servers failed to start after all restart attempts."
                 logger.error(error_msg)
                 raise ServerStartupError(message=error_msg)
 
-        self._device_context = self._get_device_context(device_id=device_id, platform=platform)
+        self._device_context = await self._get_device_context(
+            device_id=device_id, platform=platform
+        )
         logger.info(self._device_context.to_str())
         logger.info("✅ Mobile-use agent initialized.")
         self._initialized = True
@@ -497,8 +481,6 @@ class Agent:
         context = MobileUseContext(
             trace_id=task.id,
             device=self._device_context,
-            hw_bridge_client=self._hw_bridge_client,
-            screen_api_client=self._screen_api_client,
             adb_client=self._adb_client,
             ui_adb_client=self._ui_adb_client,
             idb_client=self._idb_client,
@@ -631,24 +613,6 @@ class Agent:
         else:
             logger.info("No active automation task to stop.")
 
-    def is_healthy(self):
-        """
-        Check if the agent is healthy by verifying the streaming connection status.
-        Uses the configured Screen API base URL instead of hardcoding localhost.
-        """
-        try:
-            # In cloud mode, local streaming health is irrelevant.
-            if self._config.cloud_mobile_id_or_ref:
-                return True
-            response = self._screen_api_client.get_with_retry("/streaming-status", timeout=2)
-            if response.status_code == 200:
-                data = response.json()
-                is_connected = data.get("is_streaming_connected", False)
-                return is_connected
-            return False
-        except Exception:
-            return False
-
     async def get_screenshot(self) -> Image.Image:
         """
         Capture a screenshot from the mobile device.
@@ -736,11 +700,6 @@ class Agent:
             await self._idb_client.cleanup()
             self._idb_client = None
 
-        screen_api_ok = stop_servers(
-            should_stop_screen_api=self._is_default_screen_api,
-        )
-        if not screen_api_ok:
-            logger.warning("Failed to stop Device Screen API.")
         self._initialized = False
         logger.info("✅ Mobile-use agent stopped.")
 
@@ -897,42 +856,30 @@ class Agent:
         self._idb_client = (
             IdbClientWrapper(udid=device_id) if platform == DevicePlatform.IOS else None
         )
-        self._hw_bridge_client = DeviceHardwareClient(
-            base_url=self._config.servers.hw_bridge_base_url.to_url(),
-        )
-        self._screen_api_client = ScreenApiClient(
-            base_url=self._config.servers.screen_api_base_url.to_url(),
-            retry_count=retry_count,
-            retry_wait_seconds=retry_wait_seconds,
-        )
 
     def _run_servers(self, device_id: str, platform: DevicePlatform) -> bool:
-        # Start Device Screen API if not already running
-        if self._is_default_screen_api:
-            api_process = start_device_screen_api(use_process=True)
-            if not api_process:
-                logger.error("Failed to start Device Screen API. Exiting.")
-                return False
-
-        # Check API health
-        if not self._check_device_screen_api_health():
-            logger.error("Device Screen API health check failed. Stopping...")
-            return False
+        if platform == DevicePlatform.ANDROID:
+            if not self._ui_adb_client:
+                error_msg = (
+                    "UIAutomator client is required for Android but not available. "
+                    "Please ensure UIAutomator2 is properly installed and configured."
+                )
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+            logger.info("✓ UIAutomator client available for Android")
+        elif platform == DevicePlatform.IOS:
+            if not self._idb_client:
+                error_msg = (
+                    "IDB client is required for iOS but not available. "
+                    "Please ensure idb companion is properly installed and started."
+                )
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+            logger.info("✓ IDB client available for iOS")
 
         return True
 
-    def _check_device_screen_api_health(self) -> bool:
-        try:
-            # Required to know if the Screen API is up
-            self._screen_api_client.get_with_retry("/health", timeout=5)
-            # Required to know if the Screen API actually receives screenshot from the HW Bridge API
-            self._screen_api_client.get_with_retry("/screen-info", timeout=5)
-            return True
-        except Exception as e:
-            logger.error(f"Device Screen API health check failed: {e}")
-            return False
-
-    def _get_device_context(
+    async def _get_device_context(
         self,
         device_id: str,
         platform: DevicePlatform,
@@ -940,13 +887,56 @@ class Agent:
         from platform import system
 
         host_platform = system()
-        screen_data: ScreenDataResponse = get_screen_data(self._screen_api_client)
+
+        # Get real device dimensions from the device
+        if platform == DevicePlatform.ANDROID:
+            if self._ui_adb_client:
+                try:
+                    # Use UIAutomator to get actual screen dimensions
+                    screen_data = self._ui_adb_client.get_screen_data()
+                    device_width = screen_data.width
+                    device_height = screen_data.height
+                    logger.info(
+                        f"Retrieved Android screen dimensions: {device_width}x{device_height}"
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to get Android screen dimensions: {e}, using defaults")
+                    device_width, device_height = 1080, 2340
+            else:
+                logger.warning("UIAutomator client not available, using default dimensions")
+                device_width, device_height = 1080, 2340
+        else:  # iOS
+            if self._idb_client:
+                try:
+                    # Use IDB to take a screenshot and get dimensions
+                    screenshot_data = await self._idb_client.screenshot()  # type: ignore[call-arg]
+                    if screenshot_data:
+                        from io import BytesIO
+
+                        from PIL import Image
+
+                        img = Image.open(BytesIO(screenshot_data))
+                        device_width = img.width
+                        device_height = img.height
+                        logger.info(
+                            f"Retrieved iOS screen dimensions: {device_width}x{device_height}"
+                        )
+                    else:
+                        logger.warning("IDB screenshot returned None, using default dimensions")
+                        device_width, device_height = 375, 812
+                except Exception as e:
+                    logger.warning(f"Failed to get iOS screen dimensions: {e}, using defaults")
+                    device_width, device_height = 375, 812
+            else:
+                logger.warning("IDB client not available, using default dimensions")
+                device_width, device_height = 375, 812
+
         return DeviceContext(
             host_platform="WINDOWS" if host_platform == "Windows" else "LINUX",
             mobile_platform=platform,
             device_id=device_id,
-            device_width=screen_data.width,
-            device_height=screen_data.height,
+            device_width=device_width,
+            device_height=device_height,
         )
 
     def _get_task_status_change_callback(
