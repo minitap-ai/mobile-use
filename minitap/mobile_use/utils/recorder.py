@@ -7,7 +7,6 @@ from langchain_core.messages import BaseMessage
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.controller_factory import create_device_controller
 from minitap.mobile_use.utils.logger import get_logger
-from minitap.mobile_use.utils.media import compress_base64_jpeg
 
 logger = get_logger(__name__)
 
@@ -23,7 +22,8 @@ async def record_interaction(ctx: MobileUseContext, response: BaseMessage):
     screenshot_base64 = await controller.screenshot()
     logger.info("Screenshot taken")
     try:
-        compressed_screenshot_base64 = compress_base64_jpeg(screenshot_base64, 20)
+        controller = create_device_controller(ctx)
+        compressed_screenshot_base64 = controller.get_compressed_b64_screenshot(screenshot_base64)
     except Exception as e:
         logger.error(f"Error compressing screenshot: {e}")
         return "Could not record this interaction"
