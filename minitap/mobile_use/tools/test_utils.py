@@ -7,13 +7,11 @@ import pytest
 sys.modules["langgraph.prebuilt.chat_agent_executor"] = Mock()
 sys.modules["minitap.mobile_use.graph.state"] = Mock()
 
-from minitap.mobile_use.context import MobileUseContext  # noqa: E402
-from minitap.mobile_use.controllers.mobile_command_controller import (  # noqa: E402
-    IdSelectorRequest,
-    SelectorRequestWithCoordinates,
-)
+from minitap.mobile_use.context import DeviceContext, DevicePlatform, MobileUseContext  # noqa: E402
 from minitap.mobile_use.tools.types import Target  # noqa: E402
 from minitap.mobile_use.tools.utils import (  # noqa: E402
+    IdSelectorRequest,
+    SelectorRequestWithCoordinates,
     focus_element_if_needed,
     move_cursor_to_end_if_bounds,
 )
@@ -24,7 +22,27 @@ from minitap.mobile_use.utils.ui_hierarchy import ElementBounds  # noqa: E402
 def mock_context():
     """Create a mock MobileUseContext for testing."""
     ctx = Mock(spec=MobileUseContext)
-    ctx.hw_bridge_client = Mock()
+
+    # Create device context with necessary attributes
+    ctx.device = Mock(spec=DeviceContext)
+    ctx.device.mobile_platform = DevicePlatform.ANDROID
+    ctx.device.device_id = "test_device_123"
+    ctx.device.device_width = 1080
+    ctx.device.device_height = 2340
+    ctx.device.host_platform = "LINUX"
+
+    # Mock the ADB client for Android
+    ctx.adb_client = Mock()
+    mock_device = Mock()
+    mock_device.shell = Mock(return_value="")
+    ctx.adb_client.device = Mock(return_value=mock_device)
+
+    # Mock the screen API client
+    ctx.screen_api_client = Mock()
+    mock_response = Mock()
+    mock_response.json.return_value = {"elements": []}
+    ctx.screen_api_client.get_with_retry = Mock(return_value=mock_response)
+
     return ctx
 
 
@@ -216,7 +234,9 @@ class TestFocusElementIfNeeded:
         focused_element = sample_rich_element.copy()
         focused_element["attributes"]["focused"] = "true"
 
-        mock_context.hw_bridge_client.get_rich_hierarchy.return_value = [focused_element]
+        mock_response = Mock()
+        mock_response.json.return_value = {"elements": [focused_element]}
+        mock_context.screen_api_client.get_with_retry = Mock(return_value=mock_response)
         mock_find_element.return_value = focused_element["attributes"]
 
         target = Target(
@@ -230,7 +250,7 @@ class TestFocusElementIfNeeded:
 
         mock_tap.assert_not_called()
         assert result == "resource_id"
-        mock_context.hw_bridge_client.get_rich_hierarchy.assert_called_once()
+        mock_context.screen_api_client.get_with_retry.assert_called_once()
 
     @patch("minitap.mobile_use.tools.utils.tap")
     @patch("minitap.mobile_use.tools.utils.find_element_by_resource_id")
@@ -247,7 +267,7 @@ class TestFocusElementIfNeeded:
             "children": [],
         }
 
-        mock_context.hw_bridge_client.get_rich_hierarchy.side_effect = [
+        mock_context.screen_api_client.get_with_retry.side_effect = [
             [unfocused_element],
             [focused_element],
         ]
@@ -270,7 +290,7 @@ class TestFocusElementIfNeeded:
             selector_request=IdSelectorRequest(id="com.example:id/text_input"),
             index=0,
         )
-        assert mock_context.hw_bridge_client.get_rich_hierarchy.call_count == 2
+        assert mock_context.screen_api_client.get_with_retry.call_count == 2
         assert result == "resource_id"
 
     @patch("minitap.mobile_use.tools.utils.tap")
@@ -291,7 +311,9 @@ class TestFocusElementIfNeeded:
             "height": 30,
         }
 
-        mock_context.hw_bridge_client.get_rich_hierarchy.return_value = [element_from_text]
+        mock_response = Mock()
+        mock_response.json.return_value = {"elements": [element_from_text]}
+        mock_context.screen_api_client.get_with_retry = Mock(return_value=mock_response)
         mock_find_id.return_value = element_from_id
 
         with patch("minitap.mobile_use.tools.utils.find_element_by_text") as mock_find_text:
@@ -324,7 +346,9 @@ class TestFocusElementIfNeeded:
             "height": 30,
         }
 
-        mock_context.hw_bridge_client.get_rich_hierarchy.return_value = [element_with_bounds]
+        mock_response = Mock()
+        mock_response.json.return_value = {"elements": [element_with_bounds]}
+        mock_context.screen_api_client.get_with_retry = Mock(return_value=mock_response)
         mock_find_text.return_value = element_with_bounds["attributes"]
 
         target = Target(
@@ -348,8 +372,10 @@ class TestFocusElementIfNeeded:
     @patch("minitap.mobile_use.tools.utils.logger")
     def test_focus_all_locators_fail(self, mock_logger, mock_context):
         """Test failure when no locator can find an element."""
-        mock_context.hw_bridge_client.get_rich_hierarchy.return_value = []
 
+        mock_response = Mock()
+        mock_response.json.return_value = {"elements": []}
+        mock_context.screen_api_client.get_with_retry = Mock(return_value=mock_response)
         with (
             patch("minitap.mobile_use.tools.utils.find_element_by_resource_id") as mock_find_id,
             patch("minitap.mobile_use.tools.utils.find_element_by_text") as mock_find_text,

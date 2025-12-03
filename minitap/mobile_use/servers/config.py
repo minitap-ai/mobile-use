@@ -8,7 +8,6 @@ logger = get_logger(__name__)
 
 
 class ServerSettings(BaseSettings):
-    DEVICE_SCREEN_API_PORT: int = 9998
     ADB_HOST: str | None = None
 
     model_config = {"env_file": ".env", "extra": "ignore"}

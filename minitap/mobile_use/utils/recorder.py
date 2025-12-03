@@ -5,21 +5,22 @@ from colorama import Fore, Style
 from langchain_core.messages import BaseMessage
 
 from minitap.mobile_use.context import MobileUseContext
-from minitap.mobile_use.controllers.mobile_command_controller import take_screenshot
+from minitap.mobile_use.controllers.controller_factory import create_device_controller
 from minitap.mobile_use.utils.logger import get_logger
 from minitap.mobile_use.utils.media import compress_base64_jpeg
 
 logger = get_logger(__name__)
 
 
-def record_interaction(ctx: MobileUseContext, response: BaseMessage):
+async def record_interaction(ctx: MobileUseContext, response: BaseMessage):
     if not ctx.execution_setup:
         raise ValueError("No execution setup found")
     if not ctx.execution_setup.traces_path or not ctx.execution_setup.trace_name:
         raise ValueError("No traces path or trace name found")
 
     logger.info("Recording interaction")
-    screenshot_base64 = take_screenshot(ctx)
+    controller = create_device_controller(ctx)
+    screenshot_base64 = await controller.screenshot()
     logger.info("Screenshot taken")
     try:
         compressed_screenshot_base64 = compress_base64_jpeg(screenshot_base64, 20)

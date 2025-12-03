@@ -10,14 +10,13 @@ from pathlib import Path
 from typing import Literal
 
 from adbutils import AdbClient
-from minitap.mobile_use.agents.planner.types import Subgoal
-from minitap.mobile_use.clients.device_hardware_client import DeviceHardwareClient
-from minitap.mobile_use.clients.idb_client import IdbClientWrapper
-from minitap.mobile_use.clients.screen_api_client import ScreenApiClient
-from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
-from minitap.mobile_use.config import AgentNode, LLMConfig
 from openai import BaseModel
 from pydantic import ConfigDict
+
+from minitap.mobile_use.agents.planner.types import Subgoal
+from minitap.mobile_use.clients.idb_client import IdbClientWrapper
+from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
+from minitap.mobile_use.config import AgentNode, LLMConfig
 
 
 class AppLaunchResult(BaseModel):
@@ -80,8 +79,6 @@ class MobileUseContext(BaseModel):
 
     trace_id: str
     device: DeviceContext
-    hw_bridge_client: DeviceHardwareClient
-    screen_api_client: ScreenApiClient
     llm_config: LLMConfig
     adb_client: AdbClient | None = None
     ui_adb_client: UIAutomatorClient | None = None

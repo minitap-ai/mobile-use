@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Literal
 
+from pydantic import BaseModel, ConfigDict
+
 from minitap.mobile_use.context import MobileUseContext
-from minitap.mobile_use.controllers.mobile_command_controller import (
+from minitap.mobile_use.controllers.types import (
     CoordinatesSelectorRequest,
-    IdSelectorRequest,
-    SelectorRequestWithCoordinates,
-    tap,
+    PercentagesSelectorRequest,
 )
+from minitap.mobile_use.controllers.unified_controller import UnifiedMobileController
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.types import Target
 from minitap.mobile_use.utils.logger import get_logger
@@ -131,14 +133,15 @@ def focus_element_if_needed(
     """
     Ensures the element is focused, with a sanity check to prevent trusting misleading IDs.
     """
-    rich_hierarchy = ctx.hw_bridge_client.get_rich_hierarchy()
+    controller = UnifiedMobileController(ctx)
+    rich_hierarchy = asyncio.run(controller.get_ui_elements())
     elt_from_id = None
     if target.resource_id:
         elt_from_id = find_element_by_resource_id(
             ui_hierarchy=rich_hierarchy,
             resource_id=target.resource_id,
             index=target.resource_id_index,
-            is_rich_hierarchy=True,
+            is_rich_hierarchy=False,
         )
 
     if elt_from_id and target.text:
@@ -158,12 +161,12 @@ def focus_element_if_needed(
                 index=target.resource_id_index,
             )
             logger.debug(f"Focused (tap) on resource_id={target.resource_id}")
-            rich_hierarchy = ctx.hw_bridge_client.get_rich_hierarchy()
+            rich_hierarchy = asyncio.run(controller.get_ui_elements())
             elt_from_id = find_element_by_resource_id(
                 ui_hierarchy=rich_hierarchy,
                 resource_id=target.resource_id,  # type: ignore
                 index=target.resource_id_index,
-                is_rich_hierarchy=True,
+                is_rich_hierarchy=False,
             )
         if elt_from_id and is_element_focused(elt_from_id):
             logger.debug(f"Text input is focused: {target.resource_id}")
@@ -231,3 +234,106 @@ def has_valid_selectors(target: Target) -> bool:
     has_resource_id = target.resource_id is not None and target.resource_id != ""
     has_text = target.text is not None and target.text != ""
     return has_coordinates or has_resource_id or has_text
+
+
+class IdSelectorRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str
+
+    def to_dict(self) -> dict[str, str | int]:
+        return {"id": self.id}
+
+
+class TextSelectorRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    text: str
+
+    def to_dict(self) -> dict[str, str | int]:
+        return {"text": self.text}
+
+
+class SelectorRequestWithCoordinates(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    coordinates: CoordinatesSelectorRequest
+
+    def to_dict(self) -> dict[str, str | int]:
+        return {"point": self.coordinates.to_str()}
+
+
+class SelectorRequestWithPercentages(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    percentages: PercentagesSelectorRequest
+
+    def to_dict(self) -> dict[str, str | int]:
+        return {"point": self.percentages.to_str()}
+
+
+class IdWithTextSelectorRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str
+    text: str
+
+    def to_dict(self) -> dict[str, str | int]:
+        return {"id": self.id, "text": self.text}
+
+
+SelectorRequest = (
+    IdSelectorRequest
+    | SelectorRequestWithCoordinates
+    | SelectorRequestWithPercentages
+    | TextSelectorRequest
+    | IdWithTextSelectorRequest
+)
+
+
+def _extract_resource_id_and_text_from_selector(
+    selector: SelectorRequest,
+) -> tuple[str | None, str | None]:
+    """Extract resource_id and text from a selector."""
+    resource_id = None
+    text = None
+
+    if isinstance(selector, IdSelectorRequest):
+        resource_id = selector.id
+    elif isinstance(selector, TextSelectorRequest):
+        text = selector.text
+    elif isinstance(selector, IdWithTextSelectorRequest):
+        resource_id = selector.id
+        text = selector.text
+
+    return resource_id, text
+
+
+def tap(
+    ctx: MobileUseContext,
+    selector_request: SelectorRequest,
+    index: int | None = None,
+):
+    """
+    Tap on a selector.
+    Index is optional and is used when you have multiple views matching the same selector.
+    ui_hierarchy is optional and used for ADB taps to find elements.
+    """
+    controller = UnifiedMobileController(ctx)
+    if isinstance(selector_request, SelectorRequestWithCoordinates):
+        result = asyncio.run(
+            controller.tap_at(x=selector_request.coordinates.x, y=selector_request.coordinates.y)
+        )
+        return result.error if result.error else None
+    if isinstance(selector_request, SelectorRequestWithPercentages):
+        coords = selector_request.percentages.to_coords(
+            width=ctx.device.device_width,
+            height=ctx.device.device_height,
+        )
+        return asyncio.run(controller.tap_percentage(coords.x, coords.y))
+
+    # For other selectors, we need the UI hierarchy
+    resource_id, text = _extract_resource_id_and_text_from_selector(selector_request)
+
+    return asyncio.run(
+        controller.tap_element(
+            resource_id=resource_id,
+            text=text,
+            index=index if index is not None else 0,
+        )
+    )

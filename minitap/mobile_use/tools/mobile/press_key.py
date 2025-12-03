@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Annotated
 
 from langchain_core.messages import ToolMessage
@@ -8,12 +9,15 @@ from langgraph.types import Command
 
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
-from minitap.mobile_use.controllers.mobile_command_controller import Key
-from minitap.mobile_use.controllers.mobile_command_controller import (
-    press_key as press_key_controller,
-)
+from minitap.mobile_use.controllers.unified_controller import UnifiedMobileController
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
+
+
+class Key(Enum):
+    ENTER = "Enter"
+    HOME = "Home"
+    BACK = "Back"
 
 
 def get_press_key_tool(ctx: MobileUseContext):
@@ -25,8 +29,15 @@ def get_press_key_tool(ctx: MobileUseContext):
         key: Key,
     ) -> Command:
         """Press a key on the device."""
-        output = press_key_controller(ctx=ctx, key=key)
-        has_failed = output is not None
+        controller = UnifiedMobileController(ctx)
+        match key:
+            case Key.HOME:
+                output = await controller.go_home()
+            case Key.BACK:
+                output = await controller.go_back()
+            case _:
+                output = False
+        has_failed = not output
 
         agent_outcome = (
             press_key_wrapper.on_failure_fn(key)

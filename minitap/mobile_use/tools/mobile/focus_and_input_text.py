@@ -11,8 +11,7 @@ from pydantic import BaseModel
 
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
-from minitap.mobile_use.controllers.mobile_command_controller import get_screen_data_from_context
-from minitap.mobile_use.controllers.unified_controller import UnifiedMobileController
+from minitap.mobile_use.controllers.controller_factory import create_device_controller
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 from minitap.mobile_use.tools.types import Target
@@ -34,8 +33,8 @@ async def _controller_input_text(ctx: MobileUseContext, text: str) -> InputResul
     """
     Thin wrapper to normalize the controller result.
     """
-    controller = UnifiedMobileController(ctx)
-    success = await controller.type_text(text)
+    controller = create_device_controller(ctx)
+    success = await controller.input_text(text)
     if success:
         return InputResult(ok=True)
     return InputResult(ok=False, error="Failed to type text")
@@ -91,7 +90,8 @@ def get_focus_and_input_text_tool(ctx: MobileUseContext) -> BaseTool:
 
         text_input_content = ""
         if status == "success" and target.resource_id:
-            screen_data = get_screen_data_from_context(ctx)
+            controller = create_device_controller(ctx)
+            screen_data = await controller.get_screen_data()
             state.latest_ui_hierarchy = screen_data.elements
             element = find_element_by_resource_id(
                 ui_hierarchy=state.latest_ui_hierarchy,

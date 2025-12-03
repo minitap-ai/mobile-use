@@ -1,3 +1,4 @@
+import asyncio
 from typing import Annotated
 
 from langchain_core.messages import ToolMessage
@@ -9,10 +10,7 @@ from pydantic import BaseModel
 
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
-from minitap.mobile_use.controllers.mobile_command_controller import (
-    erase_text as erase_text_controller,
-)
-from minitap.mobile_use.controllers.mobile_command_controller import get_screen_data_from_context
+from minitap.mobile_use.controllers.unified_controller import UnifiedMobileController
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 from minitap.mobile_use.tools.types import Target
@@ -23,6 +21,7 @@ from minitap.mobile_use.utils.ui_hierarchy import (
     get_element_text,
     text_input_is_empty,
 )
+from minitap.mobile_use.controllers.controller_factory import create_device_controller
 
 logger = get_logger(__name__)
 
@@ -42,15 +41,16 @@ class TextClearer:
         self.ctx = ctx
         self.state = state
 
-    def _refresh_ui_hierarchy(self) -> None:
-        screen_data = get_screen_data_from_context(self.ctx)
+    async def _refresh_ui_hierarchy(self) -> None:
+        device_controller = create_device_controller(self.ctx)
+        screen_data = await device_controller.get_screen_data()
         self.state.latest_ui_hierarchy = screen_data.elements
 
-    def _get_element_info(
+    async def _get_element_info(
         self, resource_id: str | None
     ) -> tuple[object | None, str | None, str | None]:
         if not self.state.latest_ui_hierarchy:
-            self._refresh_ui_hierarchy()
+            await self._refresh_ui_hierarchy()
 
         if not self.state.latest_ui_hierarchy:
             return None, None, None
@@ -104,14 +104,16 @@ class TextClearer:
         chars_to_erase = text_length + 1
         logger.info(f"Erasing {chars_to_erase} characters from the input")
 
-        error = erase_text_controller(ctx=self.ctx, nb_chars=chars_to_erase)
-        if error:
-            logger.error(f"Failed to erase text: {error}")
-            return str(error)
+        controller = UnifiedMobileController(self.ctx)
+        result = asyncio.run(controller.erase_text())
+
+        if not result:
+            logger.error("Failed to erase text")
+            return "Failed to erase text"
 
         return None
 
-    def _clear_with_retries(
+    async def _clear_with_retries(
         self,
         target: Target,
         initial_text: str,
@@ -130,7 +132,7 @@ class TextClearer:
                 return False, current_text, 0
             erased_chars += chars_to_erase
 
-            self._refresh_ui_hierarchy()
+            await self._refresh_ui_hierarchy()
             elt = None
             if target.resource_id:
                 elt = find_element_by_resource_id(
@@ -180,32 +182,33 @@ class TextClearer:
             hint_text=hint_text,
         )
 
-    def _handle_element_not_found(
+    async def _handle_element_not_found(
         self, resource_id: str | None, hint_text: str | None
     ) -> ClearTextResult:
-        error = erase_text_controller(ctx=self.ctx)
-        self._refresh_ui_hierarchy()
+        controller = UnifiedMobileController(self.ctx)
+        output = asyncio.run(controller.erase_text())
+        await self._refresh_ui_hierarchy()
 
-        _, final_text, _ = self._get_element_info(resource_id)
+        _, final_text, _ = await self._get_element_info(resource_id)
 
         return self._create_result(
-            success=error is None,
-            error_message=str(error) if error is not None else None,
+            success=output,
+            error_message="Erase text failed" if not output else None,
             chars_erased=0,  # Unknown since we don't have initial text
             final_text=final_text,
             hint_text=hint_text,
         )
 
-    def clear_input_text(
+    async def clear_input_text(
         self,
         target: Target,
     ) -> ClearTextResult:
-        element, current_text, hint_text = self._get_element_info(
+        element, current_text, hint_text = await self._get_element_info(
             resource_id=target.resource_id,
         )
 
         if not element:
-            return self._handle_element_not_found(target.resource_id, hint_text)
+            return await self._handle_element_not_found(target.resource_id, hint_text)
 
         if not self._should_clear_text(current_text, hint_text):
             return self._handle_no_clearing_needed(current_text, hint_text)
@@ -221,7 +224,7 @@ class TextClearer:
                 hint_text=hint_text,
             )
 
-        success, final_text, chars_erased = self._clear_with_retries(
+        success, final_text, chars_erased = await self._clear_with_retries(
             target=target,
             initial_text=current_text or "",
             hint_text=hint_text,
@@ -250,7 +253,7 @@ def get_focus_and_clear_text_tool(ctx: MobileUseContext) -> BaseTool:
         Clears all the text from the text field, by focusing it if needed.
         """
         clearer = TextClearer(ctx, state)
-        result = clearer.clear_input_text(
+        result = await clearer.clear_input_text(
             target=target,
         )
 
