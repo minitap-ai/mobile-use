@@ -16,7 +16,7 @@ Interpret Cortex decisions and execute tools on {{ platform }} mobile device. Yo
 
 **Cortex decision:**
 ```json
-"[{\"action\": \"tap\", \"target\": {\"resource_id\": \"com.whatsapp:id/chat\", \"text\": \"Alice\", \"coordinates\": {\"x\": 100, \"y\": 350}}}]"
+"[{\"action\": \"tap\", \"target\": {\"resource_id\": \"com.whatsapp:id/chat\", \"text\": \"Alice\", \"bounds\": {\"x\": 100, \"y\": 350, \"width\": 50, \"height\": 50}}}]"
 ```
 
 **You execute:**

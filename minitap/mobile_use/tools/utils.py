@@ -106,8 +106,8 @@ async def move_cursor_to_end_if_bounds(
         logger.debug(f"Tapped end of input {target.resource_id}")
         return elt
 
-    if target.coordinates:
-        await tap_bottom_right_of_element(target.coordinates, ctx=ctx)
+    if target.bounds:
+        await tap_bottom_right_of_element(target.bounds, ctx=ctx)
         logger.debug("Tapped end of input by coordinates")
         return elt
 
@@ -172,8 +172,8 @@ async def focus_element_if_needed(
             return "resource_id"
         logger.warning(f"Failed to focus using resource_id='{target.resource_id}'. Fallback...")
 
-    if target.coordinates:
-        relative_point = target.coordinates.get_center()
+    if target.bounds:
+        relative_point = target.bounds.get_center()
         await tap(
             ctx=ctx,
             selector_request=SelectorRequestWithCoordinates(
@@ -213,10 +213,10 @@ def validate_coordinates_bounds(
     Validate that coordinates are within screen bounds.
     Returns error message if invalid, None if valid.
     """
-    if not target.coordinates:
+    if not target.bounds:
         return None
 
-    center = target.coordinates.get_center()
+    center = target.bounds.get_center()
     errors = []
 
     if center.x < 0 or center.x >= screen_width:
@@ -229,7 +229,7 @@ def validate_coordinates_bounds(
 
 def has_valid_selectors(target: Target) -> bool:
     """Check if target has at least one valid selector."""
-    has_coordinates = target.coordinates is not None
+    has_coordinates = target.bounds is not None
     has_resource_id = target.resource_id is not None and target.resource_id != ""
     has_text = target.text is not None and target.text != ""
     return has_coordinates or has_resource_id or has_text

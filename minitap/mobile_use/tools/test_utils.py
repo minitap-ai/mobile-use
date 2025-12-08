@@ -98,7 +98,7 @@ class TestMoveCursorToEndIfBounds:
             resource_id_index=None,
             text=None,
             text_index=None,
-            coordinates=None,
+            bounds=None,
         )
         result = asyncio.run(
             move_cursor_to_end_if_bounds(ctx=mock_context, state=mock_state, target=target)
@@ -130,7 +130,7 @@ class TestMoveCursorToEndIfBounds:
             resource_id_index=None,
             text=None,
             text_index=None,
-            coordinates=bounds,
+            bounds=bounds,
         )
 
         result = asyncio.run(
@@ -160,7 +160,7 @@ class TestMoveCursorToEndIfBounds:
             resource_id_index=None,
             text="Sample text",
             text_index=0,
-            coordinates=None,
+            bounds=None,
         )
         result = asyncio.run(
             move_cursor_to_end_if_bounds(ctx=mock_context, state=mock_state, target=target)
@@ -184,7 +184,7 @@ class TestMoveCursorToEndIfBounds:
             resource_id_index=None,
             text="Nonexistent text",
             text_index=None,
-            coordinates=None,
+            bounds=None,
         )
         result = asyncio.run(
             move_cursor_to_end_if_bounds(ctx=mock_context, state=mock_state, target=target)
@@ -208,7 +208,7 @@ class TestMoveCursorToEndIfBounds:
             resource_id_index=None,
             text="Text without bounds",
             text_index=None,
-            coordinates=None,
+            bounds=None,
         )
         result = asyncio.run(
             move_cursor_to_end_if_bounds(ctx=mock_context, state=mock_state, target=target)
@@ -227,7 +227,7 @@ class TestMoveCursorToEndIfBounds:
             resource_id_index=None,
             text=None,
             text_index=None,
-            coordinates=None,
+            bounds=None,
         )
         result = asyncio.run(
             move_cursor_to_end_if_bounds(ctx=mock_context, state=mock_state, target=target)
@@ -258,7 +258,7 @@ class TestFocusElementIfNeeded:
             resource_id_index=None,
             text=None,
             text_index=None,
-            coordinates=None,
+            bounds=None,
         )
         result = asyncio.run(focus_element_if_needed(ctx=mock_context, target=target))
 
@@ -291,7 +291,7 @@ class TestFocusElementIfNeeded:
             resource_id_index=None,
             text=None,
             text_index=None,
-            coordinates=None,
+            bounds=None,
         )
         result = asyncio.run(focus_element_if_needed(ctx=mock_context, target=target))
 
@@ -334,7 +334,7 @@ class TestFocusElementIfNeeded:
                 resource_id_index=None,
                 text="Sample text",
                 text_index=None,
-                coordinates=None,
+                bounds=None,
             )
             result = asyncio.run(focus_element_if_needed(ctx=mock_context, target=target))
 
@@ -366,7 +366,7 @@ class TestFocusElementIfNeeded:
             resource_id_index=None,
             text="Sample text",
             text_index=None,
-            coordinates=None,
+            bounds=None,
         )
         result = asyncio.run(focus_element_if_needed(ctx=mock_context, target=target))
 
@@ -398,7 +398,7 @@ class TestFocusElementIfNeeded:
                 resource_id_index=None,
                 text="nonexistent",
                 text_index=None,
-                coordinates=None,
+                bounds=None,
             )
             result = asyncio.run(focus_element_if_needed(ctx=mock_context, target=target))
 

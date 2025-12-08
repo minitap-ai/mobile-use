@@ -30,7 +30,7 @@ def get_tap_tool(ctx: MobileUseContext) -> BaseTool:
         Taps on a UI element identified by the 'target' object.
 
         The 'target' object allows specifying an element by its resource_id
-        (with an optional index), its coordinates, or its text content (with an optional index).
+        (with an optional index), its bounds, or its text content (with an optional index).
         The tool uses a fallback strategy, trying the locators in that order.
         """
         # Track all attempts for better error reporting
@@ -43,15 +43,15 @@ def get_tap_tool(ctx: MobileUseContext) -> BaseTool:
             attempts.append(
                 {
                     "selector": "none",
-                    "error": "No valid selector provided (need coordinates, resource_id, or text)",
+                    "error": "No valid selector provided (need bounds, resource_id, or text)",
                 }
             )
 
         controller = UnifiedMobileController(ctx)
 
         # 1. Try with COORDINATES FIRST (visual approach)
-        if not success and target.coordinates:
-            center = target.coordinates.get_center()
+        if not success and target.bounds:
+            center = target.bounds.get_center()
             selector_info = f"coordinates ({center.x}, {center.y})"
 
             # Validate bounds before attempting
@@ -65,7 +65,7 @@ def get_tap_tool(ctx: MobileUseContext) -> BaseTool:
                 )
             else:
                 try:
-                    center_point = target.coordinates.get_center()
+                    center_point = target.bounds.get_center()
                     logger.info(f"Attempting tap with {selector_info}")
                     result = await controller.tap_at(x=center_point.x, y=center_point.y)
                     if result.error is None:
