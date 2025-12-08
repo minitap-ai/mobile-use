@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from minitap.mobile_use.utils.logger import get_logger
 
@@ -95,10 +95,10 @@ class Point(BaseModel):
 
 
 class ElementBounds(BaseModel):
-    x: int
-    y: int
-    width: int
-    height: int
+    x: int = Field(description="The x coordinate of the top-left corner of the element.")
+    y: int = Field(description="The y coordinate of the top-left corner of the element.")
+    width: int = Field(description="The width of the element.")
+    height: int = Field(description="The height of the element.")
 
     def get_center(self) -> Point:
         return Point(x=self.x + self.width // 2, y=self.y + self.height // 2)

@@ -19,7 +19,7 @@ class Target(BaseModel):
     text_index: int | None = Field(
         None, description="The zero-based index if multiple elements share the same text."
     )
-    coordinates: ElementBounds | None = Field(
+    bounds: ElementBounds | None = Field(
         None, description="The x, y, width, and height of the element."
     )
 

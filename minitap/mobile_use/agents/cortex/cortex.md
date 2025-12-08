@@ -46,7 +46,7 @@ When targeting ANY element (tap, input, clear...), provide ALL available info:
   "target": {
     "resource_id": "com.app:id/button",
     "resource_id_index": 0,
-    "coordinates": {"x": 100, "y": 200, "width": 50, "height": 50},
+    "bounds": {"x": 100, "y": 200, "width": 50, "height": 50},
     "text": "Submit",
     "text_index": 0
   }
@@ -55,9 +55,9 @@ When targeting ANY element (tap, input, clear...), provide ALL available info:
 
 - `resource_id_index` = index among elements with same resource_id
 - `text_index` = index among elements with same text
-- This enables **fallback**: if ID fails → tries coordinates → tries text
+- This enables **fallback**: if ID fails → tries bounds → tries text
 
-**On tap failure:** "Out of bounds" = stale coordinates. "No element found" = screen changed. Adapt, don't retry blindly.
+**On tap failure:** "Out of bounds" = stale bounds. "No element found" = screen changed. Adapt, don't retry blindly.
 
 ---
 
@@ -110,7 +110,7 @@ Session locked to: **{{ locked_app_package }}**
 **Output:**
 ```
 complete_subgoals_by_ids: ["subgoal-4-type-message"]
-Structured Decisions: "[{\"action\": \"tap\", \"target\": {\"resource_id\": \"com.whatsapp:id/send\", \"resource_id_index\": 0, \"coordinates\": {\"x\": 950, \"y\": 1800, \"width\": 100, \"height\": 100}}}]"
+Structured Decisions: "[{\"action\": \"tap\", \"target\": {\"resource_id\": \"com.whatsapp:id/send\", \"resource_id_index\": 0, \"bounds\": {\"x\": 950, \"y\": 1800, \"width\": 100, \"height\": 100}}}]"
 Decisions Reason: Agent thoughts confirm typing succeeded. Completing typing subgoal based on observed evidence. Now tapping send with full target info.
 Goals Completion Reason: Executor feedback confirmed "Hello!" was entered successfully.
 ```

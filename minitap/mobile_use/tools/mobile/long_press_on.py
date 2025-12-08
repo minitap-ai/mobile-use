@@ -30,11 +30,11 @@ def get_long_press_on_tool(ctx: MobileUseContext) -> BaseTool:
         Long presses on a UI element identified by the 'target' object.
 
         The 'target' object allows specifying an element by its resource_id
-        (with an optional index), its coordinates, or its text content (with an optional index).
+        (with an optional index), its bounds, or its text content (with an optional index).
         The tool uses a fallback strategy, trying the locators in that order.
 
         Args:
-            target: The UI element to long press on (coordinates, resource_id, or text).
+            target: The UI element to long press on (bounds, resource_id, or text).
             duration_ms: Duration of the long press in milliseconds. Choose based on interaction:
                         - 500-800ms: Quick long press (e.g., selecting text, haptic feedback)
                         - 1000ms (default): Standard long press (most common use case)
@@ -49,13 +49,13 @@ def get_long_press_on_tool(ctx: MobileUseContext) -> BaseTool:
         controller = UnifiedMobileController(ctx)
 
         # 1. Try with COORDINATES FIRST (visual approach)
-        if target.coordinates:
+        if target.bounds:
             try:
-                center_point = target.coordinates.get_center()
+                center_point = target.bounds.get_center()
                 logger.info(
                     f"Attempting to long press using coordinates: {center_point.x},{center_point.y}"
                 )
-                latest_selector_info = f"coordinates='{target.coordinates}'"
+                latest_selector_info = f"coordinates='{target.bounds}'"
                 result = await controller.tap_at(
                     x=center_point.x,
                     y=center_point.y,
@@ -66,13 +66,13 @@ def get_long_press_on_tool(ctx: MobileUseContext) -> BaseTool:
                     error_obj = None
                 else:
                     logger.warning(
-                        f"Long press with coordinates '{target.coordinates}' failed. "
+                        f"Long press with coordinates '{target.bounds}' failed. "
                         f"Error: {result.error}"
                     )
                     error_obj = {"error": result.error}
             except Exception as e:
                 logger.warning(
-                    f"Exception during long press with coordinates '{target.coordinates}': {e}"
+                    f"Exception during long press with coordinates '{target.bounds}': {e}"
                 )
                 error_obj = {"error": str(e)}
 
