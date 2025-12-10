@@ -1,0 +1,157 @@
+name: Bounty Board
+
+on:
+  issues:
+    types: [opened, labeled, edited, closed]
+  schedule:
+    # Lundi 09:00 UTC ≈ 10:00 à Paris en hiver
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+jobs:
+  # 1) Nouveau / modif bounty -> message Discord
+  post-bounty:
+    if: >
+      github.event_name == 'issues' &&
+      github.event.action != 'closed' &&
+      contains(toJson(github.event.issue.labels.*.name), 'bounty')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Post new/updated bounty to Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_BOUNTY_WEBHOOK }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_USER: ${{ github.event.issue.user.login }}
+          ISSUE_LABELS_JSON: ${{ toJson(github.event.issue.labels) }}
+        run: |
+          echo "Labels JSON: $ISSUE_LABELS_JSON"
+
+          sudo apt-get update -y >/dev/null 2>&1
+          sudo apt-get install -y jq >/dev/null 2>&1
+
+          reward=$(echo "$ISSUE_LABELS_JSON" | jq -r '[.[].name | select(startswith("reward:"))][0] // "" | split(":")[1] // ""')
+          difficulty=$(echo "$ISSUE_LABELS_JSON" | jq -r '[.[].name | select(startswith("difficulty:"))][0] // "" | split(":")[1] // ""')
+
+          [ "$reward" = "null" ] && reward=""
+          [ "$difficulty" = "null" ] && difficulty=""
+
+          short_body=$(printf "%s" "$ISSUE_BODY" | head -c 400)
+          if [ "${#ISSUE_BODY}" -gt 400 ]; then
+            short_body="$short_body…"
+          fi
+
+          header="💰 New bounty opened by \`$ISSUE_USER\` (issue #$ISSUE_NUMBER)"
+          if [ -n "$reward" ]; then
+            header="$header • Reward: **$reward**"
+          fi
+          if [ -n "$difficulty" ]; then
+            header="$header • Difficulty: **$difficulty**"
+          fi
+
+          content="$header
+**$ISSUE_TITLE**
+$ISSUE_URL
+
+$short_body"
+
+          json=$(jq -n --arg content "$content" '{content: $content}')
+
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d "$json" \
+               "$DISCORD_WEBHOOK_URL"
+
+  # 2) Bounty fermée en "completed" -> message Discord
+  bounty-completed:
+    if: >
+      github.event_name == 'issues' &&
+      github.event.action == 'closed' &&
+      contains(toJson(github.event.issue.labels.*.name), 'bounty') &&
+      github.event.issue.state_reason == 'completed'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Post completed bounty to Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_BOUNTY_WEBHOOK }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_USER: ${{ github.event.issue.user.login }}
+        run: |
+          sudo apt-get update -y >/dev/null 2>&1
+          sudo apt-get install -y jq >/dev/null 2>&1
+
+          content="✅ Bounty completed by \`$ISSUE_USER\` (issue #$ISSUE_NUMBER)
+**$ISSUE_TITLE**
+$ISSUE_URL"
+
+          json=$(jq -n --arg content "$content" '{content: $content}')
+
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d "$json" \
+               "$DISCORD_WEBHOOK_URL"
+
+  # 3) Récap hebdo des bounties ouvertes
+  weekly-summary:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Build weekly bounty summary and post to Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_BOUNTY_WEBHOOK }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          sudo apt-get update -y >/dev/null 2>&1
+          sudo apt-get install -y jq >/dev/null 2>&1
+
+          api_url="https://api.github.com/repos/$REPO/issues?labels=bounty&state=open&per_page=100"
+
+          resp=$(curl -s \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "$api_url")
+
+          count=$(echo "$resp" | jq 'length')
+
+          if [ "$count" -eq 0 ]; then
+            content=":dart: **Weekly bounty recap**
+No open bounties this week. 🎉"
+          else
+            content=":dart: **Weekly bounty recap**\nOpen bounties:\n\n"
+
+            for row in $(echo "$resp" | jq -r '.[] | @base64'); do
+              _jq() { echo "$row" | base64 --decode | jq -r "$1"; }
+
+              num=$(_jq '.number')
+              title=$(_jq '.title')
+              url=$(_jq '.html_url')
+
+              reward=$(_jq '[.labels[].name | select(startswith("reward:"))][0] // ""')
+              difficulty=$(_jq '[.labels[].name | select(startswith("difficulty:"))][0] // ""')
+
+              reward=${reward#reward:}
+              difficulty=${difficulty#difficulty:}
+
+              line="- #$num $title"
+              [ -n "$reward" ] && line="$line – ${reward}"
+              [ -n "$difficulty" ] && line="$line (${difficulty})"
+              line="$line – $url"
+
+              content="$content$line\n"
+            done
+          fi
+
+          json=$(jq -n --arg content "$content" '{content: $content}')
+
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d "$json" \
+               "$DISCORD_WEBHOOK_URL"
