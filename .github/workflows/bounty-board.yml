@@ -14,7 +14,7 @@ jobs:
     if: >
       github.event_name == 'issues' &&
       github.event.action != 'closed' &&
-      contains(toJson(github.event.issue.labels.*.name), 'bounty')
+      contains(github.event.issue.labels.*.name, 'bounty')
     runs-on: ubuntu-latest
 
     steps:
@@ -26,15 +26,15 @@ jobs:
           ISSUE_BODY: ${{ github.event.issue.body }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_USER: ${{ github.event.issue.user.login }}
-          ISSUE_LABELS_JSON: ${{ toJson(github.event.issue.labels) }}
+          ISSUE_LABELS_JSON: ${{ toJson(github.event.issue.labels.*.name) }}
         run: |
           echo "Labels JSON: $ISSUE_LABELS_JSON"
 
           sudo apt-get update -y >/dev/null 2>&1
           sudo apt-get install -y jq >/dev/null 2>&1
 
-          reward=$(echo "$ISSUE_LABELS_JSON" | jq -r '[.[].name | select(startswith("reward:"))][0] // "" | split(":")[1] // ""')
-          difficulty=$(echo "$ISSUE_LABELS_JSON" | jq -r '[.[].name | select(startswith("difficulty:"))][0] // "" | split(":")[1] // ""')
+          reward=$(echo "$ISSUE_LABELS_JSON" | jq -r '.[] | select(startswith("reward:"))? | split(":")[1]' || true)
+          difficulty=$(echo "$ISSUE_LABELS_JSON" | jq -r '.[] | select(startswith("difficulty:"))? | split(":")[1]' || true)
 
           [ "$reward" = "null" ] && reward=""
           [ "$difficulty" = "null" ] && difficulty=""
@@ -52,11 +52,7 @@ jobs:
             header="$header • Difficulty: **$difficulty**"
           fi
 
-          content="$header
-**$ISSUE_TITLE**
-$ISSUE_URL
-
-$short_body"
+          content=$(printf "%s\n**%s**\n%s\n\n%s" "$header" "$ISSUE_TITLE" "$ISSUE_URL" "$short_body")
 
           json=$(jq -n --arg content "$content" '{content: $content}')
 
@@ -70,7 +66,7 @@ $short_body"
     if: >
       github.event_name == 'issues' &&
       github.event.action == 'closed' &&
-      contains(toJson(github.event.issue.labels.*.name), 'bounty') &&
+      contains(github.event.issue.labels.*.name, 'bounty') &&
       github.event.issue.state_reason == 'completed'
     runs-on: ubuntu-latest
 
@@ -86,9 +82,7 @@ $short_body"
           sudo apt-get update -y >/dev/null 2>&1
           sudo apt-get install -y jq >/dev/null 2>&1
 
-          content="✅ Bounty completed by \`$ISSUE_USER\` (issue #$ISSUE_NUMBER)
-**$ISSUE_TITLE**
-$ISSUE_URL"
+          content=$(printf "✅ Bounty completed by \`%s\` (issue #%s)\n**%s**\n%s" "$ISSUE_USER" "$ISSUE_NUMBER" "$ISSUE_TITLE" "$ISSUE_URL")
 
           json=$(jq -n --arg content "$content" '{content: $content}')
 
@@ -122,8 +116,7 @@ $ISSUE_URL"
           count=$(echo "$resp" | jq 'length')
 
           if [ "$count" -eq 0 ]; then
-            content=":dart: **Weekly bounty recap**
-No open bounties this week. 🎉"
+            content=$(printf ":dart: **Weekly bounty recap**\nNo open bounties this week. 🎉")
           else
             content=":dart: **Weekly bounty recap**\nOpen bounties:\n\n"
 
