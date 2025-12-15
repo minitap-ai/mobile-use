@@ -1,4 +1,4 @@
-"""iOS-specific device controller implementation using IDB."""
+"""iOS-specific device controller implementation using IDB or WDA."""
 
 import asyncio
 import base64
@@ -9,6 +9,7 @@ from idb.common.types import HIDButtonType
 from PIL import Image
 
 from minitap.mobile_use.clients.idb_client import IdbClientWrapper
+from minitap.mobile_use.clients.ios_client import IosClientWrapper
 from minitap.mobile_use.controllers.device_controller import (
     MobileDeviceController,
     ScreenDataResponse,
@@ -20,17 +21,18 @@ logger = get_logger(__name__)
 
 
 class iOSDeviceController(MobileDeviceController):
-    """iOS device controller using IDB."""
+    """iOS device controller using IDB (simulators) or WDA (physical devices)."""
 
     def __init__(
         self,
-        idb_client: IdbClientWrapper,
+        ios_client: IosClientWrapper,
         device_width: int,
         device_height: int,
     ):
-        self.idb_client = idb_client
+        self.ios_client = ios_client
         self.device_width = device_width
         self.device_height = device_height
+        self._is_idb = isinstance(ios_client, IdbClientWrapper)
 
     async def tap(
         self,
@@ -41,7 +43,7 @@ class iOSDeviceController(MobileDeviceController):
         """Tap at specific coordinates using IDB."""
         try:
             duration = long_press_duration / 1000.0 if long_press else None
-            await self.idb_client.tap(x=coords.x, y=coords.y, duration=duration)  # type: ignore[call-arg]
+            await self.ios_client.tap(x=coords.x, y=coords.y, duration=duration)  # type: ignore[call-arg]
             return TapOutput(error=None)
         except Exception as e:
             return TapOutput(error=f"IDB tap failed: {str(e)}")
@@ -56,7 +58,7 @@ class iOSDeviceController(MobileDeviceController):
         try:
             # IDB delta is the number of steps, approximating from duration
             ms_duration_to_percentage = duration / 1000.0
-            await self.idb_client.swipe(  # type: ignore[call-arg]
+            await self.ios_client.swipe(  # type: ignore[call-arg]
                 x_start=start.x,
                 y_start=start.y,
                 x_end=end.x,
@@ -68,21 +70,22 @@ class iOSDeviceController(MobileDeviceController):
             return f"IDB swipe failed: {str(e)}"
 
     async def get_screen_data(self) -> ScreenDataResponse:
-        """Get screen data using IDB (screenshot and hierarchy in parallel)."""
+        """Get screen data (screenshot and hierarchy in parallel)."""
         try:
             # Run screenshot and hierarchy fetch in parallel
             screenshot_bytes, accessibility_info = await asyncio.gather(
-                self.idb_client.screenshot(),  # type: ignore[call-arg]
-                self.idb_client.describe_all(),
+                self.ios_client.screenshot(),  # type: ignore[call-arg]
+                self.ios_client.describe_all(),
             )
 
             if screenshot_bytes is None:
                 raise RuntimeError("Screenshot returned None")
 
-            base64_screenshot = base64.b64encode(screenshot_bytes).decode("utf-8")
             elements = (
                 self._process_flat_ios_hierarchy(accessibility_info) if accessibility_info else []
             )
+
+            base64_screenshot = base64.b64encode(screenshot_bytes).decode("utf-8")
 
             return ScreenDataResponse(
                 base64=base64_screenshot,
@@ -98,7 +101,7 @@ class iOSDeviceController(MobileDeviceController):
     async def screenshot(self) -> str:
         """Take a screenshot using IDB and return base64 encoded string."""
         try:
-            screenshot_bytes = await self.idb_client.screenshot()  # type: ignore[call-arg]
+            screenshot_bytes = await self.ios_client.screenshot()  # type: ignore[call-arg]
             if screenshot_bytes is None:
                 raise RuntimeError("Screenshot returned None")
             return base64.b64encode(screenshot_bytes).decode("utf-8")
@@ -109,7 +112,7 @@ class iOSDeviceController(MobileDeviceController):
     async def input_text(self, text: str) -> bool:
         """Input text using IDB."""
         try:
-            return await self.idb_client.text(text)  # type: ignore[call-arg]
+            return await self.ios_client.text(text)  # type: ignore[call-arg]
         except Exception as e:
             logger.error(f"Failed to input text: {e}")
             return False
@@ -117,7 +120,7 @@ class iOSDeviceController(MobileDeviceController):
     async def launch_app(self, package_or_bundle_id: str) -> bool:
         """Launch an iOS app using IDB."""
         try:
-            return await self.idb_client.launch(bundle_id=package_or_bundle_id)  # type: ignore[call-arg]
+            return await self.ios_client.launch(bundle_id=package_or_bundle_id)  # type: ignore[call-arg]
         except Exception as e:
             logger.error(f"Failed to launch app {package_or_bundle_id}: {e}")
             return False
@@ -128,7 +131,7 @@ class iOSDeviceController(MobileDeviceController):
             logger.warning("Cannot terminate app: bundle_id is None")
             return False
         try:
-            return await self.idb_client.terminate(bundle_id=package_or_bundle_id)  # type: ignore[call-arg]
+            return await self.ios_client.terminate(bundle_id=package_or_bundle_id)  # type: ignore[call-arg]
         except Exception as e:
             logger.error(f"Failed to terminate app {package_or_bundle_id}: {e}")
             return False
@@ -136,7 +139,7 @@ class iOSDeviceController(MobileDeviceController):
     async def open_url(self, url: str) -> bool:
         """Open a URL using IDB."""
         try:
-            return await self.idb_client.open_url(url)  # type: ignore[call-arg]
+            return await self.ios_client.open_url(url)  # type: ignore[call-arg]
         except Exception as e:
             logger.error(f"Failed to open URL {url}: {e}")
             return False
@@ -154,18 +157,21 @@ class iOSDeviceController(MobileDeviceController):
             return False
 
     async def press_home(self) -> bool:
-        """Press the home button using IDB."""
+        """Press the home button."""
         try:
-            return await self.idb_client.button(button_type=HIDButtonType.HOME)  # type: ignore[call-arg]
+            if self._is_idb:
+                return await self.ios_client.button(button_type=HIDButtonType.HOME)  # type: ignore[call-arg, union-attr]
+            else:
+                return await self.ios_client.home()  # type: ignore[union-attr]
         except Exception as e:
             logger.error(f"Failed to press home: {e}")
             return False
 
     async def get_ui_hierarchy(self) -> list[dict]:
-        """Get UI hierarchy using IDB accessibility info."""
+        """Get UI hierarchy using IDB accessibility info or WDA source."""
         try:
             accessibility_info = await asyncio.wait_for(
-                self.idb_client.describe_all(), timeout=40.0
+                self.ios_client.describe_all(), timeout=40.0
             )
             if accessibility_info is None:
                 logger.warning("Accessibility info returned None")
@@ -280,7 +286,7 @@ class iOSDeviceController(MobileDeviceController):
                 nb_chars = 50  # Default to erasing 50 characters
             # iOS delete key code is 42 (HID keyboard delete)
             for _ in range(nb_chars):
-                await self.idb_client.key(42)  # type: ignore[call-arg]
+                await self.ios_client.key(42)  # type: ignore[call-arg]
             return True
         except Exception as e:
             logger.error(f"Failed to erase text: {e}")
@@ -289,7 +295,7 @@ class iOSDeviceController(MobileDeviceController):
     async def cleanup(self) -> None:
         """Cleanup iOS controller resources."""
         logger.debug("iOS controller cleanup")
-        await self.idb_client.cleanup()
+        await self.ios_client.cleanup()
 
     def get_compressed_b64_screenshot(self, image_base64: str, quality: int = 50) -> str:
         if image_base64.startswith("data:image"):

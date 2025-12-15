@@ -1,10 +1,10 @@
-import json
 import re
 from datetime import date
 from shutil import which
 
 from adbutils import AdbDevice
 
+from minitap.mobile_use.clients.ios_client import DeviceType, get_all_ios_devices_detailed
 from minitap.mobile_use.context import DevicePlatform, MobileUseContext
 from minitap.mobile_use.utils.logger import MobileUseLogger, get_logger
 from minitap.mobile_use.utils.shell_utils import run_shell_command_on_host
@@ -24,34 +24,45 @@ def get_adb_device(ctx: MobileUseContext) -> AdbDevice:
 
 def get_first_device(
     logger: MobileUseLogger | None = None,
-) -> tuple[str | None, DevicePlatform | None]:
-    """Gets the first available device."""
+    prefer_physical: bool = True,
+) -> tuple[str | None, DevicePlatform | None, DeviceType | None]:
+    """Gets the first available device.
+
+    Args:
+        logger: Optional logger for error messages
+        prefer_physical: If True, prefer physical iOS devices over simulators
+
+    Returns:
+        Tuple of (device_id, platform, device_type) or (None, None, None) if no device found.
+        device_type is only set for iOS devices (SIMULATOR or PHYSICAL).
+    """
+    # Check for Android devices first
     if which("adb"):
         try:
             android_output = run_shell_command_on_host("adb devices")
             lines = android_output.strip().split("\n")
             for line in lines:
                 if "device" in line and not line.startswith("List of devices"):
-                    return line.split()[0], DevicePlatform.ANDROID
+                    return line.split()[0], DevicePlatform.ANDROID, None
         except RuntimeError as e:
             if logger:
                 logger.error(f"ADB command failed: {e}")
 
-    if which("xcrun"):
-        try:
-            ios_output = run_shell_command_on_host("xcrun simctl list devices booted -j")
-            data = json.loads(ios_output)
-            for runtime, devices in data.get("devices", {}).items():
-                if "iOS" not in runtime:
-                    continue
-                for device in devices:
-                    if device.get("state") == "Booted":
-                        return device["udid"], DevicePlatform.IOS
-        except RuntimeError as e:
-            if logger:
-                logger.error(f"xcrun command failed: {e}")
+    # Check for iOS devices (both simulators and physical)
+    ios_devices = get_all_ios_devices_detailed()
+    if ios_devices:
+        if prefer_physical:
+            # Sort to prefer physical devices
+            ios_devices.sort(key=lambda d: d["type"] != DeviceType.PHYSICAL)
 
-    return None, None
+        device = ios_devices[0]
+        if logger:
+            logger.info(
+                f"Selected iOS device: {device['name']} ({device['type'].value}) - {device['udid']}"
+            )
+        return device["udid"], DevicePlatform.IOS, device["type"]
+
+    return None, None, None
 
 
 def get_device_date(ctx: MobileUseContext) -> str:
