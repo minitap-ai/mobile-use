@@ -14,7 +14,7 @@ from openai import BaseModel
 from pydantic import ConfigDict
 
 from minitap.mobile_use.agents.planner.types import Subgoal
-from minitap.mobile_use.clients.idb_client import IdbClientWrapper
+from minitap.mobile_use.clients.ios_client import IosClientWrapper
 from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
 from minitap.mobile_use.config import AgentNode, LLMConfig
 
@@ -82,7 +82,7 @@ class MobileUseContext(BaseModel):
     llm_config: LLMConfig
     adb_client: AdbClient | None = None
     ui_adb_client: UIAutomatorClient | None = None
-    idb_client: IdbClientWrapper | None = None
+    ios_client: IosClientWrapper | None = None
     execution_setup: ExecutionSetup | None = None
     on_agent_thought: Callable[[AgentNode, str], Coroutine] | None = None
     on_plan_changes: Callable[[list[Subgoal], IsReplan], Coroutine] | None = None
@@ -98,7 +98,8 @@ class MobileUseContext(BaseModel):
             raise ValueError("No UIAutomator client in context.")
         return self.ui_adb_client
 
-    def get_idb_client(self) -> IdbClientWrapper:
-        if self.idb_client is None:
-            raise ValueError("No IDB client in context.")
-        return self.idb_client  # type: ignore
+    def get_ios_client(self) -> IosClientWrapper:
+        """Get the iOS client (IDB for simulators, WDA for physical devices)."""
+        if self.ios_client is None:
+            raise ValueError("No iOS client in context.")
+        return self.ios_client

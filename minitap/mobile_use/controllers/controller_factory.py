@@ -27,12 +27,12 @@ def create_device_controller(ctx: MobileUseContext) -> MobileDeviceController:
         )
 
     elif platform == DevicePlatform.IOS:
-        if ctx.idb_client is None:
-            raise ValueError("IDB client not initialized for iOS device")
+        if ctx.ios_client is None:
+            raise ValueError("iOS client not initialized for iOS device")
 
         logger.info(f"Creating iOS controller for device {ctx.device.device_id}")
         return iOSDeviceController(
-            idb_client=ctx.idb_client,
+            ios_client=ctx.ios_client,
             device_width=ctx.device.device_width,
             device_height=ctx.device.device_height,
         )

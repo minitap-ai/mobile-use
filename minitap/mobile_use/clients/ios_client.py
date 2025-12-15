@@ -1,7 +1,9 @@
 import json
 import platform
+import re
 import subprocess
-from typing import Literal
+from enum import Enum
+from typing import TypedDict
 
 from minitap.mobile_use.clients.idb_client import IdbClientWrapper
 from minitap.mobile_use.clients.wda_client import WdaClientWrapper
@@ -10,8 +12,21 @@ from minitap.mobile_use.utils.shell_utils import run_shell_command_on_host
 # Type alias for the union of both client wrappers
 IosClientWrapper = IdbClientWrapper | WdaClientWrapper
 
-# Device type literals
-DeviceType = Literal["simulator", "physical", "unknown"]
+
+class DeviceType(str, Enum):
+    """Type of iOS device."""
+
+    SIMULATOR = "SIMULATOR"
+    PHYSICAL = "PHYSICAL"
+    UNKNOWN = "UNKNOWN"
+
+
+class DeviceInfo(TypedDict):
+    """Information about an iOS device."""
+
+    udid: str
+    type: DeviceType
+    name: str
 
 
 class DeviceNotFoundError(Exception):
@@ -33,12 +48,12 @@ def get_device_type(udid: str) -> DeviceType:
         udid: The device UDID to check
 
     Returns:
-        "simulator" if the device is a simulator,
-        "physical" if it's a physical device,
-        "unknown" if detection fails
+        DeviceType.SIMULATOR if the device is a simulator,
+        DeviceType.PHYSICAL if it's a physical device,
+        DeviceType.UNKNOWN if detection fails
     """
     if platform.system() != "Darwin":
-        return "unknown"
+        return DeviceType.UNKNOWN
 
     # Check if it's a booted simulator
     try:
@@ -49,7 +64,7 @@ def get_device_type(udid: str) -> DeviceType:
             for _runtime, devices in data.get("devices", {}).items():
                 for device in devices:
                     if device.get("udid") == udid:
-                        return "simulator"
+                        return DeviceType.SIMULATOR
     except (subprocess.TimeoutExpired, json.JSONDecodeError, Exception):
         pass
 
@@ -60,7 +75,7 @@ def get_device_type(udid: str) -> DeviceType:
         if result.returncode == 0:
             physical_udids = result.stdout.strip().split("\n")
             if udid in physical_udids:
-                return "physical"
+                return DeviceType.PHYSICAL
     except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
         pass
 
@@ -69,11 +84,11 @@ def get_device_type(udid: str) -> DeviceType:
         cmd = ["system_profiler", "SPUSBDataType", "-json"]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         if result.returncode == 0 and udid in result.stdout:
-            return "physical"
+            return DeviceType.PHYSICAL
     except (subprocess.TimeoutExpired, Exception):
         pass
 
-    return "unknown"
+    return DeviceType.UNKNOWN
 
 
 def get_physical_devices() -> list[str]:
@@ -85,6 +100,7 @@ def get_physical_devices() -> list[str]:
     if platform.system() != "Darwin":
         return []
 
+    # Try idevice_id first (libimobiledevice) - most reliable
     try:
         cmd = ["idevice_id", "-l"]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
@@ -94,7 +110,124 @@ def get_physical_devices() -> list[str]:
     except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
         pass
 
+    # Fallback to xcrun xctrace - filter out simulators by checking name
+    try:
+        cmd = ["xcrun", "xctrace", "list", "devices"]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            udids = []
+            for line in result.stdout.strip().split("\n"):
+                # Skip lines with "Simulator" anywhere in the name
+                if "Simulator" in line:
+                    continue
+                # Physical devices: "Device Name (iOS Version) (UDID)"
+                match = re.search(r"\(([A-Fa-f0-9-]{36})\)$", line)
+                if match:
+                    udids.append(match.group(1))
+            return udids
+    except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
+        pass
+
     return []
+
+
+def get_physical_ios_devices() -> list[DeviceInfo]:
+    """Get detailed info about connected physical iOS devices.
+
+    Returns:
+        List of DeviceInfo dicts with udid, type, and name
+    """
+    if platform.system() != "Darwin":
+        return []
+
+    devices: list[DeviceInfo] = []
+
+    # Primary: idevice_id + ideviceinfo for names (most reliable)
+    try:
+        cmd = ["idevice_id", "-l"]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            for udid in result.stdout.strip().split("\n"):
+                if not udid:
+                    continue
+                name = _get_device_name(udid)
+                devices.append(
+                    DeviceInfo(udid=udid, type=DeviceType.PHYSICAL, name=name or "Unknown Device")
+                )
+            if devices:
+                return devices
+    except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
+        pass
+
+    # Fallback: xcrun xctrace - filter out simulators by name
+    try:
+        cmd = ["xcrun", "xctrace", "list", "devices"]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            for line in result.stdout.strip().split("\n"):
+                # Skip lines with "Simulator" anywhere in the name
+                if "Simulator" in line:
+                    continue
+                # Physical devices: "Device Name (iOS Version) (UDID)"
+                match = re.search(r"^(.+?)\s+\([^)]+\)\s+\(([A-Fa-f0-9-]{36})\)$", line)
+                if match:
+                    devices.append(
+                        DeviceInfo(
+                            udid=match.group(2),
+                            type=DeviceType.PHYSICAL,
+                            name=match.group(1).strip(),
+                        )
+                    )
+    except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
+        pass
+
+    return devices
+
+
+def _get_device_name(udid: str) -> str | None:
+    """Get device name using ideviceinfo."""
+    try:
+        cmd = ["ideviceinfo", "-u", udid, "-k", "DeviceName"]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
+        pass
+    return None
+
+
+def get_simulator_devices() -> list[DeviceInfo]:
+    """Get detailed info about booted iOS simulators.
+
+    Returns:
+        List of DeviceInfo dicts with udid, type, and name
+    """
+    if platform.system() != "Darwin":
+        return []
+
+    devices: list[DeviceInfo] = []
+
+    try:
+        cmd = ["xcrun", "simctl", "list", "devices", "--json"]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            data = json.loads(result.stdout)
+            for runtime, runtime_devices in data.get("devices", {}).items():
+                if "ios" not in runtime.lower():
+                    continue
+                for device in runtime_devices:
+                    if device.get("state") == "Booted":
+                        devices.append(
+                            DeviceInfo(
+                                udid=device.get("udid", ""),
+                                type=DeviceType.SIMULATOR,
+                                name=device.get("name", "Unknown Simulator"),
+                            )
+                        )
+    except (subprocess.TimeoutExpired, json.JSONDecodeError, Exception):
+        pass
+
+    return devices
 
 
 def get_all_ios_devices() -> dict[str, DeviceType]:
@@ -106,15 +239,25 @@ def get_all_ios_devices() -> dict[str, DeviceType]:
     devices: dict[str, DeviceType] = {}
 
     # Get simulators
-    success, simulator_udids, _ = get_ios_devices()
-    if success:
-        for udid in simulator_udids:
-            devices[udid] = "simulator"
+    for device in get_simulator_devices():
+        devices[device["udid"]] = DeviceType.SIMULATOR
 
     # Get physical devices
-    for udid in get_physical_devices():
-        devices[udid] = "physical"
+    for device in get_physical_ios_devices():
+        devices[device["udid"]] = DeviceType.PHYSICAL
 
+    return devices
+
+
+def get_all_ios_devices_detailed() -> list[DeviceInfo]:
+    """Get detailed info about all connected iOS devices.
+
+    Returns:
+        List of DeviceInfo dicts with udid, type, and name
+    """
+    devices: list[DeviceInfo] = []
+    devices.extend(get_simulator_devices())
+    devices.extend(get_physical_ios_devices())
     return devices
 
 
@@ -142,7 +285,6 @@ def get_ios_client(
 
     Raises:
         DeviceNotFoundError: If the device cannot be found
-        UnsupportedDeviceError: If the device type cannot be determined
 
     Example:
         # Auto-detect and get appropriate client
@@ -154,10 +296,10 @@ def get_ios_client(
     """
     device_type = get_device_type(udid)
 
-    if device_type == "simulator":
+    if device_type == DeviceType.SIMULATOR:
         return IdbClientWrapper(udid=udid, host=idb_host, port=idb_port)
 
-    if device_type == "physical":
+    if device_type == DeviceType.PHYSICAL:
         return WdaClientWrapper(wda_url=wda_url, timeout=wda_timeout)
 
     # Device type is unknown - try to provide helpful error

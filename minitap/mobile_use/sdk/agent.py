@@ -19,7 +19,9 @@ from pydantic import BaseModel
 from minitap.mobile_use.agents.outputter.outputter import outputter
 from minitap.mobile_use.agents.planner.types import Subgoal
 from minitap.mobile_use.clients.idb_client import IdbClientWrapper
+from minitap.mobile_use.clients.ios_client import DeviceType, IosClientWrapper, get_ios_client
 from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
+from minitap.mobile_use.clients.wda_client import WdaClientWrapper
 from minitap.mobile_use.config import AgentNode, OutputConfig, record_events, settings
 from minitap.mobile_use.context import (
     DeviceContext,
@@ -81,7 +83,8 @@ class Agent:
     _device_context: DeviceContext
     _adb_client: AdbClient | None
     _ui_adb_client: UIAutomatorClient | None
-    _idb_client: IdbClientWrapper | None
+    _ios_client: IosClientWrapper | None
+    _ios_device_type: DeviceType | None
     _current_task: asyncio.Task | None = None
     _task_lock: asyncio.Lock
     _cloud_mobile_id: str | None = None
@@ -133,9 +136,10 @@ class Agent:
 
         # Get first available device ID
         if not self._config.device_id or not self._config.device_platform:
-            device_id, platform = get_first_device(logger=logger)
+            device_id, platform, ios_device_type = get_first_device(logger=logger)
         else:
             device_id, platform = self._config.device_id, self._config.device_platform
+            ios_device_type = None  # Will be auto-detected in _init_clients
 
         if not device_id or not platform:
             error_msg = "No device found. Exiting."
@@ -146,20 +150,26 @@ class Agent:
         self._init_clients(
             device_id=device_id,
             platform=platform,
+            ios_device_type=ios_device_type,
             retry_count=retry_count,
             retry_wait_seconds=retry_wait_seconds,
         )
 
-        # Initialize IDB companion for iOS
-        if self._idb_client:
-            logger.info("Starting IDB companion for iOS device...")
-            companion_started = await self._idb_client.init_companion()
-            if not companion_started:
-                raise ServerStartupError(
-                    message="Failed to start IDB companion for iOS device. "
-                    "Please ensure fb-idb is installed: https://fbidb.io/docs/installation/"
-                )
-            logger.success("IDB companion started successfully")
+        # Initialize iOS client (IDB companion for simulators, WDA already running for physical)
+        if self._ios_client:
+            if isinstance(self._ios_client, IdbClientWrapper):
+                logger.info("Starting IDB companion for iOS simulator...")
+                companion_started = await self._ios_client.init_companion()
+                if not companion_started:
+                    raise ServerStartupError(
+                        message="Failed to start IDB companion for iOS simulator. "
+                        "Please ensure fb-idb is installed: https://fbidb.io/docs/installation/"
+                    )
+                logger.success("IDB companion started successfully")
+            elif isinstance(self._ios_client, WdaClientWrapper):
+                logger.info("Connecting to WebDriverAgent for physical iOS device...")
+                await self._ios_client.init_client()
+                logger.success("WDA client connected for physical device")
 
         # Start necessary servers
         restart_attempt = 0
@@ -559,7 +569,7 @@ class Agent:
             device=self._device_context,
             adb_client=self._adb_client,
             ui_adb_client=self._ui_adb_client,
-            idb_client=self._idb_client,
+            ios_client=self._ios_client,
             llm_config=agent_profile.llm_config,
             on_agent_thought=on_agent_thought,
             on_plan_changes=on_plan_changes,
@@ -772,9 +782,9 @@ class Agent:
         if not self._initialized and not force:
             return
 
-        if self._idb_client:
-            await self._idb_client.cleanup()
-            self._idb_client = None
+        if self._ios_client:
+            await self._ios_client.cleanup()
+            self._ios_client = None
 
         self._initialized = False
         logger.info("✅ Mobile-use agent stopped.")
@@ -918,6 +928,7 @@ class Agent:
         self,
         device_id: str,
         platform: DevicePlatform,
+        ios_device_type: DeviceType | None,
         retry_count: int,
         retry_wait_seconds: int,
     ):
@@ -929,9 +940,18 @@ class Agent:
         self._ui_adb_client = (
             UIAutomatorClient(device_id=device_id) if platform == DevicePlatform.ANDROID else None
         )
-        self._idb_client = (
-            IdbClientWrapper(udid=device_id) if platform == DevicePlatform.IOS else None
-        )
+
+        # Initialize iOS client using factory (auto-detects device type if not provided)
+        if platform == DevicePlatform.IOS:
+            self._ios_client = get_ios_client(udid=device_id)
+            self._ios_device_type = ios_device_type or (
+                DeviceType.PHYSICAL
+                if isinstance(self._ios_client, WdaClientWrapper)
+                else DeviceType.SIMULATOR
+            )
+        else:
+            self._ios_client = None
+            self._ios_device_type = None
 
     def _run_servers(self, device_id: str, platform: DevicePlatform) -> bool:
         if platform == DevicePlatform.ANDROID:
@@ -944,14 +964,15 @@ class Agent:
                 raise ValueError(error_msg)
             logger.info("✓ UIAutomator client available for Android")
         elif platform == DevicePlatform.IOS:
-            if not self._idb_client:
+            if not self._ios_client:
                 error_msg = (
-                    "IDB client is required for iOS but not available. "
-                    "Please ensure idb companion is properly installed and started."
+                    "iOS client is required but not available. "
+                    "Ensure idb (simulators) or WDA (physical) is available."
                 )
                 logger.error(error_msg)
                 raise ValueError(error_msg)
-            logger.info("✓ IDB client available for iOS")
+            client_type = "WDA" if isinstance(self._ios_client, WdaClientWrapper) else "IDB"
+            logger.info(f"✓ iOS client available ({client_type})")
 
         return True
 
@@ -982,10 +1003,10 @@ class Agent:
                 logger.warning("UIAutomator client not available, using default dimensions")
                 device_width, device_height = 1080, 2340
         else:  # iOS
-            if self._idb_client:
+            if self._ios_client:
                 try:
-                    # Use IDB to take a screenshot and get dimensions
-                    screenshot_data = await self._idb_client.screenshot()  # type: ignore[call-arg]
+                    # Use iOS client to take a screenshot and get dimensions
+                    screenshot_data = await self._ios_client.screenshot()  # type: ignore[call-arg]
                     if screenshot_data:
                         img = Image.open(BytesIO(screenshot_data))
                         device_width = img.width
