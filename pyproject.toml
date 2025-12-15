@@ -36,6 +36,7 @@ dependencies = [
     "httpx>=0.28.1",
     "uiautomator2>=3.5.0",
     "fb-idb==1.1.7",
+    "facebook-wda>=1.5.4",
 ]
 
 [project.optional-dependencies]
