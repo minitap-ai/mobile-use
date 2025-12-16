@@ -8,6 +8,7 @@ from typing import Any
 import wda
 from wda.exceptions import WDAError, WDARequestError
 
+from minitap.mobile_use.clients.idb_client import IOSAppInfo
 from minitap.mobile_use.clients.ios_client_config import WdaClientConfig
 from minitap.mobile_use.clients.wda_lifecycle import (
     build_and_run_wda,
@@ -509,3 +510,17 @@ class WdaClientWrapper:
         except ET.ParseError as e:
             logger.error(f"Failed to parse XML: {e}")
         return elements
+
+    @with_wda_client
+    async def app_current(self) -> IOSAppInfo | None:
+        """Get information about the currently active app.
+
+        Returns:
+            Dictionary with pid, name, bundleId or None on error
+        """
+        session = self._ensure_session()
+        result = await asyncio.to_thread(session.app_current)
+        return IOSAppInfo(
+            name=result.get("name"),
+            bundle_id=result.get("bundleId"),
+        )
