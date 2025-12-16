@@ -1,10 +1,23 @@
 import asyncio
+import os
+import signal
+import subprocess
 from functools import wraps
 from typing import Any
 
 import wda
 from wda.exceptions import WDAError, WDARequestError
 
+from minitap.mobile_use.clients.ios_client_config import WdaClientConfig
+from minitap.mobile_use.clients.wda_lifecycle import (
+    build_and_run_wda,
+    check_iproxy_running,
+    check_wda_running,
+    get_wda_setup_instructions,
+    parse_wda_port_from_url,
+    start_iproxy,
+    wait_for_wda,
+)
 from minitap.mobile_use.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -60,56 +73,129 @@ class WdaClientWrapper:
     This wrapper provides an interface similar to IdbClientWrapper but uses
     WebDriverAgent (WDA) for physical iOS device automation instead of fb-idb.
 
-    WDA is typically used for:
+    WDA is used for:
     - Physical iOS devices connected via USB
-    - Devices where fb-idb is not available or preferred
 
     Prerequisites:
         1. WebDriverAgent must be running on the target device
         2. Port forwarding must be set up (e.g., iproxy 8100 8100)
 
     Example:
-        # Basic usage
-        async with WdaClientWrapper(wda_url="http://localhost:8100") as wrapper:
-            await wrapper.tap(100, 200)
-            screenshot = await wrapper.screenshot()
-
-        # With custom timeout
+        # Basic usage with auto-start iproxy
         wrapper = WdaClientWrapper(
             wda_url="http://localhost:8100",
-            timeout=60.0
+            udid="00008130-000C04D12011401C",
+            auto_start_iproxy=True
         )
         await wrapper.init_client()
         await wrapper.tap(100, 200)
         await wrapper.cleanup()
+
+        # Using context manager
+        async with WdaClientWrapper(wda_url="http://localhost:8100") as wrapper:
+            await wrapper.tap(100, 200)
+            screenshot = await wrapper.screenshot()
     """
 
     def __init__(
         self,
-        wda_url: str = "http://localhost:8100",
-        timeout: float = 30.0,
+        udid: str | None = None,
+        config: WdaClientConfig | None = None,
     ):
         """Initialize the WDA client wrapper.
 
         Args:
-            wda_url: URL of the WebDriverAgent server (default: http://localhost:8100)
-            timeout: Default timeout for WDA operations in seconds (default: 30.0)
+            udid: Device UDID (required for auto-starting iproxy/WDA)
         """
-        self.wda_url = wda_url
-        self.timeout = timeout
+        resolved_config = config or WdaClientConfig()
+
+        self.wda_url = resolved_config.wda_url
+        self.timeout = resolved_config.timeout
+        self.udid = udid
+        self.auto_start_iproxy = resolved_config.auto_start_iproxy
+        self.auto_start_wda = resolved_config.auto_start_wda
+        self.wda_project_path = resolved_config.wda_project_path
+        self.wda_startup_timeout = resolved_config.wda_startup_timeout
+        self._port = parse_wda_port_from_url(self.wda_url)
         self._client: wda.Client | None = None
         self._session: wda.Session | None = None
+        self._iproxy_process: subprocess.Popen | None = None
+        self._wda_process: subprocess.Popen | None = None
+        self._owns_iproxy: bool = False
+        self._owns_wda: bool = False
 
     async def init_client(self) -> bool:
         """Initialize the WDA client connection.
+
+        This method will:
+        1. Check if iproxy is running, start it if auto_start_iproxy=True
+        2. Check if WDA is responding
+        3. Create a WDA session
 
         Returns:
             True if client initialized successfully, False otherwise
         """
         try:
-            logger.info(f"Connecting to WebDriverAgent at {self.wda_url}")
+            # Step 1: Check/start iproxy if we have a UDID
+            if self.udid and self.auto_start_iproxy:
+                if not check_iproxy_running(self._port):
+                    logger.info(f"iproxy not running on port {self._port}, starting...")
+                    self._iproxy_process = await start_iproxy(
+                        local_port=self._port,
+                        device_port=self._port,
+                        udid=self.udid,
+                    )
+                    if self._iproxy_process:
+                        self._owns_iproxy = True
+                        logger.info("iproxy started successfully")
+                    else:
+                        logger.warning(
+                            "Failed to start iproxy automatically. "
+                            f"Please run: iproxy {self._port} {self._port} -u {self.udid}"
+                        )
+                else:
+                    logger.debug(f"iproxy already running on port {self._port}")
 
-            # WDA client is synchronous, run in thread pool
+            # Step 2: Check if WDA is responding, auto-start if needed
+            wda_ready = await check_wda_running(self._port, timeout=5.0)
+            if not wda_ready:
+                if self.auto_start_wda and self.udid:
+                    # Try to auto-start WDA
+                    logger.info("WDA not responding, attempting to build and run...")
+                    self._wda_process = await build_and_run_wda(
+                        udid=self.udid,
+                        project_path=self.wda_project_path,
+                        timeout=self.wda_startup_timeout,
+                    )
+                    if self._wda_process:
+                        self._owns_wda = True
+                        # Wait for WDA to become ready
+                        logger.info("Waiting for WDA to become ready...")
+                        wda_ready = await wait_for_wda(
+                            port=self._port,
+                            timeout=60.0,
+                            poll_interval=2.0,
+                        )
+
+                if not wda_ready:
+                    # Provide helpful error message
+                    error_msg = (
+                        f"WebDriverAgent not responding on port {self._port}.\n\n"
+                        "Please ensure WDA is running on your device.\n"
+                    )
+                    if self.udid:
+                        error_msg += get_wda_setup_instructions(self.udid)
+                    else:
+                        error_msg += (
+                            "Start WDA using Xcode or xcodebuild, then run:\n"
+                            f"  iproxy {self._port} {self._port}\n"
+                        )
+                    logger.error(error_msg)
+                    await self.cleanup()  # Clean up any started processes
+                    return False
+
+            # Step 3: Connect to WDA
+            logger.info(f"Connecting to WebDriverAgent at {self.wda_url}")
             self._client = await asyncio.to_thread(wda.Client, self.wda_url)
 
             # Verify connection by getting status
@@ -124,18 +210,22 @@ class WdaClientWrapper:
 
         except Exception as e:
             logger.error(f"Failed to connect to WebDriverAgent: {e}")
-            logger.error(
-                "\nMake sure:\n"
-                "1. WebDriverAgent is running on your device\n"
-                "2. Port forwarding is active: iproxy 8100 8100\n"
-                f"3. URL is correct: {self.wda_url}"
-            )
+            if self.udid:
+                logger.error(get_wda_setup_instructions(self.udid))
+            else:
+                logger.error(
+                    "\nMake sure:\n"
+                    "1. WebDriverAgent is installed using this tutorial: https://appium.github.io/appium-xcuitest-driver/4.25/setup/#installation\n"
+                    f"2. Port forwarding is active: iproxy {self._port} {self._port}\n"
+                    f"3. URL is correct: {self.wda_url}"
+                )
             self._client = None
+            await self.cleanup()  # Clean up any started processes
             self._session = None
             return False
 
     async def cleanup(self) -> None:
-        """Clean up WDA client resources."""
+        """Clean up WDA client resources and stop owned processes."""
         if self._session is not None:
             try:
                 logger.debug("Closing WDA session")
@@ -146,6 +236,33 @@ class WdaClientWrapper:
                 self._session = None
 
         self._client = None
+
+        # Stop WDA process if we started it
+        if self._owns_wda and self._wda_process:
+            try:
+                pid = self._wda_process.pid
+                logger.info(f"Stopping WDA xcodebuild process (PID: {pid})")
+                os.killpg(os.getpgid(pid), signal.SIGTERM)
+                self._wda_process.wait(timeout=10)
+            except Exception as e:
+                logger.debug(f"Error stopping WDA: {e}")
+            finally:
+                self._wda_process = None
+                self._owns_wda = False
+
+        # Stop iproxy if we started it
+        if self._owns_iproxy and self._iproxy_process:
+            try:
+                pid = self._iproxy_process.pid
+                logger.info(f"Stopping iproxy process (PID: {pid})")
+                os.killpg(os.getpgid(pid), signal.SIGTERM)
+                self._iproxy_process.wait(timeout=5)
+            except Exception as e:
+                logger.debug(f"Error stopping iproxy: {e}")
+            finally:
+                self._iproxy_process = None
+                self._owns_iproxy = False
+
         logger.debug("WDA client cleanup completed")
 
     async def __aenter__(self):
