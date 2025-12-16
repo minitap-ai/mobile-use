@@ -1,10 +1,16 @@
-import re
+import asyncio
+from concurrent.futures.thread import ThreadPoolExecutor
 from datetime import date
 from shutil import which
 
 from adbutils import AdbDevice
+from pydantic import BaseModel
 
-from minitap.mobile_use.clients.ios_client import DeviceType, get_all_ios_devices_detailed
+from minitap.mobile_use.clients.ios_client import (
+    DeviceType,
+    get_all_ios_devices_detailed,
+    get_device_type,
+)
 from minitap.mobile_use.context import DevicePlatform, MobileUseContext
 from minitap.mobile_use.utils.logger import MobileUseLogger, get_logger
 from minitap.mobile_use.utils.shell_utils import run_shell_command_on_host
@@ -74,8 +80,45 @@ def get_device_date(ctx: MobileUseContext) -> str:
 
 def list_packages(ctx: MobileUseContext) -> str:
     if ctx.device.mobile_platform == DevicePlatform.IOS:
-        cmd = ["xcrun", "simctl", "listapps", "booted", "|", "grep", "CFBundleIdentifier"]
-        return run_shell_command_on_host(" ".join(cmd))
+        udid = ctx.device.device_id
+        device_type = get_device_type(udid)
+
+        if device_type == DeviceType.SIMULATOR:
+            cmd = ["xcrun", "simctl", "listapps", udid, "|", "grep", "CFBundleIdentifier"]
+            return run_shell_command_on_host(" ".join(cmd))
+
+        # Physical device: try ios-deploy first (common with React Native/Cordova)
+        if which("ios-deploy"):
+            cmd = ["ios-deploy", "--id", udid, "--list_bundle_id"]
+            try:
+                output = run_shell_command_on_host(" ".join(cmd))
+                packages = [line.strip() for line in output.strip().split("\n") if line.strip()]
+                return "\n".join(sorted(packages))
+            except Exception as e:
+                logger.debug(f"ios-deploy failed: {e}")
+
+        # Fallback: ideviceinstaller (libimobiledevice)
+        if which("ideviceinstaller"):
+            cmd = ["ideviceinstaller", "-l", "-u", udid]
+            try:
+                output = run_shell_command_on_host(" ".join(cmd))
+                # Parse output: "CFBundleIdentifier, CFBundleVersion, CFBundleDisplayName"
+                lines = output.strip().split("\n")
+                packages = []
+                for line in lines:
+                    if ", " in line:
+                        bundle_id = line.split(", ")[0].strip()
+                        if bundle_id and not bundle_id.startswith("CFBundle"):
+                            packages.append(bundle_id)
+                return "\n".join(sorted(packages))
+            except Exception as e:
+                logger.debug(f"ideviceinstaller failed: {e}")
+
+        logger.warning(
+            "Cannot list apps on physical iOS device. Install ios-deploy "
+            "(npm install -g ios-deploy) or ideviceinstaller (brew install ideviceinstaller)"
+        )
+        return ""
     else:
         device = get_adb_device(ctx)
         # Get full package list with paths
@@ -106,16 +149,7 @@ def get_current_foreground_package(ctx: MobileUseContext) -> str | None:
     """
     try:
         if ctx.device.mobile_platform == DevicePlatform.IOS:
-            output = run_shell_command_on_host(
-                "xcrun simctl spawn booted launchctl print "
-                "system/com.apple.SpringBoard.services | grep bundleIdentifier"
-            )
-            match = re.search(r'"bundleIdentifier"\s*=\s*"([^"]+)"', output)
-            if match:
-                bundle_id = match.group(1)
-                if "." in bundle_id:
-                    return bundle_id
-            return None
+            return _get_ios_foreground_package(ctx)
 
         device = get_adb_device(ctx)
         output = str(device.shell("dumpsys window | grep mCurrentFocus"))
@@ -139,3 +173,33 @@ def get_current_foreground_package(ctx: MobileUseContext) -> str | None:
     except Exception as e:
         logger.debug(f"Failed to get current foreground package: {e}")
         return None
+
+
+class IOSAppInfo(BaseModel):
+    name: str | None
+    bundle_id: str | None
+
+
+def _get_ios_foreground_package(ctx: MobileUseContext) -> str | None:
+    """Get foreground package for iOS devices (simulator or physical)."""
+
+    ios_client = ctx.ios_client
+
+    if not ios_client:
+        return None
+
+    try:
+        # Handle both running and non-running event loops
+        try:
+            asyncio.get_running_loop()
+            # Already in async context - run in separate thread
+            with ThreadPoolExecutor() as pool:
+                app_info = pool.submit(asyncio.run, ios_client.app_current()).result(timeout=10)
+        except RuntimeError:
+            # No running loop - use asyncio.run()
+            app_info = asyncio.run(ios_client.app_current())
+        if app_info and app_info.bundle_id:
+            return app_info.bundle_id
+    except Exception as e:
+        logger.debug(f"Failed to get foreground app: {e}")
+    return None

@@ -18,6 +18,7 @@ from minitap.mobile_use.clients.wda_lifecycle import (
     start_iproxy,
     wait_for_wda,
 )
+from minitap.mobile_use.controllers.platform_specific_commands_controller import IOSAppInfo
 from minitap.mobile_use.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -509,3 +510,17 @@ class WdaClientWrapper:
         except ET.ParseError as e:
             logger.error(f"Failed to parse XML: {e}")
         return elements
+
+    @with_wda_client
+    async def app_current(self) -> IOSAppInfo | None:
+        """Get information about the currently active app.
+
+        Returns:
+            Dictionary with pid, name, bundleId or None on error
+        """
+        session = self._ensure_session()
+        result = await asyncio.to_thread(session.app_current)
+        return IOSAppInfo(
+            name=result.get("name"),
+            bundle_id=result.get("bundleId"),
+        )
