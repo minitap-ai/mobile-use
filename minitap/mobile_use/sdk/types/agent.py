@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 from langchain_core.callbacks.base import Callbacks
 from pydantic import BaseModel
 
+from minitap.mobile_use.clients.ios_client_config import IosClientConfig
 from minitap.mobile_use.context import DevicePlatform
 from minitap.mobile_use.sdk.types.task import AgentProfile, TaskRequestCommon
 
@@ -75,5 +76,6 @@ class AgentConfig(BaseModel):
     servers: ServerConfig
     graph_config_callbacks: Callbacks = None
     cloud_mobile_id_or_ref: str | None = None
+    ios_client_config: IosClientConfig | None = None
 
     model_config = {"arbitrary_types_allowed": True}

@@ -168,7 +168,13 @@ class Agent:
                 logger.success("IDB companion started successfully")
             elif isinstance(self._ios_client, WdaClientWrapper):
                 logger.info("Connecting to WebDriverAgent for physical iOS device...")
-                await self._ios_client.init_client()
+                wda_connected = await self._ios_client.init_client()
+                if not wda_connected:
+                    raise ServerStartupError(
+                        message="Failed to connect to WebDriverAgent. "
+                        "Please ensure WDA is running on your device. "
+                        "See the setup instructions above."
+                    )
                 logger.success("WDA client connected for physical device")
 
         # Start necessary servers
@@ -943,7 +949,10 @@ class Agent:
 
         # Initialize iOS client using factory (auto-detects device type if not provided)
         if platform == DevicePlatform.IOS:
-            self._ios_client = get_ios_client(udid=device_id)
+            self._ios_client = get_ios_client(
+                udid=device_id,
+                config=self._config.ios_client_config,
+            )
             self._ios_device_type = ios_device_type or (
                 DeviceType.PHYSICAL
                 if isinstance(self._ios_client, WdaClientWrapper)
