@@ -6,6 +6,7 @@ import copy
 
 from langchain_core.callbacks.base import Callbacks
 
+from minitap.mobile_use.clients.ios_client_config import IosClientConfig
 from minitap.mobile_use.config import get_default_llm_config, get_default_minitap_llm_config
 from minitap.mobile_use.context import DevicePlatform
 from minitap.mobile_use.sdk.constants import DEFAULT_PROFILE_NAME
@@ -42,6 +43,7 @@ class AgentConfigBuilder:
         self._servers: ServerConfig = get_default_servers()
         self._graph_config_callbacks: Callbacks = None
         self._cloud_mobile_id_or_ref: str | None = None
+        self._ios_client_config: IosClientConfig | None = None
 
     def add_profile(self, profile: AgentProfile, validate: bool = True) -> "AgentConfigBuilder":
         """
@@ -164,6 +166,10 @@ class AgentConfigBuilder:
         self._graph_config_callbacks = callbacks
         return self
 
+    def with_ios_client_config(self, config: IosClientConfig) -> "AgentConfigBuilder":
+        self._ios_client_config = copy.deepcopy(config)
+        return self
+
     def build(self, validate_profiles: bool = True) -> AgentConfig:
         """
         Build the mobile-use AgentConfig object.
@@ -216,6 +222,7 @@ class AgentConfigBuilder:
             servers=self._servers,
             graph_config_callbacks=self._graph_config_callbacks,
             cloud_mobile_id_or_ref=self._cloud_mobile_id_or_ref,
+            ios_client_config=self._ios_client_config,
         )
 
 
