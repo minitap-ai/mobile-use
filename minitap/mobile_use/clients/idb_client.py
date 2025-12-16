@@ -8,8 +8,15 @@ from typing import Any
 
 from idb.common.types import HIDButtonType, InstalledAppInfo, InstalledArtifact, TCPAddress
 from idb.grpc.client import Client
+from pydantic import BaseModel
 
 from minitap.mobile_use.utils.logger import get_logger
+
+
+class IOSAppInfo(BaseModel):
+    name: str | None
+    bundle_id: str | None
+
 
 logger = get_logger(__name__)
 
@@ -290,6 +297,74 @@ class IdbClientWrapper:
     async def open_url(self, client: Client, url: str) -> bool:
         await client.open_url(url)
         return True
+
+    async def app_current(self) -> IOSAppInfo | None:
+        """Get information about the currently active app on simulator.
+
+        Uses idb ui describe-all to find the app name from the UI hierarchy,
+        then looks up the bundle ID from simctl listapps.
+        Returns dict with bundleId or None.
+        """
+        try:
+            # Get the accessibility hierarchy to find the foreground app name
+            elements = await self.describe_all()
+            if not elements:
+                return None
+
+            # Find the Application element - it contains the app name in AXLabel
+            app_name = None
+            for elem in elements:
+                if elem.get("type") == "Application":
+                    app_name = elem.get("AXLabel") or elem.get("label")
+                    break
+
+            if not app_name:
+                return None
+
+            # Get installed apps from simctl and find bundle ID by display name
+            cmd = ["xcrun", "simctl", "listapps", self.udid]
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await process.communicate()
+
+            if process.returncode != 0:
+                return IOSAppInfo(name=app_name, bundle_id=None)
+
+            # Parse plist-style output
+            # Format: "com.apple.MobileAddressBook" = { ... CFBundleDisplayName = Contacts; ...}
+            import re
+
+            output = stdout.decode()
+            current_bundle_id = None
+
+            for line in output.split("\n"):
+                line = line.strip()
+                # Match app entry: "com.bundle.id" = {
+                bundle_match = re.match(r'"([^"]+)"\s*=\s*\{', line)
+                if bundle_match:
+                    current_bundle_id = bundle_match.group(1)
+                    continue
+
+                # Match display name: CFBundleDisplayName = AppName; (no quotes)
+                # or CFBundleName = AppName;
+                if current_bundle_id:
+                    name_match = re.match(r"CFBundle(?:Display)?Name\s*=\s*([^;]+);", line)
+                    if name_match:
+                        display_name = name_match.group(1).strip()
+                        if display_name == app_name:
+                            return IOSAppInfo(name=app_name, bundle_id=current_bundle_id)
+
+                # Reset on closing brace
+                if line == "};":
+                    current_bundle_id = None
+
+            return IOSAppInfo(name=app_name, bundle_id=None)
+        except Exception as e:
+            logger.debug(f"Failed to get current app: {e}")
+            return None
 
     async def describe_all(self) -> list[dict[str, Any]] | None:
         try:
