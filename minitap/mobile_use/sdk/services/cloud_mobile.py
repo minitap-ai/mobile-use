@@ -5,6 +5,7 @@ import json
 from collections.abc import Callable
 from datetime import UTC, datetime
 from io import BytesIO
+from pathlib import Path
 from typing import Any, Literal
 
 import httpx
@@ -83,6 +84,7 @@ class VirtualMobileInfo(BaseModel):
     reference_name: str | None = None
     state: VMState
     message: str | None = None
+    platform: Literal["android", "ios"]
 
 
 class CloudMobileService:
@@ -197,6 +199,7 @@ class CloudMobileService:
                 reference_name=data.get("referenceName"),
                 state=data["state"].get("current", "Unknown"),
                 message=data["state"].get("message", "Unknown"),
+                platform=data["platform"],
             )
         except httpx.HTTPStatusError as e:
             raise PlatformServiceError(
@@ -585,5 +588,64 @@ class CloudMobileService:
         except httpx.HTTPStatusError as e:
             raise PlatformServiceError(
                 message=f"Failed to get screenshot from cloud mobile: "
+                f"{e.response.status_code} - {e.response.text}"
+            )
+
+    async def install_apk(self, cloud_mobile_id: str, apk_path: Path) -> None:
+        """
+        Upload and install an APK on a cloud mobile device.
+
+        Args:
+            cloud_mobile_id: ID of the cloud mobile to install the APK on
+            apk_path: Path to the local APK file to install
+
+        Raises:
+            FileNotFoundError: If APK file doesn't exist
+            PlatformServiceError: If upload or installation fails
+        """
+        if not apk_path.exists():
+            raise FileNotFoundError(f"APK file not found: {apk_path}")
+
+        filename = apk_path.name
+
+        try:
+            # Step 1: Get signed upload URL from storage API
+            logger.info(f"Getting signed upload URL for APK '{filename}'")
+            response = await self._client.get(
+                "v1/storage/signed-upload",
+                params={"filenames": filename},
+            )
+            response.raise_for_status()
+            upload_data = response.json()
+
+            signed_urls = upload_data.get("signed_urls", {})
+            if filename not in signed_urls:
+                raise PlatformServiceError(message=f"No signed URL returned for {filename}")
+
+            signed_url = signed_urls[filename]
+
+            # Step 2: Upload APK to signed URL
+            logger.info("Uploading APK to cloud storage")
+            async with httpx.AsyncClient(timeout=300.0) as upload_client:
+                with open(apk_path, "rb") as f:
+                    upload_response = await upload_client.put(
+                        signed_url,
+                        content=f.read(),
+                        headers={"Content-Type": "application/vnd.android.package-archive"},
+                    )
+                    upload_response.raise_for_status()
+
+            # Step 3: Install APK on cloud mobile
+            logger.info(f"Installing APK on cloud mobile '{cloud_mobile_id}'")
+            install_response = await self._client.post(
+                f"daas/virtual-mobiles/{cloud_mobile_id}/install-apk",
+                json={"filename": filename},
+            )
+            install_response.raise_for_status()
+            logger.info(f"APK installed successfully on cloud mobile '{cloud_mobile_id}'")
+
+        except httpx.HTTPStatusError as e:
+            raise PlatformServiceError(
+                message=f"Failed to install APK on cloud mobile: "
                 f"{e.response.status_code} - {e.response.text}"
             )

@@ -37,6 +37,7 @@ from minitap.mobile_use.sdk.services.cloud_mobile import CloudMobileService
 from minitap.mobile_use.sdk.services.platform import PlatformService
 from minitap.mobile_use.sdk.types.agent import AgentConfig
 from minitap.mobile_use.sdk.types.exceptions import (
+    AgentError,
     AgentNotInitializedError,
     AgentProfileNotFoundError,
     AgentTaskRequestError,
@@ -188,6 +189,80 @@ class Agent:
         logger.info("✅ Mobile-use agent initialized.")
         self._initialized = True
         return True
+
+    async def install_apk(self, apk_path: str | Path) -> None:
+        """
+        Install an APK on the connected device.
+        For cloud mobiles, the APK must be x86_64 compatible.
+
+        Args:
+            apk_path: Path to the local APK file to install
+
+        Raises:
+            AgentNotInitializedError: If the agent is not initialized
+            AgentError: If attempting to install on non-Android device or ADB operations fail
+            FileNotFoundError: If the APK file doesn't exist
+            CloudMobileServiceUninitializedError: If cloud service is unavailable
+        """
+        if isinstance(apk_path, str):
+            apk_path = Path(apk_path)
+
+        if not apk_path.exists():
+            raise FileNotFoundError(f"APK file not found: {apk_path}")
+
+        if self._config.cloud_mobile_id_or_ref:
+            await self._install_apk_on_cloud_mobile(apk_path)
+        else:
+            if not self._initialized:
+                raise AgentNotInitializedError()
+
+            if self._device_context.mobile_platform != DevicePlatform.ANDROID:
+                raise AgentError(
+                    "APK can only be installed on Android devices but got "
+                    f"'{self._device_context.mobile_platform.value}'"
+                )
+
+            device_id = self._device_context.device_id
+            logger.info(f"Installing APK on Android device '{device_id}'")
+            if not self._adb_client:
+                raise AgentError("ADB client not initialized")
+
+            device = self._adb_client.device(serial=device_id)
+            await asyncio.to_thread(device.install, apk_path)
+            logger.info(f"APK installed successfully on Android device '{device_id}'")
+
+    async def _install_apk_on_cloud_mobile(self, apk_path: Path) -> None:
+        """
+        Install an APK on a cloud mobile device.
+
+        This method starts the cloud mobile if needed, then uploads and installs the APK.
+        """
+        if not self._cloud_mobile_id:
+            raise AgentTaskRequestError("Cloud mobile ID is not configured")
+
+        if not self._cloud_mobile_service:
+            raise CloudMobileServiceUninitializedError()
+
+        # Check platform before starting - fail early if not Android
+        vm_info = await self._cloud_mobile_service._get_virtual_mobile_status(self._cloud_mobile_id)
+        if vm_info.platform and vm_info.platform != "android":
+            raise AgentError(
+                f"APK can only be installed on Android cloud mobiles but got '{vm_info.platform}'"
+            )
+
+        # Start cloud mobile if not already started
+        logger.info(f"Starting cloud mobile '{self._cloud_mobile_id}' for APK installation...")
+        await self._cloud_mobile_service.start_and_wait_for_ready(
+            cloud_mobile_id=self._cloud_mobile_id,
+        )
+
+        # Install APK
+        logger.info(f"Installing APK '{apk_path.name}' on cloud mobile '{self._cloud_mobile_id}'")
+        await self._cloud_mobile_service.install_apk(
+            cloud_mobile_id=self._cloud_mobile_id,
+            apk_path=apk_path,
+        )
+        logger.success(f"APK '{apk_path.name}' installed successfully")
 
     def new_task(self, goal: str):
         """
