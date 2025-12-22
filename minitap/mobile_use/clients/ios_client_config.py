@@ -1,8 +1,55 @@
 from __future__ import annotations
 
-from dataclasses import replace
+from pydantic import BaseModel, ConfigDict, SecretStr
 
-from pydantic import BaseModel, ConfigDict
+
+class BrowserStackClientConfig(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    username: str
+    access_key: SecretStr
+    device_name: str
+    platform_version: str
+    app_url: str
+    hub_url: str | None = None
+    project_name: str | None = None
+    build_name: str | None = None
+    session_name: str | None = None
+
+    @classmethod
+    def with_overrides(
+        cls,
+        username: str | None = None,
+        access_key: str | None = None,
+        device_name: str | None = None,
+        platform_version: str | None = None,
+        app_url: str | None = None,
+        hub_url: str | None = None,
+        project_name: str | None = None,
+        build_name: str | None = None,
+        session_name: str | None = None,
+        base: BrowserStackClientConfig | None = None,
+    ) -> BrowserStackClientConfig:
+        """Create a BrowserStackClientConfig with only specified fields overridden."""
+        if base is None:
+            raise ValueError("base config is required for BrowserStackClientConfig.with_overrides")
+        overrides = {
+            k: v
+            for k, v in {
+                "username": username,
+                "access_key": access_key,
+                "device_name": device_name,
+                "platform_version": platform_version,
+                "app_url": app_url,
+                "hub_url": hub_url,
+                "project_name": project_name,
+                "build_name": build_name,
+                "session_name": session_name,
+            }.items()
+            if v is not None
+        }
+        if not overrides:
+            return base
+        return base.model_copy(update=overrides)
 
 
 class WdaClientConfig(BaseModel):
@@ -47,7 +94,7 @@ class WdaClientConfig(BaseModel):
         }
         if not overrides:
             return base
-        return replace(base, **overrides)
+        return base.model_copy(update=overrides)
 
 
 class IdbClientConfig(BaseModel):
@@ -66,23 +113,29 @@ class IdbClientConfig(BaseModel):
         overrides = {k: v for k, v in {"host": host, "port": port}.items() if v is not None}
         if not overrides:
             return base
-        return replace(base, **overrides)
+        return base.model_copy(update=overrides)
 
 
 class IosClientConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
     wda: WdaClientConfig = WdaClientConfig()
     idb: IdbClientConfig = IdbClientConfig()
+    browserstack: BrowserStackClientConfig | None = None
 
     @classmethod
     def with_overrides(
         cls,
         wda: WdaClientConfig | None = None,
         idb: IdbClientConfig | None = None,
+        browserstack: BrowserStackClientConfig | None = None,
     ) -> IosClientConfig:
         """Create an IosClientConfig with only specified fields overridden."""
         base = cls()
-        overrides = {k: v for k, v in {"wda": wda, "idb": idb}.items() if v is not None}
+        overrides = {
+            k: v
+            for k, v in {"wda": wda, "idb": idb, "browserstack": browserstack}.items()
+            if v is not None
+        }
         if not overrides:
             return base
-        return replace(base, **overrides)
+        return base.model_copy(update=overrides)
