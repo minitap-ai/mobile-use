@@ -18,6 +18,7 @@ from pydantic import BaseModel
 
 from minitap.mobile_use.agents.outputter.outputter import outputter
 from minitap.mobile_use.agents.planner.types import Subgoal
+from minitap.mobile_use.clients.browserstack_client import BrowserStackClientWrapper
 from minitap.mobile_use.clients.idb_client import IdbClientWrapper
 from minitap.mobile_use.clients.ios_client import DeviceType, IosClientWrapper, get_ios_client
 from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
@@ -124,6 +125,29 @@ class Agent:
                 cloud_mobile_id_or_ref=self._config.cloud_mobile_id_or_ref,
             )
             logger.info("Cloud device configured - skipping local initialization")
+            self._initialized = True
+            return True
+
+        # Handle BrowserStack initialization
+        if self._config.browserstack_config:
+            logger.info("Initializing BrowserStack session...")
+            self._ios_client = BrowserStackClientWrapper(config=self._config.browserstack_config)
+            session_started = await self._ios_client.init_client()
+            if not session_started:
+                raise ServerStartupError(
+                    message="Failed to create BrowserStack session. "
+                    "Please check your credentials and device configuration."
+                )
+            self._ios_device_type = DeviceType.BROWSERSTACK
+            self._adb_client = None
+            self._ui_adb_client = None
+            logger.success("BrowserStack session created successfully")
+
+            self._device_context = await self._get_device_context(
+                device_id="browserstack", platform=DevicePlatform.IOS
+            )
+            logger.info(self._device_context.to_str())
+            logger.info("✅ Mobile-use agent initialized with BrowserStack.")
             self._initialized = True
             return True
 
@@ -980,7 +1004,12 @@ class Agent:
                 )
                 logger.error(error_msg)
                 raise ValueError(error_msg)
-            client_type = "WDA" if isinstance(self._ios_client, WdaClientWrapper) else "IDB"
+            if isinstance(self._ios_client, WdaClientWrapper):
+                client_type = "WDA"
+            elif isinstance(self._ios_client, BrowserStackClientWrapper):
+                client_type = "BrowserStack"
+            else:
+                client_type = "IDB"
             logger.info(f"✓ iOS client available ({client_type})")
 
         return True

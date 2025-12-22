@@ -6,7 +6,7 @@ import copy
 
 from langchain_core.callbacks.base import Callbacks
 
-from minitap.mobile_use.clients.ios_client_config import IosClientConfig
+from minitap.mobile_use.clients.ios_client_config import BrowserStackClientConfig, IosClientConfig
 from minitap.mobile_use.config import get_default_llm_config, get_default_minitap_llm_config
 from minitap.mobile_use.context import DevicePlatform
 from minitap.mobile_use.sdk.constants import DEFAULT_PROFILE_NAME
@@ -44,6 +44,7 @@ class AgentConfigBuilder:
         self._graph_config_callbacks: Callbacks = None
         self._cloud_mobile_id_or_ref: str | None = None
         self._ios_client_config: IosClientConfig | None = None
+        self._browserstack_config: BrowserStackClientConfig | None = None
 
     def add_profile(self, profile: AgentProfile, validate: bool = True) -> "AgentConfigBuilder":
         """
@@ -99,6 +100,11 @@ class AgentConfigBuilder:
                 "Device ID cannot be set when a cloud mobile is already configured.\n"
                 "> for_device() and for_cloud_mobile() are mutually exclusive"
             )
+        if self._browserstack_config is not None:
+            raise ValueError(
+                "Device ID cannot be set when BrowserStack is already configured.\n"
+                "> for_device() and for_browserstack() are mutually exclusive"
+            )
         self._device_id = device_id
         self._device_platform = platform
         return self
@@ -120,7 +126,37 @@ class AgentConfigBuilder:
                 "Cloud mobile device ID cannot be set when a device is already configured.\n"
                 "> for_device() and for_cloud_mobile() are mutually exclusive"
             )
+        if self._browserstack_config is not None:
+            raise ValueError(
+                "Cloud mobile cannot be set when BrowserStack is already configured.\n"
+                "> for_cloud_mobile() and for_browserstack() are mutually exclusive"
+            )
         self._cloud_mobile_id_or_ref = cloud_mobile_id_or_ref
+        return self
+
+    def for_browserstack(self, config: BrowserStackClientConfig) -> "AgentConfigBuilder":
+        """
+        Configure the mobile-use agent to use BrowserStack cloud devices.
+
+        When using BrowserStack, the agent connects to BrowserStack's cloud infrastructure
+        for iOS device automation. This is mutually exclusive with for_device() and
+        for_cloud_mobile().
+
+        Args:
+            config: BrowserStack configuration with credentials and device settings
+        """
+        if self._device_id is not None:
+            raise ValueError(
+                "BrowserStack cannot be set when a device is already configured.\n"
+                "> for_device() and for_browserstack() are mutually exclusive"
+            )
+        if self._cloud_mobile_id_or_ref is not None:
+            raise ValueError(
+                "BrowserStack cannot be set when a cloud mobile is already configured.\n"
+                "> for_cloud_mobile() and for_browserstack() are mutually exclusive"
+            )
+        self._browserstack_config = config
+        self._device_platform = DevicePlatform.IOS
         return self
 
     def with_default_task_config(self, config: TaskRequestCommon) -> "AgentConfigBuilder":
@@ -223,6 +259,7 @@ class AgentConfigBuilder:
             graph_config_callbacks=self._graph_config_callbacks,
             cloud_mobile_id_or_ref=self._cloud_mobile_id_or_ref,
             ios_client_config=self._ios_client_config,
+            browserstack_config=self._browserstack_config,
         )
 
 
