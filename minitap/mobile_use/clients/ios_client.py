@@ -4,6 +4,7 @@ import re
 from enum import Enum
 from typing import TypedDict
 
+from minitap.mobile_use.clients.browserstack_client import BrowserStackClientWrapper
 from minitap.mobile_use.clients.idb_client import IdbClientWrapper
 from minitap.mobile_use.clients.ios_client_config import IosClientConfig
 from minitap.mobile_use.clients.wda_client import WdaClientWrapper
@@ -17,8 +18,8 @@ def _run_host_cmd(cmd: list[str]) -> str:
     return run_shell_command_on_host(" ".join(cmd))
 
 
-# Type alias for the union of both client wrappers
-IosClientWrapper = IdbClientWrapper | WdaClientWrapper
+# Type alias for the union of all client wrappers
+IosClientWrapper = IdbClientWrapper | WdaClientWrapper | BrowserStackClientWrapper
 
 
 class DeviceType(str, Enum):
@@ -26,6 +27,7 @@ class DeviceType(str, Enum):
 
     SIMULATOR = "SIMULATOR"
     PHYSICAL = "PHYSICAL"
+    BROWSERSTACK = "BROWSERSTACK"
     UNKNOWN = "UNKNOWN"
 
 
@@ -269,7 +271,7 @@ def get_all_ios_devices_detailed() -> list[DeviceInfo]:
 
 
 def get_ios_client(
-    udid: str,
+    udid: str | None = None,
     config: IosClientConfig | None = None,
 ) -> IosClientWrapper:
     """Factory function to get the appropriate iOS client based on device type.
@@ -278,7 +280,7 @@ def get_ios_client(
     and returns the appropriate client wrapper.
 
     Args:
-        udid: The device UDID
+        udid: Optional device UDID
         config: Optional iOS client configuration (WDA/IDB settings). Defaults are used when None.
 
     Returns:
@@ -295,6 +297,11 @@ def get_ios_client(
             await client.tap(100, 200)
             screenshot = await client.screenshot()
     """
+    if not udid:
+        if config and config.browserstack:
+            return BrowserStackClientWrapper(config=config.browserstack)
+        raise DeviceNotFoundError("No device UDID provided")
+
     device_type = get_device_type(udid)
     resolved_config = config or IosClientConfig()
 
