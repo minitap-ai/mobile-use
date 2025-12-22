@@ -35,7 +35,7 @@ def _find_available_port(start_port: int = 10882, max_attempts: int = 100) -> in
 
 
 def with_idb_client(func):
-    """Decorator to handle idb client lifecycle.
+    """Decorator to ensure idb client is initialized before method call.
 
     Note: Function must have None or bool in return type.
     """
@@ -44,12 +44,15 @@ def with_idb_client(func):
     async def wrapper(self, *args, **kwargs):
         method_name = func.__name__
         try:
-            logger.debug(f"Building IDB client connection for {method_name}...")
-            async with Client.build(address=self.address, logger=logger.logger) as client:
-                logger.debug(f"Client built, calling {method_name}...")
-                result = await func(self, client, *args, **kwargs)
-                logger.debug(f"{method_name} completed successfully")
-                return result
+            if self._client is None:
+                raise RuntimeError(
+                    "IDB client not initialized. "
+                    "Use 'async with' context manager or call init_companion() first."
+                )
+            logger.debug(f"Calling {method_name}...")
+            result = await func(self, *args, **kwargs)
+            logger.debug(f"{method_name} completed successfully")
+            return result
         except Exception as e:
             logger.error(f"Failed to {method_name}: {e}")
             import traceback
@@ -102,6 +105,18 @@ class IdbClientWrapper:
             self.address = TCPAddress(host=host, port=actual_port)
 
         self.companion_process: subprocess.Popen | None = None
+        self._client: Client | None = None
+        self._client_generator: Any = None
+
+    @property
+    def client(self) -> Client:
+        """Get the initialized IDB client. Raises if not initialized."""
+        if self._client is None:
+            raise RuntimeError(
+                "IDB client not initialized. "
+                "Use 'async with' context manager or call init_companion() first."
+            )
+        return self._client
 
     async def init_companion(self, idb_companion_path: str = "idb_companion") -> bool:
         """
@@ -116,6 +131,11 @@ class IdbClientWrapper:
         """
         if not self._manage_companion:
             logger.info(f"Using external idb_companion at {self.address.host}:{self.address.port}")
+            # Still need to build the client connection
+            logger.debug("Building IDB client connection...")
+            self._client_generator = Client.build(address=self.address, logger=logger.logger)
+            self._client = await self._client_generator.__aenter__()
+            logger.debug("IDB client connected")
             return True
 
         if self.companion_process is not None:
@@ -143,6 +163,13 @@ class IdbClientWrapper:
             logger.info(
                 f"idb_companion started successfully for {self.udid} on port {self.address.port}"
             )
+
+            # Build and store the client connection
+            logger.debug("Building IDB client connection...")
+            self._client_generator = Client.build(address=self.address, logger=logger.logger)
+            self._client = await self._client_generator.__aenter__()
+            logger.debug("IDB client connected")
+
             return True
 
         except FileNotFoundError:
@@ -159,8 +186,20 @@ class IdbClientWrapper:
             return False
 
     async def cleanup(self) -> None:
+        # Always close the client context manager if it exists
+        if self._client_generator is not None:
+            try:
+                logger.debug("Closing IDB client connection...")
+                await self._client_generator.__aexit__(None, None, None)
+                logger.debug("IDB client closed")
+            except Exception as e:
+                logger.error(f"Error closing IDB client: {e}")
+            finally:
+                self._client = None
+                self._client_generator = None
+
         if not self._manage_companion:
-            logger.debug(f"Not managing companion for {self.udid}, skipping cleanup")
+            logger.debug(f"Not managing companion for {self.udid}, skipping companion cleanup")
             return
 
         if self.companion_process is None:
@@ -205,32 +244,31 @@ class IdbClientWrapper:
         return False
 
     @with_idb_client
-    async def tap(self, client: Client, x: int, y: int, duration: float | None = None) -> bool:
-        await client.tap(x=x, y=y, duration=duration)
+    async def tap(self, x: int, y: int, duration: float | None = None) -> bool:
+        await self.client.tap(x=x, y=y, duration=duration)
         return True
 
     @with_idb_client
     async def swipe(
         self,
-        client: Client,
         x_start: int,
         y_start: int,
         x_end: int,
         y_end: int,
         duration: float | None = None,
     ) -> bool:
-        await client.swipe(p_start=(x_start, y_start), p_end=(x_end, y_end), duration=duration)
+        await self.client.swipe(p_start=(x_start, y_start), p_end=(x_end, y_end), duration=duration)
         return True
 
     @with_idb_client
-    async def screenshot(self, client: Client, output_path: str | None = None) -> bytes | None:
+    async def screenshot(self, output_path: str | None = None) -> bytes | None:
         """
         Take a screenshot and return raw image data.
 
         Returns:
             Raw image data (PNG bytes not base64 encoded)
         """
-        screenshot_data = await client.screenshot()
+        screenshot_data = await self.client.screenshot()
         if output_path:
             with open(output_path, "wb") as f:
                 f.write(screenshot_data)
@@ -239,63 +277,62 @@ class IdbClientWrapper:
     @with_idb_client
     async def launch(
         self,
-        client: Client,
         bundle_id: str,
         args: list[str] | None = None,
         env: dict[str, str] | None = None,
     ) -> bool:
-        await client.launch(
+        await self.client.launch(
             bundle_id=bundle_id, args=args or [], env=env or {}, foreground_if_running=True
         )
         return True
 
     @with_idb_client
-    async def terminate(self, client: Client, bundle_id: str) -> bool:
-        await client.terminate(bundle_id)
+    async def terminate(self, bundle_id: str) -> bool:
+        await self.client.terminate(bundle_id)
         return True
 
     @with_idb_client
-    async def install(self, client: Client, app_path: str) -> list[InstalledArtifact] | None:
+    async def install(self, app_path: str) -> list[InstalledArtifact] | None:
         bundle_path = Path(app_path)
         artifacts = []
         with open(bundle_path, "rb") as f:
-            async for artifact in client.install(bundle=f):
+            async for artifact in self.client.install(bundle=f):
                 artifacts.append(artifact)
         return artifacts
 
     @with_idb_client
-    async def uninstall(self, client: Client, bundle_id: str) -> bool:
-        await client.uninstall(bundle_id)
+    async def uninstall(self, bundle_id: str) -> bool:
+        await self.client.uninstall(bundle_id)
         return True
 
     @with_idb_client
-    async def list_apps(self, client: Client) -> list[InstalledAppInfo] | None:
-        apps = await client.list_apps()
+    async def list_apps(self) -> list[InstalledAppInfo] | None:
+        apps = await self.client.list_apps()
         return apps
 
     @with_idb_client
-    async def text(self, client: Client, text: str) -> bool:
-        await client.text(text)
+    async def text(self, text: str) -> bool:
+        await self.client.text(text)
         return True
 
     @with_idb_client
-    async def key(self, client: Client, key_code: int) -> bool:
-        await client.key(key_code)
+    async def key(self, key_code: int) -> bool:
+        await self.client.key(key_code)
         return True
 
     @with_idb_client
-    async def button(self, client: Client, button_type: HIDButtonType) -> bool:
-        await client.button(button_type=button_type)
+    async def button(self, button_type: HIDButtonType) -> bool:
+        await self.client.button(button_type=button_type)
         return True
 
     @with_idb_client
-    async def clear_keychain(self, client: Client) -> bool:
-        await client.clear_keychain()
+    async def clear_keychain(self) -> bool:
+        await self.client.clear_keychain()
         return True
 
     @with_idb_client
-    async def open_url(self, client: Client, url: str) -> bool:
-        await client.open_url(url)
+    async def open_url(self, url: str) -> bool:
+        await self.client.open_url(url)
         return True
 
     async def app_current(self) -> IOSAppInfo | None:
@@ -387,6 +424,6 @@ class IdbClientWrapper:
             return None
 
     @with_idb_client
-    async def describe_point(self, client: Client, x: int, y: int) -> dict[str, Any] | None:
-        accessibility_info = await client.accessibility_info(point=(x, y), nested=True)
+    async def describe_point(self, x: int, y: int) -> dict[str, Any] | None:
+        accessibility_info = await self.client.accessibility_info(point=(x, y), nested=True)
         return json.loads(accessibility_info.json)
