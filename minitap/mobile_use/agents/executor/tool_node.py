@@ -9,6 +9,7 @@ from langgraph.store.base import BaseStore
 from langgraph.types import Command
 from pydantic import BaseModel
 
+from minitap.mobile_use.services.telemetry import telemetry
 from minitap.mobile_use.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -19,6 +20,10 @@ class ExecutorToolNode(ToolNode):
     ToolNode that runs tool calls one after the other - not simultaneously.
     If one error occurs, the remaining tool calls are aborted!
     """
+
+    def __init__(self, tools, messages_key: str, trace_id: str | None = None):
+        super().__init__(tools=tools, messages_key=messages_key)
+        self._trace_id = trace_id
 
     @override
     async def _afunc(
@@ -89,8 +94,25 @@ class ExecutorToolNode(ToolNode):
 
                 logger.info(f"❌ Tool call failed: {call_without_state}")
                 logger.info(f"   Error: {error_msg}")
+
+                # Capture executor action telemetry
+                if self._trace_id:
+                    telemetry.capture_executor_action(
+                        task_id=self._trace_id,
+                        tool_name=call["name"],
+                        success=False,
+                        error=str(error_msg)[:500] if error_msg else None,
+                    )
             else:
                 logger.info("✅ Tool call succeeded: " + str(call_without_state))
+
+                # Capture executor action telemetry
+                if self._trace_id:
+                    telemetry.capture_executor_action(
+                        task_id=self._trace_id,
+                        tool_name=call["name"],
+                        success=True,
+                    )
 
             outputs.append(output)
         return self._combine_tool_outputs(outputs, input_type)  # type: ignore
