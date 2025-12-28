@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     ADB_HOST: str | None = None
     ADB_PORT: int | None = None
 
+    MOBILE_USE_TELEMETRY_ENABLED: bool | None = None
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 
