@@ -126,8 +126,11 @@ class Agent:
                 retry_wait_seconds=retry_wait_seconds,
             )
         except Exception as e:
+            session_id = telemetry._session_id
             telemetry.capture_exception(e, {"phase": "agent_init"})
             telemetry.end_session(success=False, error=str(e))
+            if session_id:
+                logger.info(f"If you need support, please include this session ID: {session_id}")
             raise
 
     async def _init_internal(
@@ -766,6 +769,11 @@ class Agent:
                     duration_seconds=duration,
                 )
                 telemetry.capture_exception(e, {"task_id": task_id})
+                if telemetry._session_id:
+                    logger.info(
+                        "If you need support, please include this session ID: "
+                        f"{telemetry._session_id}"
+                    )
                 raise
             finally:
                 await self._finalize_tracing(task=task, context=context)

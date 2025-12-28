@@ -197,12 +197,10 @@ def main(
 
     display_device_status(console, adb_client=adb_client)
 
-    # Start telemetry session with CLI context
-    telemetry.start_session(
+    # Start telemetry session with CLI context (only non-sensitive flags)
+    session_id = telemetry.start_session(
         {
             "source": "cli",
-            "goal": goal,
-            "test_name": test_name,
             "has_output_description": output_description is not None,
         }
     )
@@ -231,6 +229,9 @@ def main(
         error_message = "Task cancelled by user"
     except Exception as e:
         error_message = str(e)
+        console.print(
+            f"\n[dim]If you need support, please include this session ID: {session_id}[/dim]"
+        )
         raise
     finally:
         telemetry.end_session(
