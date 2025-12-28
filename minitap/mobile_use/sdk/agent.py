@@ -59,6 +59,7 @@ from minitap.mobile_use.sdk.types.task import (
     Task,
     TaskRequest,
 )
+from minitap.mobile_use.services.telemetry import telemetry
 from minitap.mobile_use.utils.app_launch_utils import _handle_initial_app_launch
 from minitap.mobile_use.utils.logger import get_logger
 from minitap.mobile_use.utils.media import (
@@ -113,6 +114,29 @@ class Agent:
         retry_count: int = 5,
         retry_wait_seconds: int = 5,
     ):
+        # Start telemetry session for SDK usage (if not already started by CLI)
+        if not telemetry._session_id:
+            telemetry.start_session({"source": "sdk"})
+
+        try:
+            return await self._init_internal(
+                api_key=api_key,
+                server_restart_attempts=server_restart_attempts,
+                retry_count=retry_count,
+                retry_wait_seconds=retry_wait_seconds,
+            )
+        except Exception as e:
+            telemetry.capture_exception(e, {"phase": "agent_init"})
+            telemetry.end_session(success=False, error=str(e))
+            raise
+
+    async def _init_internal(
+        self,
+        api_key: str | None = None,
+        server_restart_attempts: int = 3,
+        retry_count: int = 5,
+        retry_wait_seconds: int = 5,
+    ):
         if api_key:
             self._platform_service = PlatformService(api_key=api_key)
             self._cloud_mobile_service = CloudMobileService(api_key=api_key)
@@ -149,6 +173,10 @@ class Agent:
             logger.info(self._device_context.to_str())
             logger.info("✅ Mobile-use agent initialized with BrowserStack.")
             self._initialized = True
+            telemetry.capture_agent_initialized(
+                platform=DevicePlatform.IOS.value,
+                device_id="browserstack",
+            )
             return True
 
         if not which("adb") and not which("xcrun"):
@@ -228,6 +256,10 @@ class Agent:
         logger.info(self._device_context.to_str())
         logger.info("✅ Mobile-use agent initialized.")
         self._initialized = True
+        telemetry.capture_agent_initialized(
+            platform=platform.value,
+            device_id=device_id,
+        )
         return True
 
     async def install_apk(self, apk_path: str | Path) -> None:
@@ -244,6 +276,13 @@ class Agent:
             FileNotFoundError: If the APK file doesn't exist
             CloudMobileServiceUninitializedError: If cloud service is unavailable
         """
+        try:
+            await self._install_apk_internal(apk_path)
+        except Exception as e:
+            telemetry.capture_exception(e, {"phase": "install_apk"})
+            raise
+
+    async def _install_apk_internal(self, apk_path: str | Path) -> None:
         if isinstance(apk_path, str):
             apk_path = Path(apk_path)
 
@@ -517,11 +556,13 @@ class Agent:
                 # Propagate cancellation to parent coroutine.
                 logger.info("Task cancelled during execution, re-raising CancelledError")
                 raise
-            except AgentTaskRequestError:
-                # Re-raise known exceptions
+            except AgentTaskRequestError as e:
+                # Capture and re-raise known exceptions
+                telemetry.capture_exception(e, {"phase": "cloud_mobile_task"})
                 raise
             except Exception as e:
                 logger.error(f"Unexpected error during cloud mobile task execution: {e}")
+                telemetry.capture_exception(e, {"phase": "cloud_mobile_task"})
                 raise AgentTaskRequestError(f"Unexpected error: {e}") from e
 
         async with self._task_lock:
@@ -621,6 +662,13 @@ class Agent:
         logger.info(f"[{task_name}] Starting graph with goal: `{request.goal}`")
         state = self._get_graph_state(task=task)
         graph_input = state.model_dump()
+        task_start_time = datetime.now(UTC)
+
+        telemetry.capture_task_started(
+            task_id=task_id,
+            platform=self._device_context.mobile_platform.value,
+            has_locked_app=request.locked_app_package is not None,
+        )
 
         async def _execute_task_logic():
             last_state: State | None = None
@@ -673,6 +721,14 @@ class Agent:
                 )
                 logger.info(f"✅ Automation '{task_name}' is success ✅")
                 await task.finalize(content=output, state=last_state_snapshot)
+                duration = (datetime.now(UTC) - task_start_time).total_seconds()
+                steps_count = len(last_state.agents_thoughts) if last_state else 0
+                telemetry.capture_task_completed(
+                    task_id=task_id,
+                    success=True,
+                    steps_count=steps_count,
+                    duration_seconds=duration,
+                )
                 return output
             except asyncio.CancelledError:
                 err = f"[{task_name}] Task cancelled"
@@ -681,6 +737,15 @@ class Agent:
                     content=output,
                     state=last_state_snapshot,
                     error=err,
+                    cancelled=True,
+                )
+                duration = (datetime.now(UTC) - task_start_time).total_seconds()
+                steps_count = len(last_state.agents_thoughts) if last_state else 0
+                telemetry.capture_task_completed(
+                    task_id=task_id,
+                    success=False,
+                    steps_count=steps_count,
+                    duration_seconds=duration,
                     cancelled=True,
                 )
                 raise
@@ -692,6 +757,15 @@ class Agent:
                     state=last_state_snapshot,
                     error=err,
                 )
+                duration = (datetime.now(UTC) - task_start_time).total_seconds()
+                steps_count = len(last_state.agents_thoughts) if last_state else 0
+                telemetry.capture_task_completed(
+                    task_id=task_id,
+                    success=False,
+                    steps_count=steps_count,
+                    duration_seconds=duration,
+                )
+                telemetry.capture_exception(e, {"task_id": task_id})
                 raise
             finally:
                 await self._finalize_tracing(task=task, context=context)
@@ -808,6 +882,9 @@ class Agent:
         if self._cloud_mobile_id:
             self._initialized = False
             logger.info("✅ Cloud-mode agent stopped.")
+            # End telemetry session if started by SDK (not CLI)
+            if telemetry._session_id and telemetry._session_context.get("source") == "sdk":
+                telemetry.end_session(success=True)
             return
         if not self._initialized and not force:
             return
@@ -818,6 +895,10 @@ class Agent:
 
         self._initialized = False
         logger.info("✅ Mobile-use agent stopped.")
+
+        # End telemetry session if started by SDK (not CLI)
+        if telemetry._session_id and telemetry._session_context.get("source") == "sdk":
+            telemetry.end_session(success=True)
 
     async def _prepare_app_lock(self, task: Task, context: MobileUseContext):
         """Prepare app lock by launching the locked app if specified."""

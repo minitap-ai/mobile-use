@@ -17,6 +17,7 @@ from minitap.mobile_use.config import initialize_llm_config, settings
 from minitap.mobile_use.sdk import Agent
 from minitap.mobile_use.sdk.builders import Builders
 from minitap.mobile_use.sdk.types.task import AgentProfile
+from minitap.mobile_use.services.telemetry import telemetry
 from minitap.mobile_use.utils.cli_helpers import display_device_status
 from minitap.mobile_use.utils.logger import get_logger
 
@@ -195,26 +196,96 @@ def main(
         pass  # ADB not available, will only support iOS devices
 
     display_device_status(console, adb_client=adb_client)
-    asyncio.run(
-        run_automation(
-            goal=goal,
-            test_name=test_name,
-            traces_output_path_str=traces_path,
-            output_description=output_description,
-            wda_url=wda_url,
-            wda_timeout=wda_timeout,
-            wda_auto_start_iproxy=wda_auto_start_iproxy,
-            wda_auto_start_wda=wda_auto_start_wda,
-            wda_project_path=wda_project_path,
-            wda_startup_timeout=wda_startup_timeout,
-            idb_host=idb_host,
-            idb_port=idb_port,
-        )
+
+    # Start telemetry session with CLI context
+    telemetry.start_session(
+        {
+            "source": "cli",
+            "goal": goal,
+            "test_name": test_name,
+            "has_output_description": output_description is not None,
+        }
     )
+
+    error_message = None
+    cancelled = False
+    try:
+        asyncio.run(
+            run_automation(
+                goal=goal,
+                test_name=test_name,
+                traces_output_path_str=traces_path,
+                output_description=output_description,
+                wda_url=wda_url,
+                wda_timeout=wda_timeout,
+                wda_auto_start_iproxy=wda_auto_start_iproxy,
+                wda_auto_start_wda=wda_auto_start_wda,
+                wda_project_path=wda_project_path,
+                wda_startup_timeout=wda_startup_timeout,
+                idb_host=idb_host,
+                idb_port=idb_port,
+            )
+        )
+    except KeyboardInterrupt:
+        cancelled = True
+        error_message = "Task cancelled by user"
+    except Exception as e:
+        error_message = str(e)
+        raise
+    finally:
+        telemetry.end_session(
+            success=error_message is None,
+            error=error_message,
+        )
+        if cancelled:
+            raise SystemExit(130)
+
+
+def _prompt_telemetry_consent(console: Console) -> None:
+    """Prompt user for telemetry consent if not yet configured."""
+    if not telemetry.needs_consent:
+        return
+
+    console.print()
+    console.print("[bold]📊 Help improve mobile-use[/bold]")
+    console.print(
+        "We collect anonymous usage data to help debug and improve the SDK.\n"
+        "No personal data, prompts, or device content is collected.\n"
+        "You can change this anytime by setting MOBILE_USE_TELEMETRY_ENABLED=false\n"
+    )
+
+    try:
+        import inquirer
+
+        questions = [
+            inquirer.Confirm(
+                "consent",
+                message="Enable anonymous telemetry?",
+                default=True,
+            )
+        ]
+        answers = inquirer.prompt(questions)
+        if answers is not None:
+            enabled = answers.get("consent", False)
+            telemetry.set_consent(enabled)
+            if enabled:
+                console.print("[green]✓ Telemetry enabled. Thank you![/green]\n")
+            else:
+                console.print("[dim]Telemetry disabled.[/dim]\n")
+        else:
+            telemetry.set_consent(False)
+    except (ImportError, KeyboardInterrupt):
+        telemetry.set_consent(False)
 
 
 def cli():
-    app()
+    console = Console()
+    _prompt_telemetry_consent(console)
+    telemetry.initialize()
+    try:
+        app()
+    finally:
+        telemetry.shutdown()
 
 
 if __name__ == "__main__":
