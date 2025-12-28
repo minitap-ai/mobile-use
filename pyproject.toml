@@ -39,6 +39,7 @@ dependencies = [
     "facebook-wda>=1.5.4",
     "Appium-Python-Client>=5.0.0",
     "posthog>=7.4.2",
+    "uuid-utils>=0.12.0",
 ]
 
 [project.optional-dependencies]

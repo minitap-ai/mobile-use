@@ -2,53 +2,16 @@
 
 import json
 import platform
-import secrets
-import time
-import uuid
+import threading
 from pathlib import Path
 
+import uuid_utils
 from posthog import Posthog
 
 from minitap.mobile_use.config import settings
 from minitap.mobile_use.utils.logger import get_logger
 
 logger = get_logger(__name__)
-
-
-def _generate_uuid7() -> str:
-    """
-    Generate a UUIDv7 (time-ordered UUID).
-
-    UUIDv7 format (RFC 9562):
-    - 48 bits: Unix timestamp in milliseconds
-    - 4 bits: Version (7)
-    - 12 bits: Random
-    - 2 bits: Variant (10)
-    - 62 bits: Random
-    """
-    timestamp_ms = int(time.time() * 1000)
-
-    # 48-bit timestamp
-    time_high = (timestamp_ms >> 16) & 0xFFFFFFFF
-    time_low = timestamp_ms & 0xFFFF
-
-    # Random bits
-    rand_a = secrets.randbits(12)
-    rand_b = secrets.randbits(62)
-
-    # Construct UUID
-    # time_high (32 bits) | time_low (16 bits) | version (4 bits) | rand_a (12 bits) |
-    # variant (2 bits) | rand_b (62 bits)
-    uuid_int = (
-        (time_high << 96)
-        | (time_low << 80)
-        | (0x7 << 76)  # Version 7
-        | (rand_a << 64)
-        | (0b10 << 62)  # Variant
-        | rand_b
-    )
-
-    return str(uuid.UUID(int=uuid_int))
 
 
 POSTHOG_API_KEY = "phc_MTwMcqOjMpTdTdrYwQUlsWaKkB7C8MPAw9YyZhRv8B8"
@@ -104,7 +67,7 @@ class TelemetryConfig:
         """Get or generate a persistent anonymous distinct ID."""
         if self._distinct_id is None:
             config = self.load()
-            self._distinct_id = config.get("distinct_id") or str(uuid.uuid4())
+            self._distinct_id = config.get("distinct_id") or str(uuid_utils.uuid4())
         return self._distinct_id
 
     @property
@@ -142,6 +105,7 @@ class TelemetryService:
     """PostHog telemetry service for mobile-use SDK."""
 
     _instance: "TelemetryService | None" = None
+    _lock: threading.Lock = threading.Lock()
 
     def __init__(self):
         self._config = TelemetryConfig()
@@ -152,9 +116,11 @@ class TelemetryService:
 
     @classmethod
     def get_instance(cls) -> "TelemetryService":
-        """Get singleton instance of TelemetryService."""
+        """Get singleton instance of TelemetryService (thread-safe)."""
         if cls._instance is None:
-            cls._instance = TelemetryService()
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = TelemetryService()
         return cls._instance
 
     @property
@@ -207,7 +173,7 @@ class TelemetryService:
         Returns:
             The session ID
         """
-        self._session_id = _generate_uuid7()
+        self._session_id = str(uuid_utils.uuid7())
         self._session_context = context or {}
 
         if self.is_enabled:
@@ -392,19 +358,17 @@ class TelemetryService:
     def capture_cortex_decision(
         self,
         task_id: str,
-        decisions_reason: str | None = None,
-        goals_completion_reason: str | None = None,
         has_decisions: bool = False,
+        has_goals_completion: bool = False,
         completed_subgoals_count: int = 0,
     ) -> None:
-        """Capture cortex agent decision event."""
+        """Capture cortex agent decision event (only non-sensitive flags)."""
         self.capture(
             "cortex_decision",
             {
                 "task_id": task_id,
-                "decisions_reason": decisions_reason,
-                "goals_completion_reason": goals_completion_reason,
                 "has_decisions": has_decisions,
+                "has_goals_completion": has_goals_completion,
                 "completed_subgoals_count": completed_subgoals_count,
             },
         )

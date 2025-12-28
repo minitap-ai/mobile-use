@@ -107,12 +107,11 @@ class CortexNode:
 
         agent_thought = "\n\n".join(thought_parts)
 
-        # Capture cortex decision telemetry
+        # Capture cortex decision telemetry (only non-sensitive flags)
         telemetry.capture_cortex_decision(
             task_id=self.ctx.trace_id,
-            decisions_reason=response.decisions_reason,
-            goals_completion_reason=response.goals_completion_reason,
             has_decisions=response.decisions is not None,
+            has_goals_completion=response.goals_completion_reason is not None,
             completed_subgoals_count=len(response.complete_subgoals_by_ids or []),
         )
 
