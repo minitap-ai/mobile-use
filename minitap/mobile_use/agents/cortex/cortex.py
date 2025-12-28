@@ -18,6 +18,7 @@ from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.controller_factory import create_device_controller
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message, with_fallback
+from minitap.mobile_use.services.telemetry import telemetry
 from minitap.mobile_use.tools.index import EXECUTOR_WRAPPERS_TOOLS, format_tools_list
 from minitap.mobile_use.utils.conversations import get_screenshot_message_for_llm
 from minitap.mobile_use.utils.decorators import wrap_with_callbacks
@@ -105,6 +106,15 @@ class CortexNode:
             thought_parts.append(f"Goals completion reason: {response.goals_completion_reason}")
 
         agent_thought = "\n\n".join(thought_parts)
+
+        # Capture cortex decision telemetry
+        telemetry.capture_cortex_decision(
+            task_id=self.ctx.trace_id,
+            decisions_reason=response.decisions_reason,
+            goals_completion_reason=response.goals_completion_reason,
+            has_decisions=response.decisions is not None,
+            completed_subgoals_count=len(response.complete_subgoals_by_ids or []),
+        )
 
         return await state.asanitize_update(
             ctx=self.ctx,

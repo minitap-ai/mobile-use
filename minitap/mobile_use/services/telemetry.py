@@ -389,6 +389,44 @@ class TelemetryService:
             },
         )
 
+    def capture_cortex_decision(
+        self,
+        task_id: str,
+        decisions_reason: str | None = None,
+        goals_completion_reason: str | None = None,
+        has_decisions: bool = False,
+        completed_subgoals_count: int = 0,
+    ) -> None:
+        """Capture cortex agent decision event."""
+        self.capture(
+            "cortex_decision",
+            {
+                "task_id": task_id,
+                "decisions_reason": decisions_reason,
+                "goals_completion_reason": goals_completion_reason,
+                "has_decisions": has_decisions,
+                "completed_subgoals_count": completed_subgoals_count,
+            },
+        )
+
+    def capture_executor_action(
+        self,
+        task_id: str,
+        tool_name: str,
+        success: bool,
+        error: str | None = None,
+    ) -> None:
+        """Capture executor tool action event."""
+        self.capture(
+            "executor_action",
+            {
+                "task_id": task_id,
+                "tool_name": tool_name,
+                "success": success,
+                "error": error,
+            },
+        )
+
     def flush(self) -> None:
         """Flush pending events to PostHog."""
         if self.is_enabled and self._initialized and self._client:

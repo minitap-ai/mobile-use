@@ -108,6 +108,7 @@ async def get_graph(ctx: MobileUseContext) -> CompiledStateGraph:
     executor_tool_node = ExecutorToolNode(
         tools=get_tools_from_wrappers(ctx=ctx, wrappers=EXECUTOR_WRAPPERS_TOOLS),
         messages_key=EXECUTOR_MESSAGES_KEY,
+        trace_id=ctx.trace_id,
     )
     graph_builder.add_node("executor_tools", executor_tool_node)
 
