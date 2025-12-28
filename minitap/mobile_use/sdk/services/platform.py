@@ -117,7 +117,7 @@ class PlatformService:
 
                 task_request = TaskRequest(
                     # Manual configuration
-                    max_steps=400,
+                    max_steps=request.max_steps,
                     goal=request.task.goal,
                     output_description=request.task.output_description,
                     enable_remote_tracing=True,
