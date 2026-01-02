@@ -87,16 +87,17 @@ def get_stop_video_recording_tool(ctx: MobileUseContext) -> BaseTool:
     @tool
     async def stop_video_recording(
         agent_thought: str,
-        prompt: str,
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
+        prompt: str = "Describe what happened in the video.",
     ):
         """
         Stops the current screen recording and analyzes the video content.
 
         Args:
-            prompt: A description of what you want to extract or understand from the video.
-                    For example: "What happened in the video?", "Transcribe the text shown",
+            prompt: Optional. What to extract/understand from the video.
+                    Defaults to a general description. Examples:
+                    "What happened in the video?", "Transcribe the text shown",
                     "List all the notifications that appeared", etc.
 
         Returns:
