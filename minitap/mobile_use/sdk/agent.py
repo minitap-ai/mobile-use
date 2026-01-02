@@ -648,6 +648,7 @@ class Agent:
             on_agent_thought=on_agent_thought,
             on_plan_changes=on_plan_changes,
             minitap_api_key=api_key,
+            video_recording_enabled=self._config.video_recording_enabled,
         )
 
         self._prepare_tracing(task=task, context=context)

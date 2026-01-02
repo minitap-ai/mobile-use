@@ -9,7 +9,11 @@ from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message, with_fallback
-from minitap.mobile_use.tools.index import EXECUTOR_WRAPPERS_TOOLS, get_tools_from_wrappers
+from minitap.mobile_use.tools.index import (
+    EXECUTOR_WRAPPERS_TOOLS,
+    VIDEO_RECORDING_WRAPPERS,
+    get_tools_from_wrappers,
+)
 from minitap.mobile_use.utils.decorators import wrap_with_callbacks
 from minitap.mobile_use.utils.logger import get_logger
 
@@ -54,8 +58,13 @@ class ExecutorNode:
 
         llm = get_llm(ctx=self.ctx, name="executor")
         llm_fallback = get_llm(ctx=self.ctx, name="executor", use_fallback=True)
+
+        executor_wrappers = list(EXECUTOR_WRAPPERS_TOOLS)
+        if self.ctx.video_recording_enabled:
+            executor_wrappers.extend(VIDEO_RECORDING_WRAPPERS)
+
         llm_bind_tools_kwargs: dict = {
-            "tools": get_tools_from_wrappers(self.ctx, EXECUTOR_WRAPPERS_TOOLS),
+            "tools": get_tools_from_wrappers(self.ctx, executor_wrappers),
         }
 
         # ChatGoogleGenerativeAI does not support the "parallel_tool_calls" keyword

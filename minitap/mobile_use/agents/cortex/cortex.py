@@ -19,7 +19,11 @@ from minitap.mobile_use.controllers.controller_factory import create_device_cont
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message, with_fallback
 from minitap.mobile_use.services.telemetry import telemetry
-from minitap.mobile_use.tools.index import EXECUTOR_WRAPPERS_TOOLS, format_tools_list
+from minitap.mobile_use.tools.index import (
+    EXECUTOR_WRAPPERS_TOOLS,
+    VIDEO_RECORDING_WRAPPERS,
+    format_tools_list,
+)
 from minitap.mobile_use.utils.conversations import get_screenshot_message_for_llm
 from minitap.mobile_use.utils.decorators import wrap_with_callbacks
 from minitap.mobile_use.utils.logger import get_logger
@@ -43,6 +47,10 @@ class CortexNode:
             self.ctx.execution_setup.get_locked_app_package() if self.ctx.execution_setup else None
         )
 
+        executor_wrappers = list(EXECUTOR_WRAPPERS_TOOLS)
+        if self.ctx.video_recording_enabled:
+            executor_wrappers.extend(VIDEO_RECORDING_WRAPPERS)
+
         system_message = Template(
             Path(__file__).parent.joinpath("cortex.md").read_text(encoding="utf-8")
         ).render(
@@ -51,7 +59,7 @@ class CortexNode:
             subgoal_plan=state.subgoal_plan,
             current_subgoal=get_current_subgoal(state.subgoal_plan),
             executor_feedback=executor_feedback,
-            executor_tools_list=format_tools_list(ctx=self.ctx, wrappers=EXECUTOR_WRAPPERS_TOOLS),
+            executor_tools_list=format_tools_list(ctx=self.ctx, wrappers=executor_wrappers),
             locked_app_package=current_locked_app_package,
         )
         messages = [

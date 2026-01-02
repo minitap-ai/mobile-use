@@ -93,7 +93,7 @@ def record_events(output_path: Path | None, events: list[str] | BaseModel | Any)
 ### LLM Configuration
 
 LLMProvider = Literal["openai", "google", "openrouter", "xai", "vertexai", "minitap"]
-LLMUtilsNode = Literal["outputter", "hopper"]
+LLMUtilsNode = Literal["outputter", "hopper", "video_analyzer"]
 LLMUtilsNodeWithFallback = LLMUtilsNode
 AgentNode = Literal[
     "planner",
@@ -101,6 +101,7 @@ AgentNode = Literal[
     "contextor",
     "cortex",
     "executor",
+    "video_analyzer",
 ]
 AgentNodeWithFallback = AgentNode
 
@@ -158,6 +159,7 @@ class LLMWithFallback(LLM):
 class LLMConfigUtils(BaseModel):
     outputter: LLMWithFallback
     hopper: LLMWithFallback
+    video_analyzer: LLMWithFallback | None = None
 
 
 class LLMConfig(BaseModel):
@@ -176,6 +178,8 @@ class LLMConfig(BaseModel):
         self.executor.validate_provider("Executor")
         self.utils.outputter.validate_provider("Outputter")
         self.utils.hopper.validate_provider("Hopper")
+        if self.utils.video_analyzer:
+            self.utils.video_analyzer.validate_provider("VideoAnalyzer")
 
     def __str__(self):
         return f"""
@@ -187,13 +191,20 @@ class LLMConfig(BaseModel):
 🧩 Utils:
     🔽 Hopper: {self.utils.hopper}
     📝 Outputter: {self.utils.outputter}
+    🎬 Video Analyzer: {self.utils.video_analyzer or "Not configured"}
 """
 
     def get_agent(self, item: AgentNode) -> LLMWithFallback:
         return getattr(self, item)
 
     def get_utils(self, item: LLMUtilsNode) -> LLMWithFallback:
-        return getattr(self.utils, item)
+        value = getattr(self.utils, item)
+        if value is None:
+            raise ValueError(
+                f"Utils '{item}' is not configured. "
+                f"Please add it to your LLM config or enable it via AgentConfigBuilder."
+            )
+        return value
 
 
 def get_default_llm_config() -> LLMConfig:

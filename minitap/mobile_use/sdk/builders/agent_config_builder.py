@@ -45,6 +45,7 @@ class AgentConfigBuilder:
         self._cloud_mobile_id_or_ref: str | None = None
         self._ios_client_config: IosClientConfig | None = None
         self._browserstack_config: BrowserStackClientConfig | None = None
+        self._video_recording_enabled: bool = False
 
     def add_profile(self, profile: AgentProfile, validate: bool = True) -> "AgentConfigBuilder":
         """
@@ -206,6 +207,27 @@ class AgentConfigBuilder:
         self._ios_client_config = copy.deepcopy(config)
         return self
 
+    def with_video_recording_tools(self) -> "AgentConfigBuilder":
+        """
+        Enable video recording tools (start_video_recording, stop_video_recording).
+
+        When enabled, the agent will have access to tools for recording the device
+        screen and analyzing the video content using Gemini models.
+
+        Note: This requires a video-capable model to be configured in the
+        LLM config's utils.video_analyzer setting. Ex of supported models:
+        - gemini-3-flash-preview (recommended)
+        - gemini-3-pro-preview
+        - gemini-2.5-flash
+        - gemini-2.5-pro
+        - gemini-2.0-flash
+
+        Returns:
+            Self for method chaining
+        """
+        self._video_recording_enabled = True
+        return self
+
     def build(self, validate_profiles: bool = True) -> AgentConfig:
         """
         Build the mobile-use AgentConfig object.
@@ -260,6 +282,7 @@ class AgentConfigBuilder:
             cloud_mobile_id_or_ref=self._cloud_mobile_id_or_ref,
             ios_client_config=self._ios_client_config,
             browserstack_config=self._browserstack_config,
+            video_recording_enabled=self._video_recording_enabled,
         )
 
 

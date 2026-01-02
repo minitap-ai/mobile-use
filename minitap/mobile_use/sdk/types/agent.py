@@ -66,6 +66,7 @@ class AgentConfig(BaseModel):
         servers: Custom server configurations.
         cloud_mobile_id_or_ref: ID or reference name of cloud mobile (virtual mobile)
                                 to use for remote execution.
+        video_recording_enabled: Whether video recording tools are enabled.
     """
 
     agent_profiles: dict[str, AgentProfile]
@@ -78,5 +79,6 @@ class AgentConfig(BaseModel):
     cloud_mobile_id_or_ref: str | None = None
     ios_client_config: IosClientConfig | None = None
     browserstack_config: BrowserStackClientConfig | None = None
+    video_recording_enabled: bool = False
 
     model_config = {"arbitrary_types_allowed": True}
