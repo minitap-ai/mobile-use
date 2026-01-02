@@ -214,8 +214,11 @@ class AgentConfigBuilder:
         When enabled, the agent will have access to tools for recording the device
         screen and analyzing the video content using Gemini models.
 
-        Note: This requires a video-capable model to be configured in the
-        LLM config's utils.video_analyzer setting. Ex of supported models:
+        IMPORTANT: This requires a video-capable model to be configured in the
+        LLM config's utils.video_analyzer setting. If your config file or LLMConfig
+        does not have video_analyzer configured, build() will raise an error.
+
+        Supported models for video_analyzer:
         - gemini-3-flash-preview (recommended)
         - gemini-3-pro-preview
         - gemini-2.5-flash
@@ -224,6 +227,9 @@ class AgentConfigBuilder:
 
         Returns:
             Self for method chaining
+
+        Raises:
+            ValueError: At build() time if any profile lacks video_analyzer config
         """
         self._video_recording_enabled = True
         return self

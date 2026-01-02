@@ -58,19 +58,17 @@
           "provider": "openai",
           "model": "gpt-5-mini"
         }
-      },
-      // video_analyzer is optional - only needed when using video recording tools
-      // Requires a video-capable model. Ex of supported models:
-      // gemini-3-pro-preview, gemini-3-flash-preview, gemini-2.5-flash,
-      // gemini-2.5-flash-lite, gemini-2.5-pro, gemini-2.0-flash, gemini-2.0-flash-lite
-      "video_analyzer": {
-        "provider": "google",
-        "model": "gemini-3-flash-preview",
-        "fallback": {
-          "provider": "google",
-          "model": "gemini-2.5-flash"
-        }
       }
+      // video_analyzer is optional - only needed when using video recording tools
+      // Requires a video-capable model (Google). To enable, uncomment below:
+      // "video_analyzer": {
+      //   "provider": "google",
+      //   "model": "gemini-3-flash-preview",
+      //   "fallback": {
+      //     "provider": "google",
+      //     "model": "gemini-2.5-flash"
+      //   }
+      // }
     }
   },
   // This is the config we recommend.

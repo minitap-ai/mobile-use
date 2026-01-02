@@ -604,6 +604,17 @@ class Agent:
                 raise AgentProfileNotFoundError(request.profile)
         else:
             agent_profile = self._config.default_profile
+
+        if (
+            self._config.video_recording_enabled
+            and agent_profile.llm_config.utils.video_analyzer is None
+        ):
+            raise ValueError(
+                f"with_video_recording_tools() requires 'video_analyzer' in utils for "
+                f"profile '{agent_profile.name}'. Add 'video_analyzer' with a "
+                f"video-capable model (e.g., gemini-3-flash-preview)."
+            )
+
         logger.info(str(agent_profile))
 
         on_status_changed = None
@@ -648,7 +659,10 @@ class Agent:
             on_agent_thought=on_agent_thought,
             on_plan_changes=on_plan_changes,
             minitap_api_key=api_key,
-            video_recording_enabled=self._config.video_recording_enabled,
+            video_recording_enabled=(
+                self._config.video_recording_enabled
+                and agent_profile.llm_config.utils.video_analyzer is not None
+            ),
         )
 
         self._prepare_tracing(task=task, context=context)
