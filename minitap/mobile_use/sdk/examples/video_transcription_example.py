@@ -14,13 +14,7 @@ Use case: Recording a video playing on the screen and transcribing its content.
 
 import asyncio
 
-from minitap.mobile_use.config import (
-    LLM,
-    LLMConfig,
-    LLMConfigUtils,
-    LLMWithFallback,
-    initialize_llm_config,
-)
+from minitap.mobile_use.config import LLM, LLMConfig, LLMConfigUtils, LLMWithFallback
 from minitap.mobile_use.sdk.agent import Agent
 from minitap.mobile_use.sdk.builders.agent_config_builder import AgentConfigBuilder
 from minitap.mobile_use.sdk.types.agent import AgentConfig
@@ -84,20 +78,13 @@ def get_video_capable_llm_config() -> LLMConfig:
     )
 
 
-def get_openrouter_video_capable_llm_config() -> LLMConfig:
-    """
-    Returns the LLM config from the override file
-    """
-    return initialize_llm_config()
-
-
 async def main():
     config: AgentConfig = (
         AgentConfigBuilder()
         .add_profile(
             AgentProfile(
                 name="VideoCapable",
-                llm_config=get_openrouter_video_capable_llm_config(),
+                llm_config=get_video_capable_llm_config(),
             )
         )
         .with_video_recording_tools()
@@ -108,14 +95,13 @@ async def main():
     try:
         await agent.init()
 
-        # Example 1: Record and transcribe a video
         result = await agent.run_task(
             request=TaskRequest(
                 goal="""
                 1. Open YouTube app
                 2. Search for "Python tutorial"
-                3. Play the first video
-                4. Start recording the screen
+                3. Start recording the screen
+                4. Play the first video
                 5. Wait for the first 30 seconds of the video to play
                 6. Stop recording and tell me what was said in the video
                 """,
@@ -123,22 +109,6 @@ async def main():
             )
         )
         print(f"Task result: {result}")
-
-        # # Example 2: Record app interactions and describe them
-        # result2 = await agent.run_task(
-        #     request=TaskRequest(
-        #         goal="""
-        #         1. Open the Settings app
-        #         2. Start recording the screen
-        #         3. Navigate to Display settings
-        #         4. Change the brightness
-        #         5. Stop recording and describe all the UI changes that occurred
-        #         """,
-        #         profile="VideoCapable",
-        #         max_steps=20,
-        #     )
-        # )
-        # print(f"Task 2 result: {result2}")
     finally:
         await agent.clean()
 
