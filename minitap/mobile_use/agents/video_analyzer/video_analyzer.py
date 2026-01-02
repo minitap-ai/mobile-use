@@ -14,6 +14,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message, with_fallback
 from minitap.mobile_use.utils.logger import get_logger
+from minitap.mobile_use.utils.video import compress_video_for_api
 
 logger = get_logger(__name__)
 
@@ -42,7 +43,10 @@ async def analyze_video(
     if not video_path.exists():
         raise FileNotFoundError(f"Video file not found: {video_path}")
 
-    with open(video_path, "rb") as video_file:
+    # Compress video if needed to fit within API limits
+    compressed_path = await compress_video_for_api(video_path)
+
+    with open(compressed_path, "rb") as video_file:
         video_bytes = video_file.read()
 
     video_base64 = base64.b64encode(video_bytes).decode("utf-8")
