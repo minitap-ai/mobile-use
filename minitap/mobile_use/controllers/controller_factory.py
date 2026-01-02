@@ -33,6 +33,7 @@ def create_device_controller(ctx: MobileUseContext) -> MobileDeviceController:
         logger.info(f"Creating iOS controller for device {ctx.device.device_id}")
         return iOSDeviceController(
             ios_client=ctx.ios_client,
+            device_id=ctx.device.device_id,
             device_width=ctx.device.device_width,
             device_height=ctx.device.device_height,
         )

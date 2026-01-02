@@ -12,6 +12,10 @@ from minitap.mobile_use.tools.mobile.press_key import press_key_wrapper
 from minitap.mobile_use.tools.mobile.stop_app import stop_app_wrapper
 from minitap.mobile_use.tools.mobile.swipe import swipe_wrapper
 from minitap.mobile_use.tools.mobile.tap import tap_wrapper
+from minitap.mobile_use.tools.mobile.video_recording import (
+    start_video_recording_wrapper,
+    stop_video_recording_wrapper,
+)
 from minitap.mobile_use.tools.mobile.wait_for_delay import wait_for_delay_wrapper
 from minitap.mobile_use.tools.tool_wrapper import CompositeToolWrapper, ToolWrapper
 
@@ -28,6 +32,11 @@ EXECUTOR_WRAPPERS_TOOLS = [
     focus_and_clear_text_wrapper,
     press_key_wrapper,
     wait_for_delay_wrapper,
+]
+
+VIDEO_RECORDING_WRAPPERS = [
+    start_video_recording_wrapper,
+    stop_video_recording_wrapper,
 ]
 
 

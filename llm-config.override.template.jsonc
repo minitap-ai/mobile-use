@@ -38,6 +38,14 @@
     "outputter": {
       "provider": "",
       "model": ""
+    },
+    "video_analyzer": {
+      "provider": "",
+      "model": "",
+      "fallback": {
+        "provider": "",
+        "model": ""
+      }
     }
   }
 }

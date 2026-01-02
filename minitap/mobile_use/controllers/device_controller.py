@@ -4,6 +4,7 @@ from typing import Protocol
 from pydantic import BaseModel
 
 from minitap.mobile_use.controllers.types import Bounds, CoordinatesSelectorRequest, TapOutput
+from minitap.mobile_use.utils.video import VideoRecordingResult
 
 
 class ScreenDataResponse(BaseModel):
@@ -143,5 +144,31 @@ class MobileDeviceController(Protocol):
         """
         Compress a base64 image.
         Returns the compressed base64 image.
+        """
+        raise NotImplementedError("Subclasses must implement this method")
+
+    @abstractmethod
+    async def start_video_recording(
+        self,
+        max_duration_seconds: int = 900,
+    ) -> VideoRecordingResult:
+        """
+        Start screen recording on the device.
+
+        Args:
+            max_duration_seconds: Maximum recording duration in seconds.
+
+        Returns:
+            VideoRecordingResult with success status and message.
+        """
+        raise NotImplementedError("Subclasses must implement this method")
+
+    @abstractmethod
+    async def stop_video_recording(self) -> VideoRecordingResult:
+        """
+        Stop screen recording and retrieve the video file.
+
+        Returns:
+            VideoRecordingResult with success status, message, and video_path if successful.
         """
         raise NotImplementedError("Subclasses must implement this method")

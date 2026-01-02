@@ -1,6 +1,10 @@
+import asyncio
 import base64
 import re
+import tempfile
+import time
 from io import BytesIO
+from pathlib import Path
 
 from adbutils import AdbClient, AdbDevice
 from PIL import Image
@@ -12,6 +16,19 @@ from minitap.mobile_use.controllers.device_controller import (
 )
 from minitap.mobile_use.controllers.types import Bounds, CoordinatesSelectorRequest, TapOutput
 from minitap.mobile_use.utils.logger import get_logger
+from minitap.mobile_use.utils.video import (
+    ANDROID_MAX_RECORDING_DURATION_SECONDS,
+    DEFAULT_MAX_DURATION_SECONDS,
+    VIDEO_READY_DELAY_SECONDS,
+    RecordingSession,
+    VideoRecordingResult,
+    cleanup_video_segments,
+    concatenate_videos,
+    get_active_session,
+    has_active_session,
+    remove_active_session,
+    set_active_session,
+)
 
 logger = get_logger(__name__)
 
@@ -274,3 +291,217 @@ class AndroidDeviceController(MobileDeviceController):
 
         compressed_base64 = base64.b64encode(compressed_io.getvalue()).decode("utf-8")
         return compressed_base64
+
+    async def _start_android_segment(
+        self, session: RecordingSession
+    ) -> asyncio.subprocess.Process | None:
+        """Start a single Android recording segment."""
+        segment_path = f"/sdcard/screen_recording_{session.android_segment_index}.mp4"
+        cmd = f"screenrecord --time-limit {ANDROID_MAX_RECORDING_DURATION_SECONDS} {segment_path}"
+
+        process = await asyncio.create_subprocess_shell(
+            f'adb -s {self.device_id} shell "{cmd}"',
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        session.android_device_path = segment_path
+        session.process = process
+        return process
+
+    async def _android_auto_restart_loop(
+        self,
+        session: RecordingSession,
+        max_duration_seconds: int,
+    ) -> None:
+        """Background task that auto-restarts Android recording when segment ends."""
+        total_elapsed = 0
+
+        while total_elapsed < max_duration_seconds:
+            process = session.process
+            if process is None:
+                break
+
+            try:
+                await asyncio.wait_for(
+                    process.wait(),
+                    timeout=ANDROID_MAX_RECORDING_DURATION_SECONDS + 5,
+                )
+            except TimeoutError:
+                pass
+            except asyncio.CancelledError:
+                return
+
+            if not has_active_session(self.device_id):
+                return
+
+            total_elapsed = time.time() - session.start_time
+            if total_elapsed >= max_duration_seconds:
+                break
+
+            await asyncio.sleep(VIDEO_READY_DELAY_SECONDS)
+
+            temp_dir = tempfile.mkdtemp(prefix="mobile_use_video_segment_")
+            local_segment = Path(temp_dir) / f"segment_{session.android_segment_index}.mp4"
+
+            try:
+                self.device.sync.pull(session.android_device_path, str(local_segment))
+                self.device.shell(f"rm -f {session.android_device_path}")
+                session.android_video_segments.append(local_segment)
+                logger.info(
+                    f"Saved Android segment {session.android_segment_index} to {local_segment}"
+                )
+            except Exception as e:
+                error_msg = f"Failed to pull segment {session.android_segment_index}: {e}"
+                logger.warning(error_msg)
+                session.errors.append(error_msg)
+
+            session.android_segment_index += 1
+
+            try:
+                await self._start_android_segment(session)
+                logger.info(
+                    f"Auto-restarted Android recording (segment {session.android_segment_index})"
+                )
+            except Exception as e:
+                error_msg = f"Failed to restart Android recording: {e}"
+                logger.error(error_msg)
+                session.errors.append(error_msg)
+                break
+
+    async def start_video_recording(
+        self,
+        max_duration_seconds: int = DEFAULT_MAX_DURATION_SECONDS,
+    ) -> VideoRecordingResult:
+        """Start screen recording on Android device using adb shell screenrecord."""
+        if has_active_session(self.device_id):
+            return VideoRecordingResult(
+                success=False,
+                message=f"Recording already in progress for device {self.device_id}",
+            )
+
+        try:
+            session = RecordingSession(
+                device_id=self.device_id,
+                start_time=time.time(),
+                android_video_segments=[],
+                android_segment_index=0,
+            )
+
+            set_active_session(self.device_id, session)
+            await self._start_android_segment(session)
+
+            restart_task = asyncio.create_task(
+                self._android_auto_restart_loop(session, max_duration_seconds)
+            )
+            session.android_restart_task = restart_task
+
+            logger.info(f"Started Android screen recording on {self.device_id}")
+            return VideoRecordingResult(
+                success=True,
+                message=(
+                    f"Recording started (max {max_duration_seconds}s, "
+                    f"auto-restarts every {ANDROID_MAX_RECORDING_DURATION_SECONDS}s)."
+                ),
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to start Android recording: {e}")
+            remove_active_session(self.device_id)
+            return VideoRecordingResult(
+                success=False,
+                message=f"Failed to start recording: {e}",
+            )
+
+    async def stop_video_recording(self) -> VideoRecordingResult:
+        """Stop Android recording, pull all segments, and concatenate them."""
+        session = get_active_session(self.device_id)
+
+        if not session:
+            return VideoRecordingResult(
+                success=False,
+                message=f"No active recording for device {self.device_id}",
+            )
+
+        try:
+            if session.android_restart_task:
+                session.android_restart_task.cancel()
+                try:
+                    await session.android_restart_task
+                except asyncio.CancelledError:
+                    pass
+
+            process = session.process
+            if process is not None:
+                try:
+                    process.terminate()
+                    await asyncio.wait_for(process.wait(), timeout=5.0)
+                except TimeoutError:
+                    process.kill()
+                    await process.wait()
+
+            self.device.shell("pkill -2 screenrecord || true")
+            await asyncio.sleep(VIDEO_READY_DELAY_SECONDS)
+
+            temp_dir = tempfile.mkdtemp(prefix="mobile_use_video_")
+            final_segment = Path(temp_dir) / f"segment_{session.android_segment_index}.mp4"
+
+            try:
+                self.device.sync.pull(session.android_device_path, str(final_segment))
+                self.device.shell(f"rm -f {session.android_device_path}")
+                session.android_video_segments.append(final_segment)
+            except Exception as e:
+                logger.warning(f"Failed to pull final segment: {e}")
+
+            for i in range(session.android_segment_index + 1):
+                self.device.shell(f"rm -f /sdcard/screen_recording_{i}.mp4")
+
+            all_segments = session.android_video_segments
+
+            if not all_segments:
+                remove_active_session(self.device_id)
+                return VideoRecordingResult(
+                    success=False,
+                    message="No video segments were captured",
+                )
+
+            output_dir = tempfile.mkdtemp(prefix="mobile_use_video_final_")
+            output_path = Path(output_dir) / "recording.mp4"
+
+            if len(all_segments) == 1:
+                all_segments[0].rename(output_path)
+            else:
+                success = await concatenate_videos(all_segments, output_path)
+                if not success:
+                    output_path = all_segments[-1]
+                    logger.warning("Concatenation failed, using last segment only")
+
+            cleanup_video_segments(all_segments, keep_path=output_path)
+
+            errors = session.errors.copy()
+            remove_active_session(self.device_id)
+
+            duration = time.time() - session.start_time
+            segment_count = len(all_segments)
+            logger.info(
+                f"Stopped Android recording after {duration:.1f}s, "
+                f"{segment_count} segment(s), saved to {output_path}"
+            )
+
+            message = f"Recording stopped after {duration:.1f}s ({segment_count} segments)"
+            if errors:
+                message += f". Warnings during recording: {'; '.join(errors)}"
+
+            return VideoRecordingResult(
+                success=True,
+                message=message,
+                video_path=output_path,
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to stop Android recording: {e}")
+            remove_active_session(self.device_id)
+            return VideoRecordingResult(
+                success=False,
+                message=f"Failed to stop recording: {e}",
+            )

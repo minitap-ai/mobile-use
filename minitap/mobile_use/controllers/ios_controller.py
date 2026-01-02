@@ -3,7 +3,10 @@
 import asyncio
 import base64
 import re
+import tempfile
+import time
 from io import BytesIO
+from pathlib import Path
 
 from idb.common.types import HIDButtonType
 from PIL import Image
@@ -16,6 +19,16 @@ from minitap.mobile_use.controllers.device_controller import (
 )
 from minitap.mobile_use.controllers.types import Bounds, CoordinatesSelectorRequest, TapOutput
 from minitap.mobile_use.utils.logger import get_logger
+from minitap.mobile_use.utils.video import (
+    DEFAULT_MAX_DURATION_SECONDS,
+    VIDEO_READY_DELAY_SECONDS,
+    RecordingSession,
+    VideoRecordingResult,
+    get_active_session,
+    has_active_session,
+    remove_active_session,
+    set_active_session,
+)
 
 logger = get_logger(__name__)
 
@@ -26,10 +39,12 @@ class iOSDeviceController(MobileDeviceController):
     def __init__(
         self,
         ios_client: IosClientWrapper,
+        device_id: str,
         device_width: int,
         device_height: int,
     ):
         self.ios_client = ios_client
+        self.device_id = device_id
         self.device_width = device_width
         self.device_height = device_height
         self._is_idb = isinstance(ios_client, IdbClientWrapper)
@@ -315,3 +330,98 @@ class iOSDeviceController(MobileDeviceController):
 
         compressed_base64 = base64.b64encode(compressed_io.getvalue()).decode("utf-8")
         return compressed_base64
+
+    async def start_video_recording(
+        self,
+        max_duration_seconds: int = DEFAULT_MAX_DURATION_SECONDS,
+    ) -> VideoRecordingResult:
+        """Start screen recording on iOS device/simulator using idb record-video."""
+        device_id = self.device_id
+
+        if has_active_session(device_id):
+            return VideoRecordingResult(
+                success=False,
+                message=f"Recording already in progress for device {device_id}",
+            )
+
+        try:
+            temp_dir = tempfile.mkdtemp(prefix="mobile_use_video_")
+            video_path = Path(temp_dir) / "recording.mp4"
+
+            cmd = ["idb", "record-video", "--udid", device_id, str(video_path)]
+
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            session = RecordingSession(
+                device_id=device_id,
+                start_time=time.time(),
+                process=process,
+                local_video_path=video_path,
+            )
+            set_active_session(device_id, session)
+
+            logger.info(f"Started iOS screen recording on {device_id}")
+            return VideoRecordingResult(
+                success=True,
+                message=f"Recording started (max {max_duration_seconds}s).",
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to start iOS recording: {e}")
+            return VideoRecordingResult(
+                success=False,
+                message=f"Failed to start recording: {e}",
+            )
+
+    async def stop_video_recording(self) -> VideoRecordingResult:
+        """Stop iOS recording and retrieve the video file."""
+        device_id = self.device_id
+        session = get_active_session(device_id)
+
+        if not session:
+            return VideoRecordingResult(
+                success=False,
+                message=f"No active recording for device {device_id}",
+            )
+
+        try:
+            process = session.process
+            if process is not None:
+                try:
+                    process.terminate()
+                    await asyncio.wait_for(process.wait(), timeout=10.0)
+                except TimeoutError:
+                    process.kill()
+                    await process.wait()
+
+            await asyncio.sleep(VIDEO_READY_DELAY_SECONDS)
+
+            local_path = session.local_video_path
+            remove_active_session(device_id)
+
+            duration = time.time() - session.start_time
+            logger.info(f"Stopped iOS recording after {duration:.1f}s, saved to {local_path}")
+
+            if local_path and local_path.exists():
+                return VideoRecordingResult(
+                    success=True,
+                    message=f"Recording stopped after {duration:.1f}s",
+                    video_path=local_path,
+                )
+            else:
+                return VideoRecordingResult(
+                    success=False,
+                    message="Recording stopped but video file not found",
+                )
+
+        except Exception as e:
+            logger.error(f"Failed to stop iOS recording: {e}")
+            remove_active_session(device_id)
+            return VideoRecordingResult(
+                success=False,
+                message=f"Failed to stop recording: {e}",
+            )
