@@ -32,6 +32,7 @@ async def run_automation(
     traces_output_path_str: str = "traces",
     output_description: str | None = None,
     graph_config_callbacks: Callbacks = [],
+    video_recording: bool = False,
     wda_url: str | None = None,
     wda_timeout: float | None = None,
     wda_auto_start_iproxy: bool | None = None,
@@ -44,6 +45,8 @@ async def run_automation(
     llm_config = initialize_llm_config()
     agent_profile = AgentProfile(name="default", llm_config=llm_config)
     config = Builders.AgentConfig.with_default_profile(profile=agent_profile)
+    if video_recording:
+        config.with_video_recording_tools()
 
     # Build iOS client config from CLI options
     wda_config = WdaClientConfig.with_overrides(
@@ -179,6 +182,13 @@ def main(
             help="IDB companion port (for simulators).",
         ),
     ] = None,
+    video_recording: Annotated[
+        bool,
+        typer.Option(
+            "--video-recording",
+            help="Enable video recording tools (start/stop recording, video analysis).",
+        ),
+    ] = False,
 ):
     """
     Run the Mobile-use agent to automate tasks on a mobile device.
@@ -222,6 +232,7 @@ def main(
                 wda_startup_timeout=wda_startup_timeout,
                 idb_host=idb_host,
                 idb_port=idb_port,
+                video_recording=video_recording,
             )
         )
     except KeyboardInterrupt:
