@@ -50,6 +50,7 @@ class PlannerNode:
             executor_tools_list=format_tools_list(ctx=self.ctx, wrappers=executor_wrappers),
             locked_app_package=current_locked_app_package,
             current_foreground_app=current_foreground_app,
+            video_recording_enabled=self.ctx.video_recording_enabled,
         )
         human_message = Template(
             Path(__file__).parent.joinpath("human.md").read_text(encoding="utf-8")
