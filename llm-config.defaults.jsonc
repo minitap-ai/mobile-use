@@ -72,7 +72,7 @@
     }
   },
   // This is the config we recommend.
-  // To use it, copy it to llm.override.jsonc, following llm.override.template.jsonc.
+  // To use it, copy it to llm-config.override.jsonc, following llm-config.override.template.jsonc.
   "recommended": {
     "planner": {
       "provider": "minitap",
