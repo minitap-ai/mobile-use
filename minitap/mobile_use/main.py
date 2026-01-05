@@ -193,6 +193,11 @@ def main(
     """
     Run the Mobile-use agent to automate tasks on a mobile device.
     """
+    if video_recording:
+        from minitap.mobile_use.utils.video import check_ffmpeg_available
+
+        check_ffmpeg_available()
+
     console = Console()
 
     adb_client = None
