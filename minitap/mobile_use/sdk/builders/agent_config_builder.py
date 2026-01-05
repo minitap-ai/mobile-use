@@ -214,9 +214,9 @@ class AgentConfigBuilder:
         When enabled, the agent will have access to tools for recording the device
         screen and analyzing the video content using Gemini models.
 
-        IMPORTANT: This requires a video-capable model to be configured in the
-        LLM config's utils.video_analyzer setting. If your config file or LLMConfig
-        does not have video_analyzer configured, build() will raise an error.
+        IMPORTANT: This requires:
+        1. ffmpeg to be installed on the system (for video compression)
+        2. A video-capable model configured in utils.video_analyzer
 
         Supported models for video_analyzer:
         - gemini-3-flash-preview (recommended)
@@ -229,8 +229,12 @@ class AgentConfigBuilder:
             Self for method chaining
 
         Raises:
+            FFmpegNotInstalledError: If ffmpeg is not installed
             ValueError: At build() time if any profile lacks video_analyzer config
         """
+        from minitap.mobile_use.utils.video import check_ffmpeg_available
+
+        check_ffmpeg_available()
         self._video_recording_enabled = True
         return self
 

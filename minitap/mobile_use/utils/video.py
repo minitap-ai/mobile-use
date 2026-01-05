@@ -5,6 +5,8 @@ Provides shared types and utilities for video recording across platforms.
 """
 
 import asyncio
+import platform
+import shutil
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
@@ -72,6 +74,46 @@ def remove_active_session(device_id: str) -> RecordingSession | None:
 def has_active_session(device_id: str) -> bool:
     """Check if there's an active recording session for a device."""
     return device_id in _active_recordings
+
+
+def is_ffmpeg_installed() -> bool:
+    """Check if ffmpeg is available in the system PATH."""
+    return shutil.which("ffmpeg") is not None
+
+
+class FFmpegNotInstalledError(Exception):
+    """Raised when ffmpeg is required but not installed."""
+
+    def __init__(self):
+        os_name = platform.system().lower()
+        if os_name == "darwin":  # macOS
+            install_instructions = "brew install ffmpeg"
+        elif os_name == "windows":
+            install_instructions = "Download from https://www.ffmpeg.org/download.html"
+        else:  # Linux and others
+            install_instructions = (
+                "Install via your package manager (e.g., apt install ffmpeg, "
+                "dnf install ffmpeg) or download from https://www.ffmpeg.org/download.html"
+            )
+
+        message = (
+            f"\n\n❌ ffmpeg is required for video recording but is not installed.\n\n"
+            f"Please install ffmpeg first:\n"
+            f"  → {install_instructions}\n\n"
+            f"After installation, restart mobile-use.\n"
+        )
+        super().__init__(message)
+
+
+def check_ffmpeg_available() -> None:
+    """
+    Check if ffmpeg is installed and raise an error if not.
+
+    Raises:
+        FFmpegNotInstalledError: If ffmpeg is not found in PATH.
+    """
+    if not is_ffmpeg_installed():
+        raise FFmpegNotInstalledError()
 
 
 async def concatenate_videos(segments: list[Path], output_path: Path) -> bool:
