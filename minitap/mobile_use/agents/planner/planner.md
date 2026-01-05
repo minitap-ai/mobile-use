@@ -26,6 +26,23 @@ All actions must stay within this app (except OAuth flows).
 - **No loops**: Instead of "repeat 3 times", write 3 separate subgoals
 
 **Shortcuts**: Always prefer `launch_app` to open apps (not manual app drawer navigation), `open_link` for URLs.
+{% if video_recording_enabled %}
+### 🎥 Video Recording Pattern
+
+When a goal involves capturing, transcribing, or analyzing video content, follow this execution order:
+
+1. **Start recording BEFORE interacting with the video** — The recording must be active before any click that triggers playback
+2. **Perform video interactions** — Open/play the video and wait for it to complete
+3. **Stop recording AFTER the video ends** — Only stop once playback is fully finished
+
+⚠️ **Critical:** Each recording action (start/stop) must be its own dedicated subgoal. This prevents truncation due to short videos or inference latency.
+
+**Example subgoals for "transcribe video X":**
+1. Navigate to video X location
+2. Start screen recording
+3. Play video X and wait for completion
+4. Stop recording and extract transcription
+{% endif %}
 
 Available tools: {{ executor_tools_list }}
 

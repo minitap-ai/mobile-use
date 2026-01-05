@@ -33,15 +33,8 @@ def get_start_video_recording_tool(ctx: MobileUseContext) -> BaseTool:
     ):
         """
         Starts a background screen recording on the mobile device.
-
-        Use this tool when you need to capture what happens on the screen over time,
-        such as watching a video, observing animations, or recording a user flow.
-
-        The recording will continue until stop_video_recording is called.
-        Maximum recording time is 15 minutes (or 3 minutes on Android).
-
-        Note: Audio is typically NOT recorded. On Android, screenrecord does not capture
-        audio. On iOS simulators, audio is also not captured.
+        Recording continues until stop_video_recording is called.
+        Max duration: 3 min (Android) / 15 min (iOS). Audio is not captured.
         """
         platform = ctx.device.mobile_platform
         controller = get_controller(ctx)
@@ -93,15 +86,7 @@ def get_stop_video_recording_tool(ctx: MobileUseContext) -> BaseTool:
     ):
         """
         Stops the current screen recording and analyzes the video content.
-
-        Args:
-            prompt: Optional. What to extract/understand from the video.
-                    Defaults to a general description. Examples:
-                    "What happened in the video?", "Transcribe the text shown",
-                    "List all the notifications that appeared", etc.
-
-        Returns:
-            Text analysis of the video content based on the prompt.
+        Use `prompt` to specify what to extract (e.g., "What happens after each 10s of the video?").
         """
         platform = ctx.device.mobile_platform
         controller = get_controller(ctx)
