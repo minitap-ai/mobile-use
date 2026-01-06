@@ -92,10 +92,10 @@
     },
     "cortex": {
       "provider": "minitap",
-      "model": "google/gemini-2.5-pro",
+      "model": "google/gemini-3-pro-preview",
       "fallback": {
         "provider": "minitap",
-        "model": "openai/gpt-5"
+        "model": "google/gemini-2.5-pro"
       }
     },
     "executor": {
