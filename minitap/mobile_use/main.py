@@ -32,7 +32,7 @@ async def run_automation(
     traces_output_path_str: str = "traces",
     output_description: str | None = None,
     graph_config_callbacks: Callbacks = [],
-    video_recording: bool = False,
+    video_recording_tools_enabled: bool = False,
     wda_url: str | None = None,
     wda_timeout: float | None = None,
     wda_auto_start_iproxy: bool | None = None,
@@ -45,7 +45,7 @@ async def run_automation(
     llm_config = initialize_llm_config()
     agent_profile = AgentProfile(name="default", llm_config=llm_config)
     config = Builders.AgentConfig.with_default_profile(profile=agent_profile)
-    if video_recording:
+    if video_recording_tools_enabled:
         config.with_video_recording_tools()
 
     # Build iOS client config from CLI options
@@ -182,18 +182,19 @@ def main(
             help="IDB companion port (for simulators).",
         ),
     ] = None,
-    video_recording: Annotated[
+    with_video_recording_tools: Annotated[
         bool,
         typer.Option(
-            "--video-recording",
-            help="Enable video recording tools (start/stop recording, video analysis).",
+            "--with-video-recording-tools",
+            help="Enable AI agents to use video recording tools"
+            " to analyze dynamic content on the screen.",
         ),
     ] = False,
 ):
     """
     Run the Mobile-use agent to automate tasks on a mobile device.
     """
-    if video_recording:
+    if with_video_recording_tools:
         from minitap.mobile_use.utils.video import check_ffmpeg_available
 
         check_ffmpeg_available()
@@ -237,7 +238,7 @@ def main(
                 wda_startup_timeout=wda_startup_timeout,
                 idb_host=idb_host,
                 idb_port=idb_port,
-                video_recording=video_recording,
+                video_recording_tools_enabled=with_video_recording_tools,
             )
         )
     except KeyboardInterrupt:
