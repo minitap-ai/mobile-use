@@ -230,7 +230,7 @@ class AgentConfigBuilder:
 
         Raises:
             FFmpegNotInstalledError: If ffmpeg is not installed
-            ValueError: At build() time if any profile lacks video_analyzer config
+            ValueError: When the agent is initialized if any profile lacks video_analyzer config
         """
         from minitap.mobile_use.utils.video import check_ffmpeg_available
 

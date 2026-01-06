@@ -46,58 +46,66 @@ async def analyze_video(
     # Compress video if needed to fit within API limits
     compressed_path = await compress_video_for_api(video_path)
 
-    with open(compressed_path, "rb") as video_file:
-        video_bytes = video_file.read()
+    try:
+        with open(compressed_path, "rb") as video_file:
+            video_bytes = video_file.read()
 
-    video_base64 = base64.b64encode(video_bytes).decode("utf-8")
+        video_base64 = base64.b64encode(video_bytes).decode("utf-8")
 
-    suffix = video_path.suffix.lower()
-    mime_type = "video/mp4" if suffix in [".mp4", ".m4v"] else f"video/{suffix[1:]}"
+        suffix = compressed_path.suffix.lower()
+        mime_type = "video/mp4" if suffix in [".mp4", ".m4v"] else f"video/{suffix[1:]}"
 
-    system_message_content = Template(
-        Path(__file__).parent.joinpath("video_analyzer.md").read_text(encoding="utf-8")
-    ).render()
+        system_message_content = Template(
+            Path(__file__).parent.joinpath("video_analyzer.md").read_text(encoding="utf-8")
+        ).render()
 
-    human_message_content = Template(
-        Path(__file__).parent.joinpath("human.md").read_text(encoding="utf-8")
-    ).render(prompt=prompt)
+        human_message_content = Template(
+            Path(__file__).parent.joinpath("human.md").read_text(encoding="utf-8")
+        ).render(prompt=prompt)
 
-    messages = [
-        SystemMessage(content=system_message_content),
-        HumanMessage(
-            content=[
-                {
-                    "type": "text",
-                    "text": human_message_content,
-                },
-                {
-                    "type": "file",
-                    "source_type": "base64",
-                    "mime_type": mime_type,
-                    "data": video_base64,
-                },
-            ]
-        ),
-    ]
+        messages = [
+            SystemMessage(content=system_message_content),
+            HumanMessage(
+                content=[
+                    {
+                        "type": "text",
+                        "text": human_message_content,
+                    },
+                    {
+                        "type": "file",
+                        "source_type": "base64",
+                        "mime_type": mime_type,
+                        "data": video_base64,
+                    },
+                ]
+            ),
+        ]
 
-    llm = get_llm(ctx=ctx, name="video_analyzer", is_utils=True, temperature=0.2)
-    llm_fallback = get_llm(
-        ctx=ctx, name="video_analyzer", is_utils=True, use_fallback=True, temperature=0.2
-    )
+        llm = get_llm(ctx=ctx, name="video_analyzer", is_utils=True, temperature=0.2)
+        llm_fallback = get_llm(
+            ctx=ctx, name="video_analyzer", is_utils=True, use_fallback=True, temperature=0.2
+        )
 
-    logger.info("Sending video to LLM for analysis...")
+        logger.info("Sending video to LLM for analysis...")
 
-    response = await with_fallback(
-        main_call=lambda: invoke_llm_with_timeout_message(
-            llm.ainvoke(messages), timeout_seconds=120
-        ),
-        fallback_call=lambda: invoke_llm_with_timeout_message(
-            llm_fallback.ainvoke(messages), timeout_seconds=120
-        ),
-    )
+        response = await with_fallback(
+            main_call=lambda: invoke_llm_with_timeout_message(
+                llm.ainvoke(messages), timeout_seconds=120
+            ),
+            fallback_call=lambda: invoke_llm_with_timeout_message(
+                llm_fallback.ainvoke(messages), timeout_seconds=120
+            ),
+        )
 
-    content = response.content if hasattr(response, "content") else str(response)
-    result = content if isinstance(content, str) else str(content)
-    logger.info("Video analysis completed")
+        content = response.content if hasattr(response, "content") else str(response)
+        result = content if isinstance(content, str) else str(content)
+        logger.info("Video analysis completed")
 
-    return result
+        return result
+    finally:
+        # Clean up compressed file if it differs from original
+        if compressed_path != video_path and compressed_path.exists():
+            try:
+                compressed_path.unlink()
+            except Exception:
+                pass
