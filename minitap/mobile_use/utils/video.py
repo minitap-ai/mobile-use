@@ -122,7 +122,7 @@ async def concatenate_videos(segments: list[Path], output_path: Path) -> bool:
         return False
 
     if len(segments) == 1:
-        segments[0].rename(output_path)
+        shutil.move(segments[0], output_path)
         return True
 
     list_file = output_path.parent / "segments.txt"
@@ -147,11 +147,13 @@ async def concatenate_videos(segments: list[Path], output_path: Path) -> bool:
             stderr=asyncio.subprocess.PIPE,
         )
         await process.wait()
-        list_file.unlink()
         return output_path.exists()
     except Exception as e:
         logger.error(f"Failed to concatenate videos: {e}")
         return False
+    finally:
+        if list_file.exists():
+            list_file.unlink()
 
 
 def cleanup_video_segments(segments: list[Path], keep_path: Path | None = None) -> None:

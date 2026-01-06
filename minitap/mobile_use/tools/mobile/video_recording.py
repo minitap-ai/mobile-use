@@ -5,6 +5,7 @@ Provides start/stop video recording tools that delegate to platform-specific
 controllers (AndroidDeviceController, iOSDeviceController).
 """
 
+import shutil
 from typing import Annotated
 
 from langchain_core.messages import ToolMessage
@@ -67,7 +68,7 @@ def get_start_video_recording_tool(ctx: MobileUseContext) -> BaseTool:
                     "agents_thoughts": [agent_thought, agent_outcome],
                     EXECUTOR_MESSAGES_KEY: [tool_message],
                 },
-                agent="video_analyzer",
+                agent="executor",
             ),
         )
 
@@ -115,7 +116,7 @@ def get_stop_video_recording_tool(ctx: MobileUseContext) -> BaseTool:
                         "agents_thoughts": [agent_thought, agent_outcome],
                         EXECUTOR_MESSAGES_KEY: [tool_message],
                     },
-                    agent="video_analyzer",
+                    agent="executor",
                 ),
             )
 
@@ -139,7 +140,7 @@ def get_stop_video_recording_tool(ctx: MobileUseContext) -> BaseTool:
                 if video_path and video_path.exists():
                     video_path.unlink()
                     if video_path.parent.exists():
-                        video_path.parent.rmdir()
+                        shutil.rmtree(video_path.parent)
             except Exception:
                 pass
 
@@ -156,7 +157,7 @@ def get_stop_video_recording_tool(ctx: MobileUseContext) -> BaseTool:
                     "agents_thoughts": [agent_thought, agent_outcome],
                     EXECUTOR_MESSAGES_KEY: [tool_message],
                 },
-                agent="video_analyzer",
+                agent="executor",
             ),
         )
 

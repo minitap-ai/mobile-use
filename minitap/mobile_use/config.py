@@ -101,7 +101,6 @@ AgentNode = Literal[
     "contextor",
     "cortex",
     "executor",
-    "video_analyzer",
 ]
 AgentNodeWithFallback = AgentNode
 
