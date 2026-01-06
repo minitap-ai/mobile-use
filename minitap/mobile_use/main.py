@@ -20,6 +20,7 @@ from minitap.mobile_use.sdk.types.task import AgentProfile
 from minitap.mobile_use.services.telemetry import telemetry
 from minitap.mobile_use.utils.cli_helpers import display_device_status
 from minitap.mobile_use.utils.logger import get_logger
+from minitap.mobile_use.utils.video import check_ffmpeg_available
 
 app = typer.Typer(add_completion=False, pretty_exceptions_enable=False)
 logger = get_logger(__name__)
@@ -195,8 +196,6 @@ def main(
     Run the Mobile-use agent to automate tasks on a mobile device.
     """
     if with_video_recording_tools:
-        from minitap.mobile_use.utils.video import check_ffmpeg_available
-
         check_ffmpeg_available()
 
     console = Console()
