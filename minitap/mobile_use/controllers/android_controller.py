@@ -112,6 +112,15 @@ class AndroidDeviceController(MobileDeviceController):
 
     async def input_text(self, text: str) -> bool:
         try:
+            self.ui_adb_client.send_text(text)
+            return True
+        except Exception as e:
+            logger.warning(f"UIAutomator2 send_text failed: {e}, falling back to ADB shell")
+            return self._input_text_adb_fallback(text)
+
+    def _input_text_adb_fallback(self, text: str) -> bool:
+        """Fallback method using ADB shell input text command."""
+        try:
             parts = text.split("%s")
             for i, part in enumerate(parts):
                 to_write = ""
@@ -131,7 +140,7 @@ class AndroidDeviceController(MobileDeviceController):
 
             return True
         except Exception as e:
-            logger.error(f"Failed to input text: {e}")
+            logger.error(f"Failed to input text via ADB fallback: {e}")
             return False
 
     async def launch_app(self, package_or_bundle_id: str) -> bool:
