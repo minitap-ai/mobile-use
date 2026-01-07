@@ -1056,6 +1056,7 @@ class Agent:
             remaining_steps=task.request.max_steps,
             executor_messages=[],
             cortex_last_thought=None,
+            scratchpad={},
         )
 
     def _init_clients(
