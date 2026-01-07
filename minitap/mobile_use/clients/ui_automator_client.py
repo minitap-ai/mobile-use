@@ -239,14 +239,17 @@ class UIAutomatorClient:
         Send text input to the device using FastInputIME.
 
         This method supports special characters (e.g., 'ö') that ADB shell
-        input text cannot handle.
+        input text cannot handle. The original IME is restored after input.
 
         Args:
             text: The text to input
         """
         device = self._ensure_connected()
         device.set_fastinput_ime(True)
-        device.send_keys(text)
+        try:
+            device.send_keys(text)
+        finally:
+            device.set_fastinput_ime(False)
 
     def get_hierarchy(self) -> str:
         """
