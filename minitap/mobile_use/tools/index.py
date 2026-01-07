@@ -17,6 +17,11 @@ from minitap.mobile_use.tools.mobile.video_recording import (
     stop_video_recording_wrapper,
 )
 from minitap.mobile_use.tools.mobile.wait_for_delay import wait_for_delay_wrapper
+from minitap.mobile_use.tools.scratchpad import (
+    list_notes_wrapper,
+    read_note_wrapper,
+    save_note_wrapper,
+)
 from minitap.mobile_use.tools.tool_wrapper import CompositeToolWrapper, ToolWrapper
 
 EXECUTOR_WRAPPERS_TOOLS = [
@@ -32,6 +37,10 @@ EXECUTOR_WRAPPERS_TOOLS = [
     focus_and_clear_text_wrapper,
     press_key_wrapper,
     wait_for_delay_wrapper,
+    # Scratchpad tools for persistent memory
+    save_note_wrapper,
+    read_note_wrapper,
+    list_notes_wrapper,
 ]
 
 VIDEO_RECORDING_WRAPPERS = [
