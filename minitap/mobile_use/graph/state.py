@@ -58,6 +58,13 @@ class State(BaseModel):
         take_last,
     ]
 
+    # scratchpad for explicit memory
+    scratchpad: Annotated[
+        dict[str, str],
+        "Persistent key-value storage for notes the agent can save and retrieve",
+        take_last,
+    ] = {}
+
     async def asanitize_update(
         self,
         ctx: MobileUseContext,
