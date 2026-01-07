@@ -234,6 +234,20 @@ class UIAutomatorClient:
         device = self._ensure_connected()
         return device.press(key=key)
 
+    def send_text(self, text: str) -> None:
+        """
+        Send text input to the device using FastInputIME.
+
+        This method supports special characters (e.g., 'ö') that ADB shell
+        input text cannot handle.
+
+        Args:
+            text: The text to input
+        """
+        device = self._ensure_connected()
+        device.set_fastinput_ime(True)
+        device.send_keys(text)
+
     def get_hierarchy(self) -> str:
         """
         Get the UI hierarchy XML from the device.
