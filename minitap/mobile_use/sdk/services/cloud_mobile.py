@@ -245,6 +245,7 @@ class CloudMobileService:
         poll_interval_seconds: float = 2.0,
         stall_timeout_seconds: float = 300.0,
         locked_app_package: str | None = None,
+        enable_video_tools: bool = False,
     ) -> tuple[TaskRunStatus, str | None, Any | None]:
         """
         Run a task on a cloud mobile and wait for completion.
@@ -273,6 +274,7 @@ class CloudMobileService:
                 cloud_mobile_id=cloud_mobile_id,
                 request=request,
                 locked_app_package=locked_app_package,
+                enable_video_tools=enable_video_tools,
             )
             logger.info(f"Task run started: {task_run_id}")
 
@@ -306,6 +308,7 @@ class CloudMobileService:
         cloud_mobile_id: str,
         request: PlatformTaskRequest,
         locked_app_package: str | None = None,
+        enable_video_tools: bool = False,
     ) -> str:
         """Trigger a task run on the Platform and return the task run ID."""
         try:
@@ -318,6 +321,8 @@ class CloudMobileService:
                     ),
                     "executionOrigin": request.execution_origin,
                     "lockedAppPackage": locked_app_package,
+                    "maxSteps": request.max_steps,
+                    "enableVideoTools": enable_video_tools,
                 }
             )
 

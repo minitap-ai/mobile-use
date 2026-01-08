@@ -36,6 +36,7 @@ from minitap.mobile_use.graph.graph import get_graph
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.sdk.builders.agent_config_builder import get_default_agent_config
 from minitap.mobile_use.sdk.builders.task_request_builder import TaskRequestBuilder
+from minitap.mobile_use.sdk.constants import DEFAULT_PROFILE_NAME
 from minitap.mobile_use.sdk.services.cloud_mobile import CloudMobileService
 from minitap.mobile_use.sdk.services.platform import PlatformService
 from minitap.mobile_use.sdk.types.agent import AgentConfig
@@ -462,7 +463,9 @@ class Agent:
                 if not self._platform_service:
                     raise PlatformServiceUninitializedError()
                 task_info = await self._platform_service.create_task_run(
-                    request=request, locked_app_package=locked_app_package
+                    request=request,
+                    locked_app_package=locked_app_package,
+                    enable_video_tools=self._config.video_recording_enabled,
                 )
                 if isinstance(request, CloudDevicePlatformTaskRequest):
                     request.task_run_id = task_info.task_run.id
@@ -512,6 +515,18 @@ class Agent:
         if not self._cloud_mobile_service:
             raise CloudMobileServiceUninitializedError()
 
+        if not self._platform_service:
+            raise PlatformServiceUninitializedError()
+
+        if self._config.video_recording_enabled:
+            profile_name = request.profile or DEFAULT_PROFILE_NAME
+            _, profile = await self._platform_service.get_profile(profile_name)
+            if not profile.llm_config.utils.video_analyzer:
+                raise AgentTaskRequestError(
+                    f"video_recording_enabled: profile '{profile_name}' "
+                    "must have a video_analyzer agent configured"
+                )
+
         # Start cloud mobile if not already started
         logger.info(f"Starting cloud mobile '{self._cloud_mobile_id}'...")
         await self._cloud_mobile_service.start_and_wait_for_ready(
@@ -541,6 +556,7 @@ class Agent:
                     on_status_update=status_callback,
                     on_log=log_callback,
                     locked_app_package=locked_app_package,
+                    enable_video_tools=self._config.video_recording_enabled,
                 )
                 if final_status == "completed":
                     logger.success("Cloud mobile task completed successfully")
