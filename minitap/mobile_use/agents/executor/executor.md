@@ -30,7 +30,7 @@ tap(target={resource_id: "com.whatsapp:id/chat", text: "Alice", ...}, agent_thou
 
 | Tool | Notes |
 |------|-------|
-| `focus_and_input_text` | Provide full target info. Auto-focuses + moves cursor to end. Special chars (\n, \t) are literal, not interpreted. |
+| `focus_and_input_text` | Provide full target info. Auto-focuses + moves cursor to end. Special chars are supported like newlines (use `\n` not `\\n`) as well as UTF-8 characters `行` |
 | `focus_and_clear_text` | Clears entire field. If fails: long press → select all → `erase_one_char` |
 
 ---
