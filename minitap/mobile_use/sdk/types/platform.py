@@ -41,6 +41,7 @@ class TaskOptionsResponse(BaseApiModel):
     id: str = Field(..., description="Options ID")
     enable_tracing: bool = Field(..., description="Whether tracing is enabled")
     max_steps: int = Field(..., description="Maximum number of steps")
+    enable_video_tools: bool = Field(..., description="Whether video tools are enabled")
     created_at: str = Field(..., description="Creation timestamp (ISO format)")
     updated_at: str = Field(..., description="Last update timestamp (ISO format)")
 
@@ -66,6 +67,47 @@ class CreateTaskRunRequest(BaseApiModel):
     virtual_mobile_id: str | None = Field(None, description="Virtual mobile ID to use")
     locked_app_package: str | None = Field(None, description="App package to lock for the task run")
     execution_origin: str | None = Field(None, description="Origin of the task execution")
+    enable_video_tools: bool = Field(
+        default=False,
+        description="Whether video tools are enabled for this task run",
+    )
+
+
+class CreateOrphanTaskRunRequest(BaseApiModel):
+    """Request model for creating an orphan task run (without a parent task)."""
+
+    input_prompt: str = Field(
+        ...,
+        description="Input prompt for the task run",
+    )
+    output_description: str | None = Field(
+        None,
+        description="Optional output description",
+    )
+    llm_profile_id: str = Field(
+        ...,
+        description="LLM profile ID to use",
+    )
+    virtual_mobile_id: str | None = Field(
+        None,
+        description="Optional virtual mobile ID on which it runs",
+    )
+    locked_app_package: str | None = Field(
+        None,
+        description="Optional app package to lock execution to",
+    )
+    execution_origin: str | None = Field(
+        None,
+        description="Origin of the task run execution",
+    )
+    max_steps: int | None = Field(
+        None,
+        description="Maximum number of steps for the task run",
+    )
+    enable_video_tools: bool = Field(
+        default=False,
+        description="Whether video tools are enabled for this task run",
+    )
 
 
 class UpdateTaskRunStatusRequest(BaseApiModel):

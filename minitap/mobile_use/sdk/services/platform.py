@@ -10,6 +10,7 @@ from minitap.mobile_use.agents.planner.types import Subgoal, SubgoalStatus
 from minitap.mobile_use.config import deep_merge_llm_config, get_default_llm_config, settings
 from minitap.mobile_use.sdk.types.exceptions import PlatformServiceError
 from minitap.mobile_use.sdk.types.platform import (
+    CreateOrphanTaskRunRequest,
     CreateTaskRunRequest,
     LLMProfileResponse,
     MobileUseSubgoal,
@@ -66,6 +67,7 @@ class PlatformService:
         self,
         request: PlatformTaskRequest,
         locked_app_package: str | None = None,
+        enable_video_tools: bool = False,
     ) -> PlatformTaskInfo:
         try:
             virtual_mobile_id = None
@@ -80,7 +82,7 @@ class PlatformService:
                 task_data = response.json()
                 task = TaskResponse(**task_data)
 
-                profile, agent_profile = await self._get_profile(
+                profile, agent_profile = await self.get_profile(
                     profile_name=request.profile or DEFAULT_PROFILE,
                 )
 
@@ -100,18 +102,28 @@ class PlatformService:
                     locked_app_package=locked_app_package,
                 )
 
+                if task.options.enable_video_tools and not enable_video_tools:
+                    raise PlatformServiceError(
+                        message=(
+                            "You're trying to run a task requiring video recording tools "
+                            "on an agent where they are disabled. "
+                            "Use .with_video_recording_tools() when building the agent."
+                        )
+                    )
+
                 task_run = await self._create_task_run(
                     task=task,
                     profile=profile,
                     virtual_mobile_id=virtual_mobile_id,
                     locked_app_package=locked_app_package,
                     execution_origin=request.execution_origin,
+                    enable_video_tools=enable_video_tools,
                 )
             else:
                 # Create task manually from ManualTaskConfig
                 logger.info(f"Creating manual task with goal: {request.task.goal}")
 
-                profile, agent_profile = await self._get_profile(
+                profile, agent_profile = await self.get_profile(
                     profile_name=request.profile or DEFAULT_PROFILE,
                 )
 
@@ -137,6 +149,8 @@ class PlatformService:
                     virtual_mobile_id=virtual_mobile_id,
                     locked_app_package=locked_app_package,
                     execution_origin=request.execution_origin,
+                    max_steps=request.max_steps,
+                    enable_video_tools=enable_video_tools,
                 )
 
             return PlatformTaskInfo(
@@ -340,6 +354,7 @@ class PlatformService:
         virtual_mobile_id: str | None = None,
         locked_app_package: str | None = None,
         execution_origin: str | None = None,
+        enable_video_tools: bool = False,
     ) -> TaskRunResponse:
         try:
             logger.info(f"Creating task run for task: {task.name}")
@@ -349,6 +364,7 @@ class PlatformService:
                 virtual_mobile_id=virtual_mobile_id,
                 locked_app_package=locked_app_package,
                 execution_origin=execution_origin,
+                enable_video_tools=enable_video_tools,
             )
             response = await self._client.post(url="v1/task-runs", json=task_run.model_dump())
             response.raise_for_status()
@@ -366,6 +382,8 @@ class PlatformService:
         virtual_mobile_id: str | None = None,
         locked_app_package: str | None = None,
         execution_origin: str | None = None,
+        max_steps: int | None = None,
+        enable_video_tools: bool = False,
     ) -> TaskRunResponse:
         """
         Create an orphan task run from a manual task configuration.
@@ -373,18 +391,20 @@ class PlatformService:
         """
         try:
             logger.info(f"Creating orphan task run with goal: {manual_config.goal}")
-
-            # Create an orphan task run directly
-            orphan_payload = {
-                "inputPrompt": manual_config.goal,
-                "outputDescription": manual_config.output_description,
-                "llmProfileId": profile.id,
-                "virtualMobileId": virtual_mobile_id,
-                "lockedAppPackage": locked_app_package,
-                "executionOrigin": execution_origin,
-            }
-
-            response = await self._client.post(url="v1/task-runs/orphan", json=orphan_payload)
+            task_run = CreateOrphanTaskRunRequest(
+                input_prompt=manual_config.goal,
+                output_description=manual_config.output_description,
+                llm_profile_id=profile.id,
+                virtual_mobile_id=virtual_mobile_id,
+                locked_app_package=locked_app_package,
+                execution_origin=execution_origin,
+                max_steps=max_steps,
+                enable_video_tools=enable_video_tools,
+            )
+            response = await self._client.post(
+                url="v1/task-runs/orphan",
+                json=task_run.model_dump(),
+            )
             response.raise_for_status()
             task_run_data = response.json()
             return TaskRunResponse(**task_run_data)
@@ -394,7 +414,7 @@ class PlatformService:
         except httpx.HTTPStatusError as e:
             raise PlatformServiceError(message=f"Failed to create orphan task run: {e}")
 
-    async def _get_profile(self, profile_name: str) -> tuple[LLMProfileResponse, AgentProfile]:
+    async def get_profile(self, profile_name: str) -> tuple[LLMProfileResponse, AgentProfile]:
         try:
             logger.info(f"Getting agent profile: {profile_name}")
             response = await self._client.get(url=f"v1/llm-profiles/{profile_name}")
