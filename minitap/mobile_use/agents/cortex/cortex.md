@@ -71,6 +71,7 @@ Available tools: {{ executor_tools_list }}
 | Open URL | `open_link` | Handles deep links correctly |
 | Type text | `focus_and_input_text` | Focuses + types. Verify if feedback shows empty |
 | Clear text | `focus_and_clear_text` | If fails, try: long press → select all → `erase_one_char` |
+| **Hide keyboard** | `dismiss_keyboard` | Safely dismisses keyboard only if visible. Use this instead of `back` when intent is to close keyboard. |
 
 ### Swipe Physics
 Swipe direction "pushes" the screen: **swipe RIGHT → reveals LEFT page** (and vice versa).

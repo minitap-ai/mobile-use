@@ -171,6 +171,19 @@ class iOSDeviceController(MobileDeviceController):
             logger.error(f"Failed to press back: {e}")
             return False
 
+    async def dismiss_keyboard(self) -> bool:
+        """
+        Dismiss the keyboard on iOS.
+
+        For now, this just performs a back gesture (same as press_back).
+        TODO: Implement proper keyboard detection for iOS.
+
+        Returns:
+            True on success, False on failure
+        """
+        logger.info("Dismiss keyboard called on iOS - performing back gesture")
+        return await self.press_back()
+
     async def press_home(self) -> bool:
         """Press the home button."""
         try:

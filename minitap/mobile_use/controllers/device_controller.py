@@ -84,6 +84,19 @@ class MobileDeviceController(Protocol):
         raise NotImplementedError("Subclasses must implement this method")
 
     @abstractmethod
+    async def dismiss_keyboard(self) -> bool:
+        """
+        Safely dismiss the keyboard if it is currently visible.
+
+        This method checks keyboard visibility before taking action to prevent
+        accidental navigation or data loss from pressing back when the keyboard
+        is not shown.
+
+        Returns True always (success even if keyboard was already hidden).
+        """
+        raise NotImplementedError("Subclasses must implement this method")
+
+    @abstractmethod
     async def press_home(self) -> bool:
         """
         Press the home button.

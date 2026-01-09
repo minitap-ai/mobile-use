@@ -234,6 +234,22 @@ class UIAutomatorClient:
         device = self._ensure_connected()
         return device.press(key=key)
 
+    def hide_keyboard(self) -> bool:
+        """
+        Hide the soft keyboard using uiautomator2's native method.
+
+        Returns:
+            True on success, False on failure
+        """
+        try:
+            device = self._ensure_connected()
+            device.hide_keyboard()
+            logger.info("Keyboard hidden via uiautomator2 hide_keyboard()")
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to hide keyboard: {e}")
+            return False
+
     def send_text(self, text: str) -> None:
         """
         Send text input to the device using FastInputIME.

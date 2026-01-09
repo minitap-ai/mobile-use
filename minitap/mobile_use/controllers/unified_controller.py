@@ -165,6 +165,9 @@ class UnifiedMobileController:
     async def go_home(self) -> bool:
         return await self._controller.press_home()
 
+    async def dismiss_keyboard(self) -> bool:
+        return await self._controller.dismiss_keyboard()
+
     async def erase_text(self, nb_chars: int | None = None) -> bool:
         return await self._controller.erase_text(nb_chars)
 

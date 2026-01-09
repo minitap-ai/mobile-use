@@ -184,6 +184,24 @@ class AndroidDeviceController(MobileDeviceController):
             logger.error(f"Failed to press back: {e}")
             return False
 
+    async def dismiss_keyboard(self) -> bool:
+        """
+        Safely dismiss the keyboard using uiautomator2's native hide_keyboard().
+
+        This method uses uiautomator2's built-in keyboard hiding functionality,
+        which is safe and won't cause accidental navigation.
+
+        Returns:
+            True on success, False on failure
+        """
+        try:
+            success = self.ui_adb_client.hide_keyboard()
+            logger.info(f"Keyboard dismiss result: {success}")
+            return success
+        except Exception as e:
+            logger.error(f"Failed to dismiss keyboard: {e}")
+            return False
+
     async def press_home(self) -> bool:
         try:
             self.device.shell("input keyevent 3")

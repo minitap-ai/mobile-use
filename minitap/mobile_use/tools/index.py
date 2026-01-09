@@ -2,6 +2,7 @@ from langchain_core.tools import BaseTool
 
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.tools.mobile.back import back_wrapper
+from minitap.mobile_use.tools.mobile.dismiss_keyboard import dismiss_keyboard_wrapper
 from minitap.mobile_use.tools.mobile.erase_one_char import erase_one_char_wrapper
 from minitap.mobile_use.tools.mobile.focus_and_clear_text import focus_and_clear_text_wrapper
 from minitap.mobile_use.tools.mobile.focus_and_input_text import focus_and_input_text_wrapper
@@ -26,6 +27,7 @@ from minitap.mobile_use.tools.tool_wrapper import CompositeToolWrapper, ToolWrap
 
 EXECUTOR_WRAPPERS_TOOLS = [
     back_wrapper,
+    dismiss_keyboard_wrapper,
     open_link_wrapper,
     tap_wrapper,
     long_press_on_wrapper,
