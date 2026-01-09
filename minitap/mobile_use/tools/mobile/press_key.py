@@ -6,6 +6,7 @@ from langchain_core.tools import tool
 from langchain_core.tools.base import InjectedToolCallId
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
+from pydantic import BeforeValidator
 
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
@@ -20,11 +21,21 @@ class Key(Enum):
     BACK = "Back"
 
 
+def normalize_key(value: str | Key) -> str:
+    """Convert key input to Title Case for case-insensitive matching."""
+    if isinstance(value, Key):
+        return value.value
+    return value.title()
+
+
+CaseInsensitiveKey = Annotated[Key, BeforeValidator(normalize_key)]
+
+
 def get_press_key_tool(ctx: MobileUseContext):
     @tool
     async def press_key(
         agent_thought: str,
-        key: Key,
+        key: CaseInsensitiveKey,
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
     ) -> Command:
