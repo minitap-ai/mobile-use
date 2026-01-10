@@ -24,6 +24,7 @@ All actions must stay within this app (except OAuth flows).
 - **Sequential**: Each step prepares the next
 - **Not too granular**: High-level milestones, not button-by-button
 - **No loops**: Instead of "repeat 3 times", write 3 separate subgoals
+- **Self-Correcting**: If the goal has specific formatting constraints (e.g., "add a new line", "sorted list"), include a final subgoal to **verify the result and fix it** if necessary.
 
 **Shortcuts**: Always prefer `launch_app` to open apps (not manual app drawer navigation), `open_link` for URLs.
 {% if video_recording_enabled %}
