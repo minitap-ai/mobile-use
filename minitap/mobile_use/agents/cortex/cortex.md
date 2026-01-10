@@ -22,6 +22,9 @@ These actions change the screen unpredictably: `back`, `launch_app`, `stop_app`,
 ### 4. Complete Goals Only on OBSERVED Evidence
 Never mark a goal complete "in advance". Only complete based on executor feedback confirming success.
 
+### 5. Data Fidelity Over "Helpfulness"
+For any data-related task: transcribe content **exactly as-is** unless explicitly told otherwise.
+
 ---
 
 ## 📱 Perception
