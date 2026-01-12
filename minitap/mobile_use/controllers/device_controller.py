@@ -92,6 +92,14 @@ class MobileDeviceController(Protocol):
         raise NotImplementedError("Subclasses must implement this method")
 
     @abstractmethod
+    async def press_enter(self) -> bool:
+        """
+        Press the enter/return key.
+        Returns True on success, False on failure.
+        """
+        raise NotImplementedError("Subclasses must implement this method")
+
+    @abstractmethod
     async def get_ui_hierarchy(self) -> list[dict]:
         """
         Get the UI element hierarchy.
