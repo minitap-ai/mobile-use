@@ -182,6 +182,15 @@ class iOSDeviceController(MobileDeviceController):
             logger.error(f"Failed to press home: {e}")
             return False
 
+    async def press_enter(self) -> bool:
+        """Press the enter/return key."""
+        try:
+            await self.ios_client.key(40)  # type: ignore[call-arg]
+            return True
+        except Exception as e:
+            logger.error(f"Failed to press enter: {e}")
+            return False
+
     async def get_ui_hierarchy(self) -> list[dict]:
         """Get UI hierarchy using IDB accessibility info or WDA source."""
         try:

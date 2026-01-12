@@ -192,6 +192,14 @@ class AndroidDeviceController(MobileDeviceController):
             logger.error(f"Failed to press home: {e}")
             return False
 
+    async def press_enter(self) -> bool:
+        try:
+            self.device.shell("input keyevent 66")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to press enter: {e}")
+            return False
+
     async def get_ui_hierarchy(self) -> list[dict]:
         try:
             device_data = await self.get_screen_data()

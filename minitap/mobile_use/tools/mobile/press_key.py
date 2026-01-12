@@ -46,8 +46,8 @@ def get_press_key_tool(ctx: MobileUseContext):
                 output = await controller.go_home()
             case Key.BACK:
                 output = await controller.go_back()
-            case _:
-                output = False
+            case Key.ENTER:
+                output = await controller.press_enter()
         has_failed = not output
 
         agent_outcome = (
