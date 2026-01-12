@@ -80,6 +80,10 @@ Swipe direction "pushes" the screen: **swipe RIGHT → reveals LEFT page** (and 
 Default to **percentage-based** swipes. Use coordinates only for precise controls (sliders).
 Memory aid: Swipe RIGHT (low→high x) to see LEFT page. Swipe LEFT (high→low x) to see RIGHT page.
 
+### Form Filling
+Before concluding a field is missing, **scroll through the entire form** to verify all fields. If you observed a field earlier but can't find it now, scroll back - don't assume it's gone.
+**Rule:** Never input data into the wrong field if the correct field was previously observed.
+
 {% if locked_app_package %}
 ---
 
