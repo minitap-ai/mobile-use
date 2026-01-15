@@ -12,7 +12,8 @@
 [![GitHub stars](https://img.shields.io/github/stars/minitap-ai/mobile-use?style=for-the-badge&color=e0a8dd)](https://github.com/minitap-ai/mobile-use/stargazers)
 
 <h3>
-    <a href="https://docs.minitap.ai/v2/mcp-server/introduction"><b>📚 Official Documentation</b></a>
+    <a href="https://platform.mobile-use.ai"><b>☁️ Cloud</b></a> •
+    <a href="https://docs.minitap.ai/v2/mcp-server/introduction"><b>📚 Documentation</b></a>
 </h3>
 <p align="center">
     <a href="https://discord.gg/6nSqmQ9pQs"><b>Discord</b></a> •
@@ -44,10 +45,11 @@ Mobile-use is a powerful, open-source AI agent that controls your Android or IOS
   </a>
 </p>
 
-We stand among the top performers in the AndroidWorld benchmark.
-More info here: https://minitap.ai/benchmark
+We stand as the top performers and the first to have completed 100% of the AndroidWorld benchmark.
 
-The official leaderboard is available [here](https://docs.google.com/spreadsheets/d/1cchzP9dlTZ3WXQTfYNhh3avxoLipqHN75v1Tb86uhHo/edit?pli=1&gid=0#gid=0)
+Get more info about how we reached this milestone here: [Minitap Benchmark](https://minitap.ai/benchmark).
+
+The official leaderboard is available [here](https://docs.google.com/spreadsheets/d/1cchzP9dlTZ3WXQTfYNhh3avxoLipqHN75v1Tb86uhHo/edit?pli=1&gid=0#gid=0).
 
 ## 🚀 Getting Started
 
