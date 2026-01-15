@@ -26,7 +26,7 @@ async def main() -> None:
     """
     Main execution function demonstrating minitap platform usage pattern.
 
-    Visit https://platform.minitap.ai to create a task, customize your profiles,
+    Visit https://platform.mobile-use.ai to create a task, customize your profiles,
     and get your API key.
     Pass the api_key parameter to the agent.init() method
     ...or set MINITAP_API_KEY environment variable.

@@ -109,7 +109,7 @@ class AgentInvalidApiKeyError(AgentTaskRequestError):
 
     def __init__(self):
         super().__init__(
-            "Minitap API key is incorrect. Visit https://platform.minitap.ai/api-keys "
+            "Minitap API key is incorrect. Visit https://platform.mobile-use.ai/api-keys "
             "to get your API key."
         )
 
@@ -120,7 +120,7 @@ class PlatformServiceUninitializedError(MobileUseError):
     def __init__(self):
         super().__init__(
             "Platform service is not initialized. "
-            "To use Minitap platform service, visit https://platform.minitap.ai.",
+            "To use Minitap platform service, visit https://platform.mobile-use.ai.",
         )
 
 
