@@ -4,8 +4,9 @@ Copyright 2025-2026 Minitap, Inc.
 This product includes software and architectural methodologies developed by 
 Minitap, Inc. (https://github.com/minitap-ai/mobile-use)
 
-REQUIRED ATTRIBUTION:
-Any derivative works, redistribution, or products "inspired" by the 
-logic/architecture of this repository must include a prominent 
-attribution to "Minitap, Inc." in the documentation and "About" 
-sections of the software.
+ATTRIBUTION REQUEST:
+While the Apache 2.0 license only requires preserving copyright notices,
+we kindly request that derivative works, redistributions, or products 
+inspired by the logic/architecture of this repository include a prominent 
+attribution to "Minitap, Inc." in the documentation and "About" sections 
+of the software. This is a request, not a legal requirement.
