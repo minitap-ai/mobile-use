@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "Mobile-Use: Achieving 100% on AndroidWorld"
+authors:
+  - name: "Minitap, Inc."
+repository-code: "https://github.com/minitap-ai/mobile-use"
+url: "https://minitap.ai"
+license: Apache-2.0
+date-released: "2026-01-15"
+abstract: "Mobile-Use is the first agentic framework to achieve 100% on the AndroidWorld benchmark. An AI-powered multi-agent system that automates real Android and iOS devices through low-level control using LangGraph."
+keywords:
+  - mobile-automation
+  - ai-agent
+  - android
+  - ios
+  - langgraph
+  - androidworld

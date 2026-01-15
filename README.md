@@ -21,7 +21,7 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/minitap-mobile-use.svg?color=blue)](https://pypi.org/project/minitap-mobile-use/)
 [![Python Version](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-MIT-blue)](https://github.com/minitap-ai/mobile-use/blob/main/LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](https://github.com/minitap-ai/mobile-use/blob/main/LICENSE)
 
 </div>
 
@@ -262,6 +262,14 @@ We love contributions! Whether you're fixing a bug, adding a feature, or improvi
   </a>
 </p>
 
-## 📜 License
+## 🏆 Attribution & Licensing
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+`mobile-use` is the first agentic framework to achieve **100% on the AndroidWorld benchmark**. 
+
+This project is licensed under the **Apache License 2.0**. 
+
+**If you use this code, or are inspired by the architecture used to reach our benchmark results, you are REQUIRED to credit Minitap, Inc.**
+
+### How to Cite
+If you use this work in research or a commercial product, please use the following:
+> Minitap, Inc. (2026). Mobile-Use: Achieving 100% on AndroidWorld. GitHub: https://github.com/minitap-ai/mobile-use
