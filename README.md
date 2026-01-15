@@ -268,7 +268,7 @@ We love contributions! Whether you're fixing a bug, adding a feature, or improvi
 
 This project is licensed under the **Apache License 2.0**. 
 
-**If you use this code, or are inspired by the architecture used to reach our benchmark results, you are REQUIRED to credit Minitap, Inc.**
+If you use this code, or are inspired by the architecture used to reach our benchmark results, we kindly request that you credit Minitap, Inc.
 
 ### How to Cite
 If you use this work in research or a commercial product, please use the following:
