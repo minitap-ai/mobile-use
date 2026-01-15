@@ -40,7 +40,7 @@ Mobile-use is a powerful, open-source AI agent that controls your Android or IOS
 
 <p align="center">
   <a href="https://minitap.ai/benchmark">
-    <img src="https://files.peachworlds.com/website/753680a0-c383-451e-9800-703d04489ea9/comparison.png" alt="Project banner" />
+    <img src="https://files.peachworlds.com/website/2b590171-669d-42ce-b4b5-ce6eae83a9d8/scorerank-140126.webp" alt="Project banner" />
   </a>
 </p>
 
