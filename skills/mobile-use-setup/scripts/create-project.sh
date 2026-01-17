@@ -123,30 +123,14 @@ if __name__ == "__main__":
     asyncio.run(main())
 EOF
 
-    # Create LLM config template
-    cat > llm-config.override.jsonc << 'EOF'
-{
-  // LLM Configuration for Local Development
-  // Add your API keys to .env: OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.
-
-  "planner": {
-    "provider": "openai",
-    "model": "gpt-4o-mini"
-  },
-  "cortex": {
-    "provider": "openai",
-    "model": "gpt-4o"
-  },
-  "executor": {
-    "provider": "openai",
-    "model": "gpt-4o-mini"
-  },
-  "validator": {
-    "provider": "openai",
-    "model": "gpt-4o-mini"
-  }
-}
-EOF
+    # Download LLM config template from mobile-use repo
+    echo "Downloading LLM config template..."
+    curl -sL https://raw.githubusercontent.com/minitap-ai/mobile-use/main/llm-config.override.template.jsonc \
+        -o llm-config.override.jsonc || {
+        echo "Warning: Could not download template. Creating placeholder."
+        echo "// Copy from llm-config.override.template.jsonc and configure your models" > llm-config.override.jsonc
+        echo "// Refer to llm-config.defaults.jsonc for recommended settings" >> llm-config.override.jsonc
+    }
 
     # Update .env.example for local mode
     cat >> .env.example << 'EOF'

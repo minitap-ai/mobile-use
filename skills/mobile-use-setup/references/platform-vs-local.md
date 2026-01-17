@@ -72,29 +72,17 @@ Full control over LLM configuration with your own API keys.
 
 ### Setup
 
-1. Create `llm-config.override.jsonc`:
-   ```jsonc
-   {
-     "planner": {
-       "provider": "openai",
-       "model": "gpt-4o-mini"
-     },
-     "cortex": {
-       "provider": "openai",
-       "model": "gpt-4o"  // Needs vision
-     },
-     "executor": {
-       "provider": "openai",
-       "model": "gpt-4o-mini"
-     },
-     "validator": {
-       "provider": "openai",
-       "model": "gpt-4o-mini"
-     }
-   }
+1. Copy the config template:
+   ```bash
+   cp llm-config.override.template.jsonc llm-config.override.jsonc
    ```
 
-2. Add provider keys to `.env`:
+2. Configure your LLM models:
+   - Edit `llm-config.override.jsonc` with your preferred models
+   - For recommended settings, refer to `llm-config.defaults.jsonc`
+   - If using Minitap's optimized config, set `MINITAP_API_KEY` in your `.env`
+
+3. Add provider keys to `.env`:
    ```
    OPENAI_API_KEY=sk-...
    ```
@@ -126,8 +114,8 @@ result = await agent.run_task(
 | Provider | Config Value | Vision Support |
 |----------|--------------|----------------|
 | OpenAI | `openai` | gpt-4o, gpt-4-turbo |
-| Anthropic | `anthropic` | claude-3-opus, claude-3-sonnet |
-| Google | `google` | gemini-pro-vision |
+| Anthropic | `anthropic` | claude-sonnet-4, claude-opus-4 |
+| Google | `google` | gemini-2.5-pro, gemini-2.5-flash |
 
 ## When to Use Each
 

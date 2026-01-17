@@ -121,8 +121,12 @@ MINITAP_API_KEY=<their-key>
 4. Add .env to .gitignore
 
 **For Local Mode:**
-1. Create llm-config.override.jsonc with provider settings
-2. Add provider API keys to .env (OPENAI_API_KEY, etc.)
+1. Copy the config template:
+   ```bash
+   cp llm-config.override.template.jsonc llm-config.override.jsonc
+   ```
+2. Edit `llm-config.override.jsonc` with preferred models (refer to `llm-config.defaults.jsonc` for recommended settings)
+3. Add provider API keys to .env (OPENAI_API_KEY, etc.) or set MINITAP_API_KEY for optimized config
 
 ### Phase 6: Device-Specific Setup
 
