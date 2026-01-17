@@ -114,7 +114,7 @@ result = await agent.run_task(
 | Provider | Config Value | Vision Support |
 |----------|--------------|----------------|
 | OpenAI | `openai` | gpt-4o, gpt-4-turbo |
-| Anthropic | `anthropic` | claude-sonnet-4, claude-opus-4 |
+| Anthropic | `anthropic` | claude-sonnet-4-5, claude-opus-4-5 |
 | Google | `google` | gemini-2.5-pro, gemini-2.5-flash |
 
 ## When to Use Each
