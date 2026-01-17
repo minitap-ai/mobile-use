@@ -96,11 +96,12 @@ adb -s SERIAL_NUMBER shell
 
 In Python:
 ```python
+from minitap.mobile_use.sdk import Agent
 from minitap.mobile_use.sdk.builders import Builders
 
 config = (
     Builders.AgentConfig
-    .for_device("SERIAL_NUMBER", platform="android")
+    .for_device(platform="android", device_id="SERIAL_NUMBER")
     .build()
 )
 agent = Agent(config=config)

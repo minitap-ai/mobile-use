@@ -109,12 +109,13 @@ Go to Settings → General → VPN & Device Management and trust your certificat
 When multiple iOS devices are connected, specify the target device:
 
 ```python
+from minitap.mobile_use.sdk import Agent
 from minitap.mobile_use.sdk.builders import Builders
 
 # Get UDID with: idevice_id -l
 config = (
     Builders.AgentConfig
-    .for_device("00008110-001A2C3E4F50001E", platform="ios")
+    .for_device(platform="ios", device_id="00008110-001A2C3E4F50001E")
     .build()
 )
 agent = Agent(config=config)
