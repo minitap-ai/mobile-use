@@ -31,10 +31,10 @@ Minitap handles all LLM orchestration. You just need an API key.
 
 ### Setup
 
-1. Sign up at https://platform.minitap.ai
+1. Sign up at [platform.minitap.ai](https://platform.minitap.ai)
 2. Create API key
 3. Add to `.env`:
-   ```
+   ```env
    MINITAP_API_KEY=sk-...
    ```
 4. Create tasks via Platform UI
@@ -83,7 +83,7 @@ Full control over LLM configuration with your own API keys.
    - If using Minitap's optimized config, set `MINITAP_API_KEY` in your `.env`
 
 3. Add provider keys to `.env`:
-   ```
+   ```env
    OPENAI_API_KEY=sk-...
    ```
 
