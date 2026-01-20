@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     MINITAP_API_KEY: SecretStr | None = None
 
     OPENAI_BASE_URL: str | None = None
-    MINITAP_BASE_URL: str = "https://platform.mobile-use.ai"
+    MINITAP_BASE_URL: str = "https://platform.minitap.ai"
 
     ADB_HOST: str | None = None
     ADB_PORT: int | None = None
