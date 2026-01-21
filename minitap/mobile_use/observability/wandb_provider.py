@@ -117,7 +117,7 @@ class WandbProvider(WandbBaseManager):
 
     def start_task(self, task_id: str, task_name: str, step: int) -> None:
         """Mark the start of a task.
-        
+
         Args:
             task_id: Unique task identifier
             task_name: Human-readable task name
@@ -125,29 +125,28 @@ class WandbProvider(WandbBaseManager):
         """
         self._current_step = step
         self._task_start_time = time.time()
-        self._accumulate("task_id", 0)  # Placeholder, actual ID logged in flush
         self._task_id = task_id
         self._task_name = task_name
 
     def end_task(self, steps_taken: int | None = None) -> None:
         """Mark the end of a task and flush metrics.
-        
+
         Args:
             steps_taken: Number of steps/actions the agent took to complete the task
         """
         if self._task_start_time:
             duration = time.time() - self._task_start_time
-            self._accumulate("task_duration_seconds", duration)
+            self._accumulate("task/duration_seconds", duration)
 
-        # Add task metadata to the flush
+        # Add task metadata to the flush (hierarchical naming)
         if hasattr(self, "_task_id"):
-            self._metrics_buffer["task_id"] = self._task_id
+            self._metrics_buffer["task/id"] = self._task_id
         if hasattr(self, "_task_name"):
-            self._metrics_buffer["task_name"] = self._task_name
-        
+            self._metrics_buffer["task/name"] = self._task_name
+
         # Add steps taken
         if steps_taken is not None:
-            self._metrics_buffer["steps_taken"] = steps_taken
+            self._metrics_buffer["task/steps_taken"] = steps_taken
 
         self.flush(self._current_step)
 
@@ -163,24 +162,24 @@ class WandbProvider(WandbBaseManager):
     ) -> None:
         """Log an LLM invocation by an agent."""
         total_tokens = input_tokens + output_tokens
-        
-        # Per-agent metrics
-        self._accumulate(f"{agent}_input_tokens", input_tokens)
-        self._accumulate(f"{agent}_output_tokens", output_tokens)
-        self._accumulate(f"{agent}_total_tokens", total_tokens)
-        self._accumulate(f"{agent}_duration_ms", duration_ms)
-        self._increment(f"{agent}_invocations")
-        
+
+        # Per-agent metrics (hierarchical naming for W&B panel organization)
+        self._accumulate(f"agents/{agent}/input_tokens", input_tokens)
+        self._accumulate(f"agents/{agent}/output_tokens", output_tokens)
+        self._accumulate(f"agents/{agent}/total_tokens", total_tokens)
+        self._accumulate(f"agents/{agent}/duration_ms", duration_ms)
+        self._increment(f"agents/{agent}/invocations")
+
         # Per-model metrics
         model_key = model.replace("-", "_").replace(".", "_")
-        self._accumulate(f"model_{model_key}_tokens", total_tokens)
-        
+        self._accumulate(f"models/{model_key}/tokens", total_tokens)
+
         # Aggregate metrics
-        self._accumulate("total_input_tokens", input_tokens)
-        self._accumulate("total_output_tokens", output_tokens)
-        self._accumulate("total_tokens", total_tokens)
-        self._accumulate("total_llm_duration_ms", duration_ms)
-        self._increment("total_llm_invocations")
+        self._accumulate("totals/input_tokens", input_tokens)
+        self._accumulate("totals/output_tokens", output_tokens)
+        self._accumulate("totals/tokens", total_tokens)
+        self._accumulate("totals/llm_duration_ms", duration_ms)
+        self._increment("totals/llm_invocations")
 
     def log_tool_call(
         self,
@@ -191,29 +190,30 @@ class WandbProvider(WandbBaseManager):
     ) -> None:
         """Log a tool call execution."""
         tool_key = tool.replace("-", "_")
-        
-        self._increment(f"tool_{tool_key}_calls")
-        self._accumulate(f"tool_{tool_key}_duration_ms", duration_ms)
-        
+
+        # Per-tool metrics (hierarchical naming)
+        self._increment(f"tools/{tool_key}/calls")
+        self._accumulate(f"tools/{tool_key}/duration_ms", duration_ms)
+
         if success:
-            self._increment(f"tool_{tool_key}_success")
+            self._increment(f"tools/{tool_key}/success")
         else:
-            self._increment(f"tool_{tool_key}_failures")
-        
+            self._increment(f"tools/{tool_key}/failures")
+
         # Aggregate metrics
-        self._increment("total_tool_calls")
-        self._accumulate("total_tool_duration_ms", duration_ms)
+        self._increment("totals/tool_calls")
+        self._accumulate("totals/tool_duration_ms", duration_ms)
         if success:
-            self._increment("total_tool_success")
+            self._increment("totals/tool_success")
         else:
-            self._increment("total_tool_failures")
+            self._increment("totals/tool_failures")
 
     def log_agent_thought(self, agent: str, thought: str) -> None:
         """Log an agent's reasoning/thought."""
         # We don't log full thoughts to W&B (too verbose)
         # Just count them for metrics
-        self._increment(f"{agent}_thoughts")
-        self._increment("total_thoughts")
+        self._increment(f"agents/{agent}/thoughts")
+        self._increment("totals/thoughts")
 
     def log_node_execution(
         self,
@@ -223,18 +223,19 @@ class WandbProvider(WandbBaseManager):
     ) -> None:
         """Log a graph node execution."""
         node_key = node.replace("-", "_")
-        
-        self._increment(f"node_{node_key}_executions")
-        self._accumulate(f"node_{node_key}_duration_ms", duration_ms)
-        
+
+        # Per-node metrics (hierarchical naming)
+        self._increment(f"nodes/{node_key}/executions")
+        self._accumulate(f"nodes/{node_key}/duration_ms", duration_ms)
+
         if error:
-            self._increment(f"node_{node_key}_errors")
+            self._increment(f"nodes/{node_key}/errors")
 
     def log_error(self, source: str, error: str) -> None:
         """Log an error occurrence."""
         source_key = source.replace("-", "_")
-        self._increment(f"error_{source_key}")
-        self._increment("total_errors")
+        self._increment(f"errors/{source_key}")
+        self._increment("totals/errors")
         
         # Log error details immediately (not buffered)
         self._safe_log({
