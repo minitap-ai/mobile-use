@@ -7,7 +7,7 @@ Uses ContextVar to avoid prop drilling and maintain clean function signatures.
 from collections.abc import Callable, Coroutine
 from enum import Enum
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from adbutils import AdbClient
 from openai import BaseModel
@@ -17,6 +17,9 @@ from minitap.mobile_use.agents.planner.types import Subgoal
 from minitap.mobile_use.clients.ios_client import IosClientWrapper
 from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
 from minitap.mobile_use.config import AgentNode, LLMConfig
+
+if TYPE_CHECKING:
+    from minitap.mobile_use.observability.protocols import ObservabilityProvider
 
 
 class AppLaunchResult(BaseModel):
@@ -88,6 +91,9 @@ class MobileUseContext(BaseModel):
     on_plan_changes: Callable[[list[Subgoal], IsReplan], Coroutine] | None = None
     minitap_api_key: str | None = None
     video_recording_enabled: bool = False
+    
+    # W&B observability provider for logging metrics
+    observability: "ObservabilityProvider | None" = None
 
     def get_adb_client(self) -> AdbClient:
         if self.adb_client is None:

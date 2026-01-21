@@ -19,6 +19,7 @@ from minitap.mobile_use.config import (
 )
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.utils.logger import get_logger
+from minitap.mobile_use.observability.langchain_callback import WandbLangChainCallback
 
 # Logger for internal messages (ex: fallback)
 llm_logger = logging.getLogger(__name__)
@@ -193,39 +194,50 @@ def get_llm(
     use_fallback: bool = False,
     temperature: float = 1,
 ) -> BaseChatModel:
-    llm = (
+    llm_config = (
         ctx.llm_config.get_utils(name)  # type: ignore
         if is_utils
         else ctx.llm_config.get_agent(name)  # type: ignore
     )
     if use_fallback:
-        if isinstance(llm, LLMWithFallback):
-            llm = llm.fallback
+        if isinstance(llm_config, LLMWithFallback):
+            llm_config = llm_config.fallback
         else:
             raise ValueError("LLM has no fallback!")
-    if llm.provider == "openai":
-        return get_openai_llm(llm.model, temperature)
-    elif llm.provider == "google":
-        return get_google_llm(llm.model, temperature)
-    elif llm.provider == "vertexai":
-        return get_vertex_llm(llm.model, temperature)
-    elif llm.provider == "openrouter":
-        return get_openrouter_llm(llm.model, temperature)
-    elif llm.provider == "xai":
-        return get_grok_llm(llm.model, temperature)
-    elif llm.provider == "minitap":
+    
+    # Create the base LLM
+    llm: BaseChatModel
+    if llm_config.provider == "openai":
+        llm = get_openai_llm(llm_config.model, temperature)
+    elif llm_config.provider == "google":
+        llm = get_google_llm(llm_config.model, temperature)
+    elif llm_config.provider == "vertexai":
+        llm = get_vertex_llm(llm_config.model, temperature)
+    elif llm_config.provider == "openrouter":
+        llm = get_openrouter_llm(llm_config.model, temperature)
+    elif llm_config.provider == "xai":
+        llm = get_grok_llm(llm_config.model, temperature)
+    elif llm_config.provider == "minitap":
         remote_tracing = False
         if ctx.execution_setup:
             remote_tracing = ctx.execution_setup.enable_remote_tracing
-        return get_minitap_llm(
+        llm = get_minitap_llm(
             trace_id=ctx.trace_id,
             remote_tracing=remote_tracing,
-            model=llm.model,
+            model=llm_config.model,
             temperature=temperature,
             api_key=ctx.minitap_api_key,
         )
     else:
-        raise ValueError(f"Unsupported provider: {llm.provider}")
+        raise ValueError(f"Unsupported provider: {llm_config.provider}")
+    
+    # Inject W&B callback if observability is enabled
+    if ctx.observability is not None:
+        agent_name = name if isinstance(name, str) else str(name)
+        callback = WandbLangChainCallback(ctx.observability, agent_name=agent_name)
+        llm = llm.with_config(callbacks=[callback])  # type: ignore[assignment]
+    
+    return llm
 
 
 T = TypeVar("T")

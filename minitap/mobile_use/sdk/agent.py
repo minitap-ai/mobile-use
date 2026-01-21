@@ -70,6 +70,7 @@ from minitap.mobile_use.utils.media import (
     remove_steps_json_from_trace_folder,
 )
 from minitap.mobile_use.utils.recorder import log_agent_thought
+from minitap.mobile_use.observability.wandb_provider import WandbProvider
 
 logger = get_logger(__name__)
 
@@ -665,6 +666,17 @@ class Agent:
         if platform_service:
             api_key = platform_service._api_key
 
+        # Initialize W&B observability if run ID is provided
+        wandb_provider = None
+        if request.wandb_run_id:
+            wandb_provider = WandbProvider(run_id=request.wandb_run_id)
+            wandb_provider.__enter__()
+            wandb_provider.start_task(
+                task_id=task_id,
+                task_name=request.task_name or request.goal[:50],
+                step=request.step_index,
+            )
+
         context = MobileUseContext(
             trace_id=task.id,
             device=self._device_context,
@@ -679,6 +691,7 @@ class Agent:
                 self._config.video_recording_enabled
                 and agent_profile.llm_config.utils.video_analyzer is not None
             ),
+            observability=wandb_provider,
         )
 
         self._prepare_tracing(task=task, context=context)
@@ -708,6 +721,8 @@ class Agent:
             last_state: State | None = None
             last_state_snapshot: dict | None = None
             output = None
+            # Use list to allow modification from nested scope (for finally block)
+            steps_count_holder: list[int] = [0]
             try:
                 logger.info(f"[{task_name}] Invoking graph with input: {graph_input}")
                 await task.set_status(status="running", message="Invoking graph...")
@@ -757,6 +772,7 @@ class Agent:
                 await task.finalize(content=output, state=last_state_snapshot)
                 duration = (datetime.now(UTC) - task_start_time).total_seconds()
                 steps_count = len(last_state.agents_thoughts) if last_state else 0
+                steps_count_holder[0] = steps_count  # Store for finally block
                 telemetry.capture_task_completed(
                     task_id=task_id,
                     success=True,
@@ -775,6 +791,7 @@ class Agent:
                 )
                 duration = (datetime.now(UTC) - task_start_time).total_seconds()
                 steps_count = len(last_state.agents_thoughts) if last_state else 0
+                steps_count_holder[0] = steps_count  # Store for finally block
                 telemetry.capture_task_completed(
                     task_id=task_id,
                     success=False,
@@ -793,6 +810,7 @@ class Agent:
                 )
                 duration = (datetime.now(UTC) - task_start_time).total_seconds()
                 steps_count = len(last_state.agents_thoughts) if last_state else 0
+                steps_count_holder[0] = steps_count  # Store for finally block
                 telemetry.capture_task_completed(
                     task_id=task_id,
                     success=False,
@@ -808,6 +826,10 @@ class Agent:
                 raise
             finally:
                 await self._finalize_tracing(task=task, context=context)
+                # Cleanup W&B observability if it was initialized
+                if wandb_provider:
+                    wandb_provider.end_task(steps_taken=steps_count_holder[0])
+                    wandb_provider.__exit__(None, None, None)
 
         async with self._task_lock:
             if self._current_task and not self._current_task.done():

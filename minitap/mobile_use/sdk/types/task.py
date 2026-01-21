@@ -98,6 +98,8 @@ class TaskRequest[TOutput](TaskRequestCommon):
         trace_path: Directory path to save trace data if recording is enabled
         llm_output_path: Path to save LLM output data
         thoughts_output_path: Path to save thoughts output data
+        wandb_run_id: Optional W&B run ID for logging metrics (from android-world-runner)
+        step_index: Task index in the benchmark (for W&B logging)
     """
 
     goal: str
@@ -106,6 +108,8 @@ class TaskRequest[TOutput](TaskRequestCommon):
     output_description: str | None = None
     output_format: type[TOutput] | None = None
     enable_remote_tracing: bool = False
+    wandb_run_id: str | None = None
+    step_index: int = 0
 
 
 class ManualTaskConfig(BaseModel):

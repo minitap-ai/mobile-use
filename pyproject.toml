@@ -40,6 +40,7 @@ dependencies = [
     "Appium-Python-Client>=5.0.0",
     "posthog>=7.4.2",
     "uuid-utils>=0.12.0",
+    "wandb>=0.19.0",
 ]
 
 [project.optional-dependencies]
