@@ -3,7 +3,8 @@
 import time
 import asyncio
 from functools import wraps
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
+from collections.abc import Callable
 
 from minitap.mobile_use.observability.protocols import ObservabilityProvider
 

@@ -89,12 +89,16 @@ class CortexNode:
             )
             messages.append(get_screenshot_message_for_llm(compressed_image_base64))
 
-        llm = get_llm(ctx=self.ctx, name="cortex", temperature=1).with_structured_output(
-            CortexOutput
+        from minitap.mobile_use.services.llm import attach_wandb_callback
+        llm = attach_wandb_callback(
+            get_llm(ctx=self.ctx, name="cortex", temperature=1).with_structured_output(
+                CortexOutput
+            )
         )
-        llm_fallback = get_llm(
-            ctx=self.ctx, name="cortex", use_fallback=True, temperature=1
-        ).with_structured_output(CortexOutput)
+        llm_fallback = attach_wandb_callback(
+            get_llm(ctx=self.ctx, name="cortex", use_fallback=True, temperature=1
+            ).with_structured_output(CortexOutput)
+        )
         response: CortexOutput = await with_fallback(
             main_call=lambda: invoke_llm_with_timeout_message(llm.ainvoke(messages)),
             fallback_call=lambda: invoke_llm_with_timeout_message(llm_fallback.ainvoke(messages)),

@@ -71,8 +71,9 @@ class ExecutorNode:
         if not isinstance(llm, ChatGoogleGenerativeAI | ChatVertexAI):
             llm_bind_tools_kwargs["parallel_tool_calls"] = True
 
-        llm = llm.bind_tools(**llm_bind_tools_kwargs)
-        llm_fallback = llm_fallback.bind_tools(**llm_bind_tools_kwargs)
+        from minitap.mobile_use.services.llm import attach_wandb_callback
+        llm = attach_wandb_callback(llm.bind_tools(**llm_bind_tools_kwargs))
+        llm_fallback = attach_wandb_callback(llm_fallback.bind_tools(**llm_bind_tools_kwargs))
         response = await with_fallback(
             main_call=lambda: invoke_llm_with_timeout_message(llm.ainvoke(messages)),
             fallback_call=lambda: invoke_llm_with_timeout_message(llm_fallback.ainvoke(messages)),

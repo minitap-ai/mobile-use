@@ -1,5 +1,5 @@
 .env
-__pycache__
+__pycache__/
 **/mobile-use.egg-info
 .vscode/settings.json
 .venv/
@@ -11,3 +11,22 @@ llm-config.override.jsonc
 .ios_udid
 
 *.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Ruff
+.ruff_cache/
+
+# W&B
+wandb/
+
+# Build
+*.egg-info/
+dist/
+build/
+
+# Logs
+*.log

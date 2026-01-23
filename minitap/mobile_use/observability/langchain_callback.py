@@ -1,7 +1,7 @@
 """LangChain callback handler for automatic token tracking."""
 
 import time
-from typing import Any, Dict, List, Union
+from typing import Any
 from uuid import UUID
 
 from langchain_core.callbacks import BaseCallbackHandler
@@ -33,18 +33,18 @@ class WandbLangChainCallback(BaseCallbackHandler):
         self.provider = provider
         self.agent_name = agent_name
         self._llm_start_time: float | None = None
-        self._tool_start_times: Dict[str, float] = {}
+        self._tool_start_times: dict[str, float] = {}
         self._current_model: str = "unknown"
 
     def on_llm_start(
         self,
-        serialized: Dict[str, Any],
-        prompts: List[str],
+        serialized: dict[str, Any],
+        prompts: list[str],
         *,
         run_id: UUID,
         parent_run_id: UUID | None = None,
-        tags: List[str] | None = None,
-        metadata: Dict[str, Any] | None = None,
+        tags: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         """Called when LLM starts processing."""
@@ -122,14 +122,14 @@ class WandbLangChainCallback(BaseCallbackHandler):
 
     def on_tool_start(
         self,
-        serialized: Dict[str, Any],
+        serialized: dict[str, Any],
         input_str: str,
         *,
         run_id: UUID,
         parent_run_id: UUID | None = None,
-        tags: List[str] | None = None,
-        metadata: Dict[str, Any] | None = None,
-        inputs: Dict[str, Any] | None = None,
+        tags: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+        inputs: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         """Called when a tool starts execution."""

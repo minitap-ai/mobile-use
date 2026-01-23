@@ -94,7 +94,7 @@ class WandbBaseManager(ABC):
             value: Value to add to the accumulated total
         """
         current = self._metrics_buffer.get(key, 0)
-        if isinstance(current, (int, float)):
+        if isinstance(current, int | float):
             self._metrics_buffer[key] = current + value
         else:
             self._metrics_buffer[key] = value

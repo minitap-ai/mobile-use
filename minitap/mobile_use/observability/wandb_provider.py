@@ -1,11 +1,9 @@
 """W&B observability provider for mobile-use agent."""
 
 import time
-import asyncio
-from typing import Any, Self
+from typing import Self
 
 from minitap.mobile_use.observability.base import WandbBaseManager
-from minitap.mobile_use.observability.protocols import ObservabilityProvider
 
 
 class WandbProvider(WandbBaseManager):
@@ -58,6 +56,16 @@ class WandbProvider(WandbBaseManager):
             self.enabled = False
             return self
 
+        # Check if there's already an active run with the same ID (same-process case)
+        # This happens when WandbManager and WandbProvider run in the same process
+        if wandb.run is not None and wandb.run.id == self._resume_run_id:
+            self.run = wandb.run
+            self.run_id = self.run.id
+            self._same_process = True
+            return self
+
+        self._same_process = False
+
         # Resume the existing run with retry logic for race conditions
         for attempt in range(self._max_resume_retries):
             try:
@@ -73,7 +81,8 @@ class WandbProvider(WandbBaseManager):
                 if attempt < self._max_resume_retries - 1:
                     time.sleep(2 ** attempt)  # Exponential backoff
                 else:
-                    print(f"[W&B] Failed to resume run after {self._max_resume_retries} attempts: {e}")
+                    print(f"[W&B] Failed to resume run after {self._max_resume_retries} "
+                          f"attempts: {e}")
                     self.enabled = False
                     return self
             except Exception as e:
@@ -180,6 +189,15 @@ class WandbProvider(WandbBaseManager):
         self._accumulate("totals/tokens", total_tokens)
         self._accumulate("totals/llm_duration_ms", duration_ms)
         self._increment("totals/llm_invocations")
+        
+        # Log immediately for real-time visibility in W&B
+        self._safe_log({
+            f"agents/{agent}/input_tokens": input_tokens,
+            f"agents/{agent}/output_tokens": output_tokens,
+            f"agents/{agent}/total_tokens": total_tokens,
+            f"agents/{agent}/duration_ms": duration_ms,
+            "model": model,
+        })
 
     def log_tool_call(
         self,
@@ -207,6 +225,14 @@ class WandbProvider(WandbBaseManager):
             self._increment("totals/tool_success")
         else:
             self._increment("totals/tool_failures")
+        
+        # Log immediately for real-time visibility
+        self._safe_log({
+            f"tools/{tool_key}/call": 1,
+            f"tools/{tool_key}/success": 1 if success else 0,
+            f"tools/{tool_key}/duration_ms": duration_ms,
+            "tool_name": tool,
+        })
 
     def log_agent_thought(self, agent: str, thought: str) -> None:
         """Log an agent's reasoning/thought."""

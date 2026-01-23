@@ -7,7 +7,7 @@ Uses ContextVar to avoid prop drilling and maintain clean function signatures.
 from collections.abc import Callable, Coroutine
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from adbutils import AdbClient
 from openai import BaseModel
@@ -93,7 +93,8 @@ class MobileUseContext(BaseModel):
     video_recording_enabled: bool = False
     
     # W&B observability provider for logging metrics
-    observability: "ObservabilityProvider | None" = None
+    # Using Any to avoid Pydantic forward reference issues
+    observability: Any = None
 
     def get_adb_client(self) -> AdbClient:
         if self.adb_client is None:

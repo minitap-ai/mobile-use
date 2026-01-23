@@ -65,10 +65,14 @@ class PlannerNode:
             HumanMessage(content=human_message),
         ]
 
-        llm = get_llm(ctx=self.ctx, name="planner").with_structured_output(PlannerOutput)
-        llm_fallback = get_llm(
-            ctx=self.ctx, name="planner", use_fallback=True
-        ).with_structured_output(PlannerOutput)
+        from minitap.mobile_use.services.llm import attach_wandb_callback
+        llm = attach_wandb_callback(
+            get_llm(ctx=self.ctx, name="planner").with_structured_output(PlannerOutput)
+        )
+        llm_fallback = attach_wandb_callback(
+            get_llm(ctx=self.ctx, name="planner", use_fallback=True
+            ).with_structured_output(PlannerOutput)
+        )
         response: PlannerOutput = await with_fallback(
             main_call=lambda: invoke_llm_with_timeout_message(
                 llm.ainvoke(messages),

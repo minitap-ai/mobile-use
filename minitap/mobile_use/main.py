@@ -3,11 +3,8 @@ import os
 from shutil import which
 from typing import Annotated
 
-import typer
 from adbutils import AdbClient
 from langchain.callbacks.base import Callbacks
-from rich.console import Console
-
 from minitap.mobile_use.clients.ios_client_config import (
     IdbClientConfig,
     IosClientConfig,
@@ -21,6 +18,8 @@ from minitap.mobile_use.services.telemetry import telemetry
 from minitap.mobile_use.utils.cli_helpers import display_device_status
 from minitap.mobile_use.utils.logger import get_logger
 from minitap.mobile_use.utils.video import check_ffmpeg_available
+from rich.console import Console
+import typer
 
 app = typer.Typer(add_completion=False, pretty_exceptions_enable=False)
 logger = get_logger(__name__)

@@ -74,12 +74,16 @@ class OrchestratorNode:
             HumanMessage(content=human_message),
         ]
 
-        llm = get_llm(ctx=self.ctx, name="orchestrator", temperature=1).with_structured_output(
-            OrchestratorOutput
+        from minitap.mobile_use.services.llm import attach_wandb_callback
+        llm = attach_wandb_callback(
+            get_llm(ctx=self.ctx, name="orchestrator", temperature=1).with_structured_output(
+                OrchestratorOutput
+            )
         )
-        llm_fallback = get_llm(
-            ctx=self.ctx, name="orchestrator", use_fallback=True, temperature=1
-        ).with_structured_output(OrchestratorOutput)
+        llm_fallback = attach_wandb_callback(
+            get_llm(ctx=self.ctx, name="orchestrator", use_fallback=True, temperature=1
+            ).with_structured_output(OrchestratorOutput)
+        )
         response: OrchestratorOutput = await with_fallback(
             main_call=lambda: invoke_llm_with_timeout_message(llm.ainvoke(messages)),
             fallback_call=lambda: invoke_llm_with_timeout_message(llm_fallback.ainvoke(messages)),

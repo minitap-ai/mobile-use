@@ -231,13 +231,53 @@ def get_llm(
     else:
         raise ValueError(f"Unsupported provider: {llm_config.provider}")
     
-    # Inject W&B callback if observability is enabled
+    # Store callback for attachment after with_structured_output
+    # (callbacks set via with_config don't propagate through with_structured_output)
     if ctx.observability is not None:
         agent_name = name if isinstance(name, str) else str(name)
         callback = WandbLangChainCallback(ctx.observability, agent_name=agent_name)
-        llm = llm.with_config(callbacks=[callback])  # type: ignore[assignment]
+        # Store callback on the LLM for later attachment
+        llm._wandb_callback = callback  # type: ignore[attr-defined]
     
     return llm
+
+
+def attach_wandb_callback(runnable: Any) -> Any:
+    """Attach W&B callback to a runnable if one was configured.
+    
+    Call this AFTER with_structured_output() or bind_tools() to ensure callbacks propagate.
+    
+    Args:
+        runnable: A LangChain runnable (could be LLM or structured output wrapper)
+    
+    Returns:
+        The runnable with callbacks attached
+    """
+    # Try multiple paths to find the stored callback
+    callback = None
+    
+    # Direct attribute
+    if hasattr(runnable, '_wandb_callback'):
+        callback = runnable._wandb_callback
+    # RunnableBinding (from bind_tools, with_structured_output)
+    elif hasattr(runnable, 'bound') and hasattr(runnable.bound, '_wandb_callback'):
+        callback = runnable.bound._wandb_callback
+    # RunnableSequence
+    elif hasattr(runnable, 'first') and hasattr(runnable.first, '_wandb_callback'):
+        callback = runnable.first._wandb_callback
+    # Nested RunnableBinding
+    elif hasattr(runnable, 'bound') and hasattr(runnable.bound, 'bound'):
+        if hasattr(runnable.bound.bound, '_wandb_callback'):
+            callback = runnable.bound.bound._wandb_callback
+    # Another common pattern: first.bound
+    elif hasattr(runnable, 'first') and hasattr(runnable.first, 'bound'):
+        if hasattr(runnable.first.bound, '_wandb_callback'):
+            callback = runnable.first.bound._wandb_callback
+    
+    if callback is not None:
+        return runnable.with_config(callbacks=[callback])
+    
+    return runnable
 
 
 T = TypeVar("T")
