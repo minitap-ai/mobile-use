@@ -1,0 +1,15 @@
+{
+  // A5 - Meta-Reasoning (84% expected)
+  // ENABLED: Multi-agent, Sequential, Validation, Deterministic text, Vision, Meta-reasoning
+  // DISABLED: Scratchpad, video, data fidelity
+  
+  "use_multi_agent": true,
+  "use_sequential_execution": true,
+  "use_post_validation": true,
+  "use_deterministic_text": true,
+  "use_vision": true,
+  "use_meta_reasoning": true,
+  "use_scratchpad": false,
+  "use_video_recording": false,
+  "use_data_fidelity_prompts": false
+}
