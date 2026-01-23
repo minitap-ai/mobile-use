@@ -8,16 +8,16 @@ from minitap.mobile_use.observability.base import WandbBaseManager
 
 class WandbProvider(WandbBaseManager):
     """W&B provider that RESUMES an existing run created by android-world-runner.
-    
+
     This class implements the ObservabilityProvider protocol and is used by
     mobile-use to log agent-level metrics (token usage, tool calls, etc.)
     to a W&B run that was created by the benchmark runner.
-    
+
     Usage:
         async with WandbProvider(run_id="abc123") as provider:
             provider.log_agent_invocation(...)
             provider.flush(step=0)
-    
+
     The provider does NOT call wandb.finish() - that's the runner's responsibility.
     """
 
@@ -30,7 +30,7 @@ class WandbProvider(WandbBaseManager):
         max_resume_retries: int = 3,
     ):
         """Initialize the W&B provider.
-        
+
         Args:
             run_id: The W&B run ID to resume (from android-world-runner)
             project: W&B project name
@@ -74,15 +74,25 @@ class WandbProvider(WandbBaseManager):
                     project=self.project,
                     entity=self.entity,
                     resume="must",
+                    # Match settings from WandbManager (android-world-runner)
+                    settings=wandb.Settings(
+                        disable_code=True,
+                        disable_git=True,
+                        x_disable_stats=True,  # Disable system metrics - we only want agent metrics
+                        insecure_disable_ssl=True,  # Skip TLS verification for prod environments
+                        x_update_finish_state=False,  # CRITICAL: Don't finalize run on process exit
+                    ),
                 )
                 self.run_id = self.run.id
                 return self
             except wandb.errors.CommError as e:
                 if attempt < self._max_resume_retries - 1:
-                    time.sleep(2 ** attempt)  # Exponential backoff
+                    time.sleep(2**attempt)  # Exponential backoff
                 else:
-                    print(f"[W&B] Failed to resume run after {self._max_resume_retries} "
-                          f"attempts: {e}")
+                    print(
+                        f"[W&B] Failed to resume run after {self._max_resume_retries} "
+                        f"attempts: {e}"
+                    )
                     self.enabled = False
                     return self
             except Exception as e:
@@ -94,9 +104,14 @@ class WandbProvider(WandbBaseManager):
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Exit context manager - DO NOT finish the run.
-        
+
         The android-world-runner owns the run lifecycle and will call finish().
         We just need to make sure any remaining metrics are logged.
+
+        Note: We use x_update_finish_state=False in wandb.Settings to prevent
+        the W&B SDK's atexit handler from finalizing the run when this process
+        exits. Without this, the run would be marked as finished before the
+        runner can log the final task evaluation results.
         """
         if not self.enabled or not self.run:
             return
@@ -107,6 +122,8 @@ class WandbProvider(WandbBaseManager):
 
         # Note: We intentionally do NOT call wandb.finish() here
         # The runner will finish the run after logging evaluation results
+        # The x_update_finish_state=False setting ensures the atexit handler
+        # won't finalize the run either
 
     async def __aenter__(self):
         """Async context manager entry."""
@@ -118,7 +135,7 @@ class WandbProvider(WandbBaseManager):
 
     def set_step(self, step: int) -> None:
         """Set the current task/step index.
-        
+
         Args:
             step: The current step index
         """
@@ -189,15 +206,17 @@ class WandbProvider(WandbBaseManager):
         self._accumulate("totals/tokens", total_tokens)
         self._accumulate("totals/llm_duration_ms", duration_ms)
         self._increment("totals/llm_invocations")
-        
+
         # Log immediately for real-time visibility in W&B
-        self._safe_log({
-            f"agents/{agent}/input_tokens": input_tokens,
-            f"agents/{agent}/output_tokens": output_tokens,
-            f"agents/{agent}/total_tokens": total_tokens,
-            f"agents/{agent}/duration_ms": duration_ms,
-            "model": model,
-        })
+        self._safe_log(
+            {
+                f"agents/{agent}/input_tokens": input_tokens,
+                f"agents/{agent}/output_tokens": output_tokens,
+                f"agents/{agent}/total_tokens": total_tokens,
+                f"agents/{agent}/duration_ms": duration_ms,
+                "model": model,
+            }
+        )
 
     def log_tool_call(
         self,
@@ -225,14 +244,16 @@ class WandbProvider(WandbBaseManager):
             self._increment("totals/tool_success")
         else:
             self._increment("totals/tool_failures")
-        
+
         # Log immediately for real-time visibility
-        self._safe_log({
-            f"tools/{tool_key}/call": 1,
-            f"tools/{tool_key}/success": 1 if success else 0,
-            f"tools/{tool_key}/duration_ms": duration_ms,
-            "tool_name": tool,
-        })
+        self._safe_log(
+            {
+                f"tools/{tool_key}/call": 1,
+                f"tools/{tool_key}/success": 1 if success else 0,
+                f"tools/{tool_key}/duration_ms": duration_ms,
+                "tool_name": tool,
+            }
+        )
 
     def log_agent_thought(self, agent: str, thought: str) -> None:
         """Log an agent's reasoning/thought."""
@@ -262,13 +283,15 @@ class WandbProvider(WandbBaseManager):
         source_key = source.replace("-", "_")
         self._increment(f"errors/{source_key}")
         self._increment("totals/errors")
-        
+
         # Log error details immediately (not buffered)
-        self._safe_log({
-            "step": self._current_step,
-            "error_source": source,
-            "error_message": error[:500],  # Truncate long errors
-        })
+        self._safe_log(
+            {
+                "step": self._current_step,
+                "error_source": source,
+                "error_message": error[:500],  # Truncate long errors
+            }
+        )
 
     def flush(self, step: int) -> None:
         """Flush accumulated metrics for a step."""
