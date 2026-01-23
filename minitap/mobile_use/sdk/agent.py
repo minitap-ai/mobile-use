@@ -60,6 +60,7 @@ from minitap.mobile_use.sdk.types.task import (
     Task,
     TaskRequest,
 )
+from minitap.mobile_use.observability import WandbResumeProvider, parse_task_name_for_wandb
 from minitap.mobile_use.services.telemetry import telemetry
 from minitap.mobile_use.utils.app_launch_utils import _handle_initial_app_launch
 from minitap.mobile_use.utils.logger import get_logger
@@ -658,7 +659,20 @@ class Agent:
             on_status_changed=on_status_changed,
         )
         self._tasks.append(task)
-        task_name = task.get_name()
+        raw_task_name = task.get_name()
+
+        # Parse task name to extract W&B run ID if encoded
+        # Format: "{task_name}__wandb_{run_id}"
+        task_name, wandb_run_id = parse_task_name_for_wandb(raw_task_name)
+
+        # Create W&B provider if run ID was found in task name
+        wandb_provider: WandbResumeProvider | None = None
+        if wandb_run_id:
+            wandb_provider = WandbResumeProvider(
+                run_id=wandb_run_id,
+                task_name=task_name,
+            )
+            wandb_provider.__enter__()
 
         # Extract API key from platform service if available
         api_key = None
@@ -808,6 +822,9 @@ class Agent:
                 raise
             finally:
                 await self._finalize_tracing(task=task, context=context)
+                # Close W&B provider if it was created
+                if wandb_provider:
+                    wandb_provider.__exit__(None, None, None)
 
         async with self._task_lock:
             if self._current_task and not self._current_task.done():
