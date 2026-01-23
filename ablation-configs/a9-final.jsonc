@@ -1,0 +1,14 @@
+{
+  // A9 - Final / Full System (100% expected)
+  // ALL features ENABLED - represents the complete mobile-use system
+  
+  "use_multi_agent": true,
+  "use_sequential_execution": true,
+  "use_post_validation": true,
+  "use_deterministic_text": true,
+  "use_vision": true,
+  "use_meta_reasoning": true,
+  "use_scratchpad": true,
+  "use_video_recording": true,
+  "use_data_fidelity_prompts": true
+}

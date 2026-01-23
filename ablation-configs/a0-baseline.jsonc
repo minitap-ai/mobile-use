@@ -1,0 +1,15 @@
+{
+  // A0 - Baseline (64% expected)
+  // ALL features DISABLED - represents July 2025 baseline
+  // Single-agent, parallel execution, no vision, no validation, etc.
+  
+  "use_multi_agent": false,
+  "use_sequential_execution": false,
+  "use_post_validation": false,
+  "use_deterministic_text": false,
+  "use_vision": false,
+  "use_meta_reasoning": false,
+  "use_scratchpad": false,
+  "use_video_recording": false,
+  "use_data_fidelity_prompts": false
+}

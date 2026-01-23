@@ -1,0 +1,15 @@
+{
+  // A2 - Sequential Execution with Validation (76% expected)
+  // ENABLED: Multi-agent, Sequential execution, Post-validation
+  // DISABLED: Deterministic text, vision, meta-reasoning, scratchpad, video, data fidelity
+  
+  "use_multi_agent": true,
+  "use_sequential_execution": true,
+  "use_post_validation": true,
+  "use_deterministic_text": false,
+  "use_vision": false,
+  "use_meta_reasoning": false,
+  "use_scratchpad": false,
+  "use_video_recording": false,
+  "use_data_fidelity_prompts": false
+}

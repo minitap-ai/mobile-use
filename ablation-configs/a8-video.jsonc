@@ -1,0 +1,15 @@
+{
+  // A8 - Video Recording (97% expected)
+  // ENABLED: Multi-agent, Sequential, Validation, Deterministic text, Vision, Meta-reasoning, Scratchpad, Video
+  // DISABLED: Data fidelity prompts
+  
+  "use_multi_agent": true,
+  "use_sequential_execution": true,
+  "use_post_validation": true,
+  "use_deterministic_text": true,
+  "use_vision": true,
+  "use_meta_reasoning": true,
+  "use_scratchpad": true,
+  "use_video_recording": true,
+  "use_data_fidelity_prompts": false
+}
