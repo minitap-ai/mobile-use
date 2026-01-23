@@ -30,8 +30,21 @@ class ContextorNode:
         on_failure=lambda _: logger.error("Contextor Agent"),
     )
     async def __call__(self, state: State):
+        # Get ablation config to check if vision is enabled
+        ablation_config = self.ctx.get_ablation_config()
+        use_vision = ablation_config.use_vision
+
         device_controller = create_device_controller(self.ctx)
         device_data = await device_controller.get_screen_data()
+        
+        # Conditionally include screenshot based on ablation config
+        if use_vision:
+            screenshot_base64 = device_data.base64
+        else:
+            # Vision disabled - don't pass screenshot to LLM
+            logger.warning("Vision DISABLED (ablation mode) - screenshot will not be sent to LLM")
+            screenshot_base64 = None
+
         current_app_package = get_current_foreground_package(self.ctx)
         device_date = get_device_date(self.ctx)
         agent_outcome: str | None = None
@@ -69,7 +82,7 @@ class ContextorNode:
             ctx=self.ctx,
             update={
                 "latest_ui_hierarchy": device_data.elements,
-                "latest_screenshot": device_data.base64,
+                "latest_screenshot": screenshot_base64,
                 "focused_app_info": current_app_package,
                 "screen_size": (device_data.width, device_data.height),
                 "device_date": device_date,

@@ -16,7 +16,7 @@ from pydantic import ConfigDict
 from minitap.mobile_use.agents.planner.types import Subgoal
 from minitap.mobile_use.clients.ios_client import IosClientWrapper
 from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
-from minitap.mobile_use.config import AgentNode, LLMConfig
+from minitap.mobile_use.config import AblationConfig, AgentNode, LLMConfig
 
 
 class AppLaunchResult(BaseModel):
@@ -88,6 +88,7 @@ class MobileUseContext(BaseModel):
     on_plan_changes: Callable[[list[Subgoal], IsReplan], Coroutine] | None = None
     minitap_api_key: str | None = None
     video_recording_enabled: bool = False
+    ablation_config: AblationConfig | None = None
 
     def get_adb_client(self) -> AdbClient:
         if self.adb_client is None:
@@ -104,3 +105,41 @@ class MobileUseContext(BaseModel):
         if self.ios_client is None:
             raise ValueError("No iOS client in context.")
         return self.ios_client
+
+    def get_ablation_config(self) -> AblationConfig:
+        """
+        Get the ablation configuration.
+        Returns a default config with all features enabled if not set.
+        """
+        if self.ablation_config is None:
+            from minitap.mobile_use.config import get_default_ablation_config
+            return get_default_ablation_config()
+        return self.ablation_config
+
+    def is_feature_enabled(self, feature: str) -> bool:
+        """
+        Check if a specific ablation feature is enabled.
+        
+        Args:
+            feature: One of 'multi_agent', 'sequential_execution', 'post_validation',
+                    'deterministic_text', 'vision', 'meta_reasoning', 'scratchpad',
+                    'video_recording', 'data_fidelity_prompts'
+        
+        Returns:
+            True if the feature is enabled, False otherwise.
+        """
+        config = self.get_ablation_config()
+        feature_map = {
+            "multi_agent": config.use_multi_agent,
+            "sequential_execution": config.use_sequential_execution,
+            "post_validation": config.use_post_validation,
+            "deterministic_text": config.use_deterministic_text,
+            "vision": config.use_vision,
+            "meta_reasoning": config.use_meta_reasoning,
+            "scratchpad": config.use_scratchpad,
+            "video_recording": config.use_video_recording,
+            "data_fidelity_prompts": config.use_data_fidelity_prompts,
+        }
+        if feature not in feature_map:
+            raise ValueError(f"Unknown ablation feature: {feature}")
+        return feature_map[feature]

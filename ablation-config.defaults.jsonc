@@ -1,0 +1,64 @@
+{
+  // Ablation Configuration for mobile-use
+  // 
+  // This file controls feature toggles for ablation studies.
+  // All features enabled = full system (100% AndroidWorld performance)
+  // Create ablation-config.override.jsonc to disable specific features.
+  //
+  // Ablation branches and their expected performance:
+  //   a0-baseline (64%):  All features disabled (single-agent, parallel, no vision, etc.)
+  //   a1-multi-agent (70%): Only multi-agent enabled
+  //   a2-sequential (76%): + sequential execution with validation
+  //   a3-deterministic (79%): + deterministic text input
+  //   a4-vision (81%): + vision (screenshots)
+  //   a5-reasoning (84%): + meta-reasoning
+  //   a7-scratchpad (95%): + scratchpad (notes)
+  //   a8-video (97%): + video recording
+  //   a9-final (100%): + data fidelity prompts (full system)
+
+  // === Architecture Features ===
+  
+  // Use multi-agent graph (6 agents: Planner, Orchestrator, Contextor, Cortex, Executor, Summarizer)
+  // When false: Uses single monolithic agent
+  "use_multi_agent": true,
+
+  // Execute tools sequentially with abort-on-failure
+  // When false: Tools execute in parallel (LangGraph default behavior)
+  "use_sequential_execution": true,
+
+  // === Input/Output Features ===
+
+  // Validate text input results after execution (post-input verification)
+  // When false: No validation after text input operations
+  "use_post_validation": true,
+
+  // Use deterministic state machine for text input (clear -> focus -> type -> verify)
+  // When false: Simple direct text input without state machine
+  "use_deterministic_text": true,
+
+  // === Vision and Reasoning Features ===
+
+  // Include screenshots in Cortex agent prompts
+  // When false: Text-only mode (July 2025 baseline behavior)
+  "use_vision": true,
+
+  // Enable agent_thoughts injection and meta-reasoning prompts in Cortex
+  // When false: No meta-reasoning, simpler prompts
+  "use_meta_reasoning": true,
+
+  // === Memory and Context Features ===
+
+  // Enable save_note/read_note/list_notes tools for persistent memory
+  // When false: No scratchpad tools available
+  "use_scratchpad": true,
+
+  // Enable video recording for debugging and analysis
+  // When false: No video recording (also controlled by ctx.video_recording_enabled)
+  "use_video_recording": true,
+
+  // === Prompt Features ===
+
+  // Include data fidelity instructions in Cortex prompts (section 5 of cortex.md)
+  // When false: Simpler prompts without data fidelity guardrails
+  "use_data_fidelity_prompts": true
+}

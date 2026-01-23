@@ -411,3 +411,221 @@ class OutputConfig(BaseModel):
 
     def needs_structured_format(self):
         return self.structured_output or self.output_description
+
+
+### Ablation Configuration
+
+DEFAULT_ABLATION_CONFIG_FILENAME = "ablation-config.defaults.jsonc"
+OVERRIDE_ABLATION_CONFIG_FILENAME = "ablation-config.override.jsonc"
+
+
+class AblationConfig(BaseModel):
+    """
+    Configuration for ablation study feature toggles.
+    
+    Each feature can be independently enabled/disabled to measure its contribution
+    to the overall system performance. When all features are enabled, this represents
+    the full mobile-use system (100% AndroidWorld performance).
+    """
+    
+    # Architecture features
+    use_multi_agent: Annotated[
+        bool,
+        Field(
+            default=True,
+            description="Use multi-agent graph (6 agents) vs single monolithic agent",
+        ),
+    ]
+    use_sequential_execution: Annotated[
+        bool,
+        Field(
+            default=True,
+            description="Execute tools sequentially with abort-on-failure vs parallel execution",
+        ),
+    ]
+    
+    # Input/Output features
+    use_post_validation: Annotated[
+        bool,
+        Field(
+            default=True,
+            description="Validate text input results after execution",
+        ),
+    ]
+    use_deterministic_text: Annotated[
+        bool,
+        Field(
+            default=True,
+            description="Use deterministic state machine for text input vs simple input",
+        ),
+    ]
+    
+    # Vision and reasoning features
+    use_vision: Annotated[
+        bool,
+        Field(
+            default=True,
+            description="Include screenshots in Cortex agent prompts",
+        ),
+    ]
+    use_meta_reasoning: Annotated[
+        bool,
+        Field(
+            default=True,
+            description="Enable agent_thoughts injection and meta-reasoning prompts",
+        ),
+    ]
+    
+    # Memory and context features
+    use_scratchpad: Annotated[
+        bool,
+        Field(
+            default=True,
+            description="Enable save_note/read_note/list_notes tools for persistent memory",
+        ),
+    ]
+    use_video_recording: Annotated[
+        bool,
+        Field(
+            default=True,
+            description="Enable video recording for debugging and analysis",
+        ),
+    ]
+    
+    # Prompt features
+    use_data_fidelity_prompts: Annotated[
+        bool,
+        Field(
+            default=True,
+            description="Include data fidelity instructions in Cortex prompts (section 5)",
+        ),
+    ]
+
+    def __str__(self):
+        return f"""
+Ablation Configuration:
+  Multi-agent graph: {self.use_multi_agent}
+  Sequential execution: {self.use_sequential_execution}
+  Post-validation: {self.use_post_validation}
+  Deterministic text input: {self.use_deterministic_text}
+  Vision (screenshots): {self.use_vision}
+  Meta-reasoning: {self.use_meta_reasoning}
+  Scratchpad (notes): {self.use_scratchpad}
+  Video recording: {self.use_video_recording}
+  Data fidelity prompts: {self.use_data_fidelity_prompts}
+"""
+
+    def get_enabled_features(self) -> list[str]:
+        """Return list of enabled feature names."""
+        features = []
+        if self.use_multi_agent:
+            features.append("multi_agent")
+        if self.use_sequential_execution:
+            features.append("sequential_execution")
+        if self.use_post_validation:
+            features.append("post_validation")
+        if self.use_deterministic_text:
+            features.append("deterministic_text")
+        if self.use_vision:
+            features.append("vision")
+        if self.use_meta_reasoning:
+            features.append("meta_reasoning")
+        if self.use_scratchpad:
+            features.append("scratchpad")
+        if self.use_video_recording:
+            features.append("video_recording")
+        if self.use_data_fidelity_prompts:
+            features.append("data_fidelity_prompts")
+        return features
+
+    def get_disabled_features(self) -> list[str]:
+        """Return list of disabled feature names."""
+        features = []
+        if not self.use_multi_agent:
+            features.append("multi_agent")
+        if not self.use_sequential_execution:
+            features.append("sequential_execution")
+        if not self.use_post_validation:
+            features.append("post_validation")
+        if not self.use_deterministic_text:
+            features.append("deterministic_text")
+        if not self.use_vision:
+            features.append("vision")
+        if not self.use_meta_reasoning:
+            features.append("meta_reasoning")
+        if not self.use_scratchpad:
+            features.append("scratchpad")
+        if not self.use_video_recording:
+            features.append("video_recording")
+        if not self.use_data_fidelity_prompts:
+            features.append("data_fidelity_prompts")
+        return features
+
+
+def get_default_ablation_config() -> AblationConfig:
+    """
+    Returns the default ablation config with all features enabled.
+    This represents the full mobile-use system.
+    """
+    return AblationConfig(
+        use_multi_agent=True,
+        use_sequential_execution=True,
+        use_post_validation=True,
+        use_deterministic_text=True,
+        use_vision=True,
+        use_meta_reasoning=True,
+        use_scratchpad=True,
+        use_video_recording=True,
+        use_data_fidelity_prompts=True,
+    )
+
+
+def parse_ablation_config() -> AblationConfig:
+    """
+    Parse ablation config from files, with override support.
+    
+    Loads defaults from ablation-config.defaults.jsonc and merges
+    with ablation-config.override.jsonc if it exists.
+    """
+    default_config = get_default_ablation_config()
+    
+    # Try to load defaults file
+    if os.path.exists(ROOT_DIR / DEFAULT_ABLATION_CONFIG_FILENAME):
+        try:
+            with open(ROOT_DIR / DEFAULT_ABLATION_CONFIG_FILENAME) as f:
+                defaults_dict = load_jsonc(f)
+            default_config = AblationConfig.model_validate(defaults_dict)
+        except (ValidationError, Exception) as e:
+            logger.warning(f"Failed to load ablation defaults: {e}. Using hardcoded defaults.")
+    
+    # Try to load override file
+    if os.path.exists(ROOT_DIR / OVERRIDE_ABLATION_CONFIG_FILENAME):
+        try:
+            with open(ROOT_DIR / OVERRIDE_ABLATION_CONFIG_FILENAME) as f:
+                override_dict = load_jsonc(f)
+            # Merge override into default
+            merged_dict = default_config.model_dump()
+            merged_dict.update(override_dict)
+            return AblationConfig.model_validate(merged_dict)
+        except (ValidationError, Exception) as e:
+            logger.warning(f"Failed to load ablation override: {e}. Using defaults.")
+    
+    return default_config
+
+
+def initialize_ablation_config() -> AblationConfig:
+    """
+    Initialize and return the ablation configuration.
+    Logs the configuration for visibility.
+    """
+    ablation_config = parse_ablation_config()
+    
+    enabled = ablation_config.get_enabled_features()
+    disabled = ablation_config.get_disabled_features()
+    
+    if disabled:
+        logger.warning(f"Ablation mode: {len(disabled)} features DISABLED: {disabled}")
+    else:
+        logger.success("Ablation config: All features enabled (full system)")
+    
+    return ablation_config

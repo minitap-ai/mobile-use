@@ -65,6 +65,13 @@ class State(BaseModel):
         take_last,
     ] = {}
 
+    # monolithic agent (ablation baseline) related keys
+    monolithic_is_complete: Annotated[
+        bool,
+        "Flag indicating the monolithic agent believes the task is complete",
+        take_last,
+    ] = False
+
     async def asanitize_update(
         self,
         ctx: MobileUseContext,

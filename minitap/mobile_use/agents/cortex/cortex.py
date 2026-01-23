@@ -41,6 +41,13 @@ class CortexNode:
         on_failure=lambda _: logger.error("Cortex Agent"),
     )
     async def __call__(self, state: State):
+        # Get ablation configuration
+        ablation_config = self.ctx.get_ablation_config()
+        use_vision = ablation_config.use_vision
+        use_meta_reasoning = ablation_config.use_meta_reasoning
+        use_data_fidelity = ablation_config.use_data_fidelity_prompts
+        use_scratchpad = ablation_config.use_scratchpad
+
         executor_feedback = get_executor_agent_feedback(state)
 
         current_locked_app_package = (
@@ -48,9 +55,23 @@ class CortexNode:
         )
 
         executor_wrappers = list(EXECUTOR_WRAPPERS_TOOLS)
-        if self.ctx.video_recording_enabled:
+        
+        # Remove scratchpad tools if disabled
+        if not use_scratchpad:
+            from minitap.mobile_use.tools.scratchpad import (
+                list_notes_wrapper,
+                read_note_wrapper,
+                save_note_wrapper,
+            )
+            executor_wrappers = [
+                w for w in executor_wrappers
+                if w not in (save_note_wrapper, read_note_wrapper, list_notes_wrapper)
+            ]
+        
+        if self.ctx.video_recording_enabled and ablation_config.use_video_recording:
             executor_wrappers.extend(VIDEO_RECORDING_WRAPPERS)
 
+        # Render system prompt with ablation flags
         system_message = Template(
             Path(__file__).parent.joinpath("cortex.md").read_text(encoding="utf-8")
         ).render(
@@ -61,6 +82,10 @@ class CortexNode:
             executor_feedback=executor_feedback,
             executor_tools_list=format_tools_list(ctx=self.ctx, wrappers=executor_wrappers),
             locked_app_package=current_locked_app_package,
+            # Ablation flags for conditional prompt sections
+            use_vision=use_vision,
+            use_meta_reasoning=use_meta_reasoning,
+            use_data_fidelity=use_data_fidelity,
         )
         messages = [
             SystemMessage(content=system_message),
@@ -74,20 +99,28 @@ class CortexNode:
                 else ""
             ),
         ]
-        for thought in state.agents_thoughts:
-            messages.append(AIMessage(content=thought))
+        
+        # Only include agent thoughts if meta-reasoning is enabled
+        if use_meta_reasoning:
+            for thought in state.agents_thoughts:
+                messages.append(AIMessage(content=thought))
+        else:
+            logger.warning("Meta-reasoning DISABLED (ablation mode) - skipping agent thoughts")
 
         if state.latest_ui_hierarchy:
             ui_hierarchy_dict: list[dict] = state.latest_ui_hierarchy
             ui_hierarchy_str = json.dumps(ui_hierarchy_dict, indent=2, ensure_ascii=False)
             messages.append(HumanMessage(content="Here is the UI hierarchy:\n" + ui_hierarchy_str))
 
-        if state.latest_screenshot:
+        # Only include screenshots if vision is enabled
+        if use_vision and state.latest_screenshot:
             controller = create_device_controller(self.ctx)
             compressed_image_base64 = controller.get_compressed_b64_screenshot(
                 state.latest_screenshot
             )
             messages.append(get_screenshot_message_for_llm(compressed_image_base64))
+        elif not use_vision:
+            logger.warning("Vision DISABLED (ablation mode) - TEXT-ONLY mode")
 
         llm = get_llm(ctx=self.ctx, name="cortex", temperature=1).with_structured_output(
             CortexOutput

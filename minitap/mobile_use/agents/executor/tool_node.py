@@ -19,11 +19,21 @@ class ExecutorToolNode(ToolNode):
     """
     ToolNode that runs tool calls one after the other - not simultaneously.
     If one error occurs, the remaining tool calls are aborted!
+    
+    When sequential_execution=False (ablation mode), tools run in parallel
+    without abort-on-failure behavior.
     """
 
-    def __init__(self, tools, messages_key: str, trace_id: str | None = None):
+    def __init__(
+        self,
+        tools,
+        messages_key: str,
+        trace_id: str | None = None,
+        sequential_execution: bool = True,
+    ):
         super().__init__(tools=tools, messages_key=messages_key)
         self._trace_id = trace_id
+        self._sequential_execution = sequential_execution
 
     @override
     async def _afunc(
@@ -57,8 +67,26 @@ class ExecutorToolNode(ToolNode):
         store: BaseStore | None,
     ) -> Any:
         tool_calls, input_type = self._parse_input(input, store)
+        
+        if self._sequential_execution:
+            return await self._run_sequential(is_async, tool_calls, input_type, config)
+        else:
+            return await self._run_parallel(is_async, tool_calls, input_type, config)
+
+    async def _run_sequential(
+        self,
+        is_async: bool,
+        tool_calls: list[ToolCall],
+        input_type: Any,
+        config: RunnableConfig,
+    ) -> Any:
+        """
+        Sequential execution with abort-on-failure (production mode).
+        If one tool fails, remaining tools are aborted.
+        """
         outputs: list[Command | ToolMessage] = []
         failed = False
+        
         for call in tool_calls:
             if failed:
                 output = self._get_erroneous_command(
@@ -78,44 +106,116 @@ class ExecutorToolNode(ToolNode):
                     )
                     failed = True
 
-            call_without_state = copy.deepcopy(call)
-            if "args" in call_without_state and "state" in call_without_state["args"]:
-                del call_without_state["args"]["state"]
-            if failed:
-                error_msg = ""
-                try:
-                    if isinstance(output, ToolMessage):
-                        error_msg = output.content
-                    elif isinstance(output, Command):
-                        tool_msg = self._get_tool_message(output)
-                        error_msg = tool_msg.content
-                except Exception:
-                    error_msg = "Could not extract error details"
-
-                logger.info(f"❌ Tool call failed: {call_without_state}")
-                logger.info(f"   Error: {error_msg}")
-
-                # Capture executor action telemetry
-                if self._trace_id:
-                    telemetry.capture_executor_action(
-                        task_id=self._trace_id,
-                        tool_name=call["name"],
-                        success=False,
-                        error=str(error_msg)[:500] if error_msg else None,
-                    )
-            else:
-                logger.info("✅ Tool call succeeded: " + str(call_without_state))
-
-                # Capture executor action telemetry
-                if self._trace_id:
-                    telemetry.capture_executor_action(
-                        task_id=self._trace_id,
-                        tool_name=call["name"],
-                        success=True,
-                    )
-
+            self._log_tool_result(call, output, failed)
             outputs.append(output)
+        
         return self._combine_tool_outputs(outputs, input_type)  # type: ignore
+
+    async def _run_parallel(
+        self,
+        is_async: bool,
+        tool_calls: list[ToolCall],
+        input_type: Any,
+        config: RunnableConfig,
+    ) -> Any:
+        """
+        Parallel execution without abort-on-failure (ablation baseline mode).
+        All tools run regardless of failures.
+        """
+        logger.warning("Running tools in PARALLEL mode (ablation baseline)")
+        outputs: list[Command | ToolMessage] = []
+        
+        if is_async:
+            # Run all tools concurrently
+            tasks = [self._arun_one(call, input_type, config) for call in tool_calls]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            for call, result in zip(tool_calls, results):
+                if isinstance(result, Exception):
+                    output = self._get_erroneous_command(
+                        call=call,
+                        message=f"Exception during parallel execution: {str(result)}",
+                    )
+                    failed = True
+                else:
+                    output = result
+                    failed = self._has_tool_call_failed(call, output)
+                    if failed is None:
+                        output = self._get_erroneous_command(
+                            call=call,
+                            message=f"Unexpected tool output type: {type(output)}",
+                        )
+                        failed = True
+                
+                self._log_tool_result(call, output, failed)
+                outputs.append(output)
+        else:
+            # Sync fallback - still run sequentially but don't abort
+            for call in tool_calls:
+                try:
+                    output = self._run_one(call, input_type, config)
+                    failed = self._has_tool_call_failed(call, output)
+                    if failed is None:
+                        output = self._get_erroneous_command(
+                            call=call,
+                            message=f"Unexpected tool output type: {type(output)}",
+                        )
+                        failed = True
+                except Exception as e:
+                    output = self._get_erroneous_command(
+                        call=call,
+                        message=f"Exception: {str(e)}",
+                    )
+                    failed = True
+                
+                self._log_tool_result(call, output, failed)
+                outputs.append(output)
+        
+        return self._combine_tool_outputs(outputs, input_type)  # type: ignore
+
+    def _log_tool_result(
+        self,
+        call: ToolCall,
+        output: ToolMessage | Command,
+        failed: bool,
+    ) -> None:
+        """Log tool execution result and capture telemetry."""
+        call_without_state = copy.deepcopy(call)
+        if "args" in call_without_state and "state" in call_without_state["args"]:
+            del call_without_state["args"]["state"]
+        
+        if failed:
+            error_msg = ""
+            try:
+                if isinstance(output, ToolMessage):
+                    error_msg = output.content
+                elif isinstance(output, Command):
+                    tool_msg = self._get_tool_message(output)
+                    error_msg = tool_msg.content
+            except Exception:
+                error_msg = "Could not extract error details"
+
+            logger.info(f"❌ Tool call failed: {call_without_state}")
+            logger.info(f"   Error: {error_msg}")
+
+            # Capture executor action telemetry
+            if self._trace_id:
+                telemetry.capture_executor_action(
+                    task_id=self._trace_id,
+                    tool_name=call["name"],
+                    success=False,
+                    error=str(error_msg)[:500] if error_msg else None,
+                )
+        else:
+            logger.info("✅ Tool call succeeded: " + str(call_without_state))
+
+            # Capture executor action telemetry
+            if self._trace_id:
+                telemetry.capture_executor_action(
+                    task_id=self._trace_id,
+                    tool_name=call["name"],
+                    success=True,
+                )
 
     def _has_tool_call_failed(
         self,
