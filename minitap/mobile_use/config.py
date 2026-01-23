@@ -621,8 +621,6 @@ def initialize_ablation_config() -> AblationConfig:
     Logs the configuration for visibility.
     """
     ablation_config = parse_ablation_config()
-    
-    enabled = ablation_config.get_enabled_features()
     disabled = ablation_config.get_disabled_features()
     
     if disabled:

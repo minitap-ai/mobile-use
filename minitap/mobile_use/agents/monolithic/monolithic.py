@@ -3,7 +3,7 @@ Monolithic Agent for Ablation Baseline.
 
 This single-agent implementation combines all functionality into one agent,
 representing the baseline configuration (a0-baseline) for ablation studies.
-It lacks the sophisticated multi-agent reasoning, meta-cognition, and 
+It lacks the sophisticated multi-agent reasoning, meta-cognition, and
 specialized roles of the full system.
 """
 
@@ -11,22 +11,27 @@ import json
 from pathlib import Path
 
 from jinja2 import Template
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import (
     AIMessage,
     HumanMessage,
-    RemoveMessage,
     SystemMessage,
     ToolMessage,
 )
+from langchain_core.tools import tool
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_google_vertexai.chat_models import ChatVertexAI
-from langgraph.graph.message import REMOVE_ALL_MESSAGES
+from langchain_openai import ChatOpenAI
 
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.controller_factory import create_device_controller
 from minitap.mobile_use.graph.state import State
-from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message, with_fallback
+from minitap.mobile_use.services.llm import (
+    get_llm,
+    invoke_llm_with_timeout_message,
+    with_fallback,
+)
 from minitap.mobile_use.tools.index import (
     EXECUTOR_WRAPPERS_TOOLS,
     VIDEO_RECORDING_WRAPPERS,
@@ -38,6 +43,22 @@ from minitap.mobile_use.utils.decorators import wrap_with_callbacks
 from minitap.mobile_use.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+TASK_COMPLETE_TOOL_NAME = "task_complete"
+
+
+@tool
+def task_complete(summary: str) -> str:
+    """
+    Call this tool when the task/goal has been successfully completed.
+
+    Args:
+        summary: A brief summary of what was accomplished.
+
+    Returns:
+        Confirmation that the task is marked complete.
+    """
+    return f"Task marked as complete. Summary: {summary}"
 
 
 class MonolithicNode:
@@ -101,9 +122,24 @@ class MonolithicNode:
             ),
         ]
 
-        # Add previous conversation context (limited)
-        for msg in state.executor_messages[-10:]:  # Keep last 10 messages
-            messages.append(msg)
+        # Include properly paired AI+Tool messages to maintain conversation context
+        # Only include AI messages that have tool_calls, followed by their ToolMessages
+        recent_messages = state.executor_messages[-10:]
+        i = 0
+        while i < len(recent_messages):
+            msg = recent_messages[i]
+            if isinstance(msg, AIMessage):
+                tool_calls = getattr(msg, "tool_calls", None)
+                if tool_calls and len(tool_calls) > 0:
+                    # This AI message has tool calls, include it
+                    messages.append(msg)
+                    # Include all following ToolMessages that match
+                    i += 1
+                    while i < len(recent_messages) and isinstance(recent_messages[i], ToolMessage):
+                        messages.append(recent_messages[i])
+                        i += 1
+                    continue
+            i += 1
 
         # Add screenshot if vision is enabled
         if state.latest_screenshot and ablation_config.use_vision:
@@ -117,37 +153,51 @@ class MonolithicNode:
         llm = get_llm(ctx=self.ctx, name="cortex")  # Use cortex LLM config
         llm_fallback = get_llm(ctx=self.ctx, name="cortex", use_fallback=True)
 
-        llm_bind_tools_kwargs: dict = {
-            "tools": get_tools_from_wrappers(self.ctx, executor_wrappers),
-        }
+        # Get executor tools + add task_complete tool
+        tools = get_tools_from_wrappers(self.ctx, executor_wrappers)
+        tools.append(task_complete)  # Add completion signal tool
 
-        # ChatGoogleGenerativeAI does not support "parallel_tool_calls"
-        if not isinstance(llm, ChatGoogleGenerativeAI | ChatVertexAI):
-            # In baseline, we allow parallel tool calls (less reliable)
-            llm_bind_tools_kwargs["parallel_tool_calls"] = True
+        # Helper to check if model supports parallel_tool_calls
+        def supports_parallel_tool_calls(model: BaseChatModel) -> bool:
+            # Google models don't support it
+            if isinstance(model, ChatGoogleGenerativeAI | ChatVertexAI):
+                return False
+            # OpenAI reasoning models (o1, o3, o4-mini, etc.) don't support it
+            if isinstance(model, ChatOpenAI):
+                model_name = getattr(model, "model_name", "") or ""
+                if any(x in model_name.lower() for x in ["o1", "o3", "o4"]):
+                    return False
+            return True
 
-        llm = llm.bind_tools(**llm_bind_tools_kwargs)
-        llm_fallback = llm_fallback.bind_tools(**llm_bind_tools_kwargs)
+        # Bind tools to main LLM
+        llm_bind_kwargs: dict = {"tools": tools}
+        if supports_parallel_tool_calls(llm):
+            llm_bind_kwargs["parallel_tool_calls"] = True
+        llm = llm.bind_tools(**llm_bind_kwargs)
+
+        # Bind tools to fallback LLM (may have different capabilities)
+        fallback_bind_kwargs: dict = {"tools": tools}
+        if supports_parallel_tool_calls(llm_fallback):
+            fallback_bind_kwargs["parallel_tool_calls"] = True
+        llm_fallback = llm_fallback.bind_tools(**fallback_bind_kwargs)
 
         response = await with_fallback(
             main_call=lambda: invoke_llm_with_timeout_message(llm.ainvoke(messages)),
             fallback_call=lambda: invoke_llm_with_timeout_message(llm_fallback.ainvoke(messages)),
         )
 
-        # Check if task is complete (agent says so without tool calls)
+        # Check if task is complete (agent called task_complete tool)
         is_complete = False
         if isinstance(response, AIMessage):
             tool_calls = getattr(response, "tool_calls", None)
-            if not tool_calls and response.content:
-                # Agent responded with text but no tools - might be done
-                content_lower = str(response.content).lower()
-                if any(phrase in content_lower for phrase in [
-                    "task is complete",
-                    "goal has been achieved",
-                    "successfully completed",
-                    "task has been completed",
-                ]):
-                    is_complete = True
+            if tool_calls:
+                # Check if task_complete was called
+                for tc in tool_calls:
+                    if tc.get("name") == TASK_COMPLETE_TOOL_NAME:
+                        is_complete = True
+                        summary = tc.get("args", {}).get("summary", "No summary")
+                        logger.info(f"[monolithic] Task marked complete: {summary}")
+                        break
 
         return await state.asanitize_update(
             ctx=self.ctx,
@@ -219,7 +269,9 @@ class MonolithicContextorNode:
             if ablation_config.use_vision:
                 screenshot = device_data.base64
             else:
-                logger.warning("Vision DISABLED (ablation mode) - screenshot will not be sent to LLM")
+                logger.warning(
+                    "Vision DISABLED (ablation mode) - screenshot not sent to LLM"
+                )
         except Exception as e:
             logger.warning(f"Failed to get screen data: {e}")
 

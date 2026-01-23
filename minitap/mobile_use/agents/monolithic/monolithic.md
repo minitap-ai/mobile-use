@@ -38,13 +38,17 @@ Analyze the current screen state and execute the appropriate tool calls to make 
 ### Clearing Text
 - Use `focus_and_clear_text` to clear input fields
 
+### Task Completion
+- **IMPORTANT**: When the goal has been achieved, you MUST call `task_complete` with a summary
+- Do NOT just respond with text - always call `task_complete` to signal you are done
+
 ---
 
 ## Output Format
 
 Think step-by-step about what action to take, then call the appropriate tool(s).
 
-If you believe the goal has been achieved, respond with a message explaining that the task is complete.
+**When the goal is achieved**: Call `task_complete(summary="brief description of what was accomplished")`
 
 ---
 
