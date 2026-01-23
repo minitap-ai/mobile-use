@@ -1,0 +1,15 @@
+{
+  // A1 - Multi-Agent (70% expected)
+  // ENABLED: Multi-agent graph
+  // DISABLED: Everything else
+  
+  "use_multi_agent": true,
+  "use_sequential_execution": false,
+  "use_post_validation": false,
+  "use_deterministic_text": false,
+  "use_vision": false,
+  "use_meta_reasoning": false,
+  "use_scratchpad": false,
+  "use_video_recording": false,
+  "use_data_fidelity_prompts": false
+}
