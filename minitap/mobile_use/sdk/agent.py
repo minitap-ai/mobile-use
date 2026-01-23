@@ -23,7 +23,13 @@ from minitap.mobile_use.clients.idb_client import IdbClientWrapper
 from minitap.mobile_use.clients.ios_client import DeviceType, IosClientWrapper, get_ios_client
 from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
 from minitap.mobile_use.clients.wda_client import WdaClientWrapper
-from minitap.mobile_use.config import AgentNode, OutputConfig, record_events, settings
+from minitap.mobile_use.config import (
+    AgentNode,
+    OutputConfig,
+    initialize_ablation_config,
+    record_events,
+    settings,
+)
 from minitap.mobile_use.context import (
     DeviceContext,
     DevicePlatform,
@@ -679,6 +685,9 @@ class Agent:
         if platform_service:
             api_key = platform_service._api_key
 
+        # Initialize ablation config (reads from override file if present)
+        ablation_config = initialize_ablation_config()
+
         context = MobileUseContext(
             trace_id=task.id,
             device=self._device_context,
@@ -693,6 +702,7 @@ class Agent:
                 self._config.video_recording_enabled
                 and agent_profile.llm_config.utils.video_analyzer is not None
             ),
+            ablation_config=ablation_config,
         )
 
         self._prepare_tracing(task=task, context=context)

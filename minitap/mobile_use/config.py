@@ -101,6 +101,8 @@ AgentNode = Literal[
     "contextor",
     "cortex",
     "executor",
+    "monolithic",
+    "monolithic_contextor",
 ]
 AgentNodeWithFallback = AgentNode
 

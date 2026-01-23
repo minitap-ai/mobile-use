@@ -201,30 +201,30 @@ class MonolithicContextorNode:
     )
     async def __call__(self, state: State):
         """Capture current screen state."""
-        controller = create_device_controller(self.ctx)
-        
-        # Get UI hierarchy
-        ui_hierarchy = None
-        try:
-            ui_hierarchy = await controller.aget_ui_hierarchy()
-        except Exception as e:
-            logger.warning(f"Failed to get UI hierarchy: {e}")
+        from minitap.mobile_use.controllers.platform_specific_commands_controller import (
+            get_device_date,
+        )
 
-        # Get screenshot if vision enabled
-        screenshot = None
+        controller = create_device_controller(self.ctx)
         ablation_config = self.ctx.get_ablation_config()
-        if ablation_config.use_vision:
-            try:
-                screenshot = await controller.aget_screenshot()
-            except Exception as e:
-                logger.warning(f"Failed to get screenshot: {e}")
+
+        # Get screen data (UI hierarchy + screenshot)
+        ui_hierarchy = None
+        screenshot = None
+        try:
+            device_data = await controller.get_screen_data()
+            ui_hierarchy = device_data.elements
+            
+            # Only include screenshot if vision is enabled
+            if ablation_config.use_vision:
+                screenshot = device_data.base64
+            else:
+                logger.warning("Vision DISABLED (ablation mode) - screenshot will not be sent to LLM")
+        except Exception as e:
+            logger.warning(f"Failed to get screen data: {e}")
 
         # Get device date
-        device_date = None
-        try:
-            device_date = await controller.aget_device_date()
-        except Exception:
-            pass
+        device_date = get_device_date(self.ctx)
 
         return await state.asanitize_update(
             ctx=self.ctx,
