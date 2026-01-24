@@ -100,6 +100,9 @@ class PlatformService:
                     thoughts_output_path=request.thoughts_output_path,
                     task_name=task.name,
                     locked_app_package=locked_app_package,
+                    # W&B observability
+                    wandb_run_id=request.wandb_run_id,
+                    step_index=request.step_index,
                 )
 
                 if task.options.enable_video_tools and not enable_video_tools:
@@ -141,6 +144,9 @@ class PlatformService:
                     thoughts_output_path=request.thoughts_output_path,
                     task_name=request.task.task_name,
                     locked_app_package=locked_app_package,
+                    # W&B observability
+                    wandb_run_id=request.wandb_run_id,
+                    step_index=request.step_index,
                 )
 
                 task_run = await self._create_manual_task_run(

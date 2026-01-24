@@ -71,6 +71,8 @@ class TaskRequestBase(BaseModel):
     trace_path: Path = Path("mobile-use-traces")
     llm_output_path: Path | None = None
     thoughts_output_path: Path | None = None
+    wandb_run_id: str | None = None
+    step_index: int = 0
 
 
 class TaskRequestCommon(TaskRequestBase):
@@ -108,8 +110,6 @@ class TaskRequest[TOutput](TaskRequestCommon):
     output_description: str | None = None
     output_format: type[TOutput] | None = None
     enable_remote_tracing: bool = False
-    wandb_run_id: str | None = None
-    step_index: int = 0
 
 
 class ManualTaskConfig(BaseModel):
