@@ -23,7 +23,7 @@ from minitap.mobile_use.clients.idb_client import IdbClientWrapper
 from minitap.mobile_use.clients.ios_client import DeviceType, IosClientWrapper, get_ios_client
 from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
 from minitap.mobile_use.clients.wda_client import WdaClientWrapper
-from minitap.mobile_use.config import AgentNode, OutputConfig, record_events, settings
+from minitap.mobile_use.config import AgentNode, LLMConfig, OutputConfig, record_events, settings
 from minitap.mobile_use.context import (
     DeviceContext,
     DevicePlatform,
@@ -77,6 +77,49 @@ logger = get_logger(__name__)
 TOutput = TypeVar("TOutput", bound=BaseModel | None)
 
 load_dotenv()
+
+
+def _llm_config_to_dict(llm_config: LLMConfig) -> dict[str, Any]:
+    """Convert LLMConfig to a dict format for W&B config update.
+    
+    Args:
+        llm_config: The LLMConfig object from mobile-use
+        
+    Returns:
+        Dictionary with agent -> {provider, model, fallback} structure
+    """
+    result = {}
+    
+    # Core agents
+    for agent_name in ["planner", "orchestrator", "contextor", "cortex", "executor"]:
+        agent_config = getattr(llm_config, agent_name, None)
+        if agent_config:
+            result[agent_name] = {
+                "provider": agent_config.provider,
+                "model": agent_config.model,
+            }
+            if hasattr(agent_config, "fallback") and agent_config.fallback:
+                result[agent_name]["fallback"] = {
+                    "provider": agent_config.fallback.provider,
+                    "model": agent_config.fallback.model,
+                }
+    
+    # Utils agents
+    if llm_config.utils:
+        for util_name in ["outputter", "hopper", "video_analyzer"]:
+            util_config = getattr(llm_config.utils, util_name, None)
+            if util_config:
+                result[util_name] = {
+                    "provider": util_config.provider,
+                    "model": util_config.model,
+                }
+                if hasattr(util_config, "fallback") and util_config.fallback:
+                    result[util_name]["fallback"] = {
+                        "provider": util_config.fallback.provider,
+                        "model": util_config.fallback.model,
+                    }
+    
+    return result
 
 
 class Agent:
@@ -675,6 +718,10 @@ class Agent:
                 task_id=task_id,
                 task_name=request.task_name or request.goal[:50],
                 step=request.step_index,
+            )
+            # Update W&B config with actual LLM configuration from mobile-use
+            wandb_provider.update_llm_config(
+                _llm_config_to_dict(agent_profile.llm_config)
             )
 
         context = MobileUseContext(

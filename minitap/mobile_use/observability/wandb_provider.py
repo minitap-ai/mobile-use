@@ -138,6 +138,66 @@ class WandbProvider(WandbBaseManager):
         """Async context manager exit."""
         return self.__exit__(exc_type, exc_val, exc_tb)
 
+    def update_config(self, config: dict[str, Any]) -> None:
+        """Update the W&B run config with runtime information from mobile-use.
+        
+        This allows mobile-use to add its actual LLM config, agent settings,
+        and other runtime metadata to the W&B run created by android-world-runner.
+        
+        Args:
+            config: Dictionary of config values to add/update
+                    e.g., {"llm_executor_model": "gemini-2.0-flash", ...}
+        """
+        if not self.enabled or not self.run:
+            return
+        
+        try:
+            self.run.config.update(config)
+            print(f"[W&B] Updated run config with {len(config)} keys")
+        except Exception as e:
+            print(f"[W&B] Failed to update config: {e}")
+
+    def update_llm_config(self, llm_config: dict[str, Any]) -> None:
+        """Update W&B config with LLM configuration from mobile-use.
+        
+        Flattens the LLM config for easy filtering in W&B UI.
+        
+        Args:
+            llm_config: LLM configuration dict, e.g.:
+                {
+                    "planner": {"provider": "google", "model": "gemini-2.0-flash"},
+                    "cortex": {"provider": "google", "model": "gemini-2.0-flash"},
+                    ...
+                }
+        """
+        if not self.enabled or not self.run or not llm_config:
+            return
+        
+        flat_config = {}
+        models_used = set()
+        
+        for agent, config in llm_config.items():
+            if isinstance(config, dict):
+                provider = config.get("provider", "unknown")
+                model = config.get("model", "unknown")
+                
+                flat_config[f"llm_{agent}_provider"] = provider
+                flat_config[f"llm_{agent}_model"] = model
+                models_used.add(model)
+                
+                # Handle fallback config
+                if "fallback" in config:
+                    fallback = config["fallback"]
+                    flat_config[f"llm_{agent}_fallback_provider"] = fallback.get("provider")
+                    flat_config[f"llm_{agent}_fallback_model"] = fallback.get("model")
+                    if fallback.get("model"):
+                        models_used.add(fallback["model"])
+        
+        flat_config["model_diversity_count"] = len(models_used)
+        flat_config["models_used"] = list(models_used)
+        
+        self.update_config(flat_config)
+
     def set_step(self, step: int) -> None:
         """Set the current task/step index.
 
