@@ -45,6 +45,10 @@ class OrchestratorNode:
                     else f"Starting the next subgoal: {new_subgoal}"
                 )
             ]
+            # Log agent step
+            if self.ctx.observability and hasattr(self.ctx.observability, "log_agent_step"):
+                action = "start_first_subgoal" if no_subgoal_started else "start_next_subgoal"
+                self.ctx.observability.log_agent_step(agent="orchestrator", action=action)
             return await _get_state_update(
                 ctx=self.ctx, state=state, thoughts=thoughts, update_plan=True
             )
@@ -92,6 +96,13 @@ class OrchestratorNode:
             thoughts = [response.reason]
             state.subgoal_plan = fail_current_subgoal(state.subgoal_plan)
             thoughts.append("==== END OF PLAN, REPLANNING ====")
+            # Log agent step - this is a REPLAN event
+            if self.ctx.observability and hasattr(self.ctx.observability, "log_agent_step"):
+                self.ctx.observability.log_agent_step(
+                    agent="orchestrator",
+                    action="needs_replan",
+                    is_replan=True,
+                )
             return await _get_state_update(
                 ctx=self.ctx, state=state, thoughts=thoughts, update_plan=True
             )
@@ -103,19 +114,37 @@ class OrchestratorNode:
         thoughts = [response.reason]
         if all_completed(state.subgoal_plan):
             logger.success("All the subgoals have been completed successfully.")
+            # Log agent step - task complete
+            if self.ctx.observability and hasattr(self.ctx.observability, "log_agent_step"):
+                self.ctx.observability.log_agent_step(
+                    agent="orchestrator",
+                    action="task_complete",
+                )
             return await _get_state_update(
                 ctx=self.ctx, state=state, thoughts=thoughts, update_plan=True
             )
 
         if current_subgoal.id not in response.completed_subgoal_ids:
             # The current subgoal is not yet complete.
+            if self.ctx.observability and hasattr(self.ctx.observability, "log_agent_step"):
+                self.ctx.observability.log_agent_step(
+                    agent="orchestrator",
+                    action="subgoal_in_progress",
+                )
             return await _get_state_update(
                 ctx=self.ctx, state=state, thoughts=thoughts, update_plan=True
             )
 
+        # Subgoal completed, moving to next
         state.subgoal_plan = start_next_subgoal(state.subgoal_plan)
         new_subgoal = get_current_subgoal(state.subgoal_plan)
         thoughts.append(f"==== NEXT SUBGOAL: {new_subgoal} ====")
+        # Log agent step - subgoal complete, starting next
+        if self.ctx.observability and hasattr(self.ctx.observability, "log_agent_step"):
+            self.ctx.observability.log_agent_step(
+                agent="orchestrator",
+                action="subgoal_complete_next",
+            )
         return await _get_state_update(
             ctx=self.ctx, state=state, thoughts=thoughts, update_plan=True
         )

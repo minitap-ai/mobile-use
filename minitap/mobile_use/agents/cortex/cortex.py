@@ -127,6 +127,13 @@ class CortexNode:
             completed_subgoals_count=len(response.complete_subgoals_by_ids or []),
         )
 
+        # Log agent step for detailed W&B tracking
+        if self.ctx.observability and hasattr(self.ctx.observability, "log_agent_step"):
+            self.ctx.observability.log_agent_step(
+                agent="cortex",
+                action="verify_state",
+            )
+
         return await state.asanitize_update(
             ctx=self.ctx,
             update={

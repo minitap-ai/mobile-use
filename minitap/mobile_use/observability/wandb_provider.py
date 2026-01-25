@@ -1,7 +1,7 @@
 """W&B observability provider for mobile-use agent."""
 
 import time
-from typing import Self
+from typing import Any, Self
 
 from minitap.mobile_use.observability.base import WandbBaseManager
 
@@ -43,6 +43,11 @@ class WandbProvider(WandbBaseManager):
         self._max_resume_retries = max_resume_retries
         self._task_start_time: float | None = None
         self._current_step: int = 0
+
+        # Agent step tracking (detailed steps within each task)
+        self._step_buffer: list[dict[str, Any]] = []
+        self._agent_step_counter: int = 0
+        self._replan_counter: int = 0
 
     def __enter__(self) -> Self:
         """Synchronous context manager entry - resume the W&B run."""
@@ -146,7 +151,7 @@ class WandbProvider(WandbBaseManager):
 
         Args:
             task_id: Unique task identifier
-            task_name: Human-readable task name
+            task_name: Human-readable task name (AndroidWorld task name)
             step: Task index in the benchmark
         """
         self._current_step = step
@@ -154,8 +159,16 @@ class WandbProvider(WandbBaseManager):
         self._task_id = task_id
         self._task_name = task_name
 
+        # Reset step tracking for this task
+        self._step_buffer = []
+        self._agent_step_counter = 0
+        self._replan_counter = 0
+
     def end_task(self, steps_taken: int | None = None) -> None:
         """Mark the end of a task and flush metrics.
+
+        Creates a W&B Table artifact with detailed agent steps for this task,
+        then flushes aggregated metrics.
 
         Args:
             steps_taken: Number of steps/actions the agent took to complete the task
@@ -170,11 +183,91 @@ class WandbProvider(WandbBaseManager):
         if hasattr(self, "_task_name"):
             self._metrics_buffer["task/name"] = self._task_name
 
-        # Add steps taken
+        # Add agent step counts (KEY METRICS)
+        self._metrics_buffer["agent_steps"] = self._agent_step_counter
+        self._metrics_buffer["replans"] = self._replan_counter
+
+        # Add steps taken (from graph, for backward compat)
         if steps_taken is not None:
             self._metrics_buffer["task/steps_taken"] = steps_taken
 
+        # Create detailed step table artifact for this task
+        self._create_step_table_artifact()
+
         self.flush(self._current_step)
+
+    def log_agent_step(
+        self,
+        agent: str,
+        action: str,
+        tool: str | None = None,
+        tokens: int = 0,
+        duration_ms: float = 0,
+        is_replan: bool = False,
+    ) -> None:
+        """Log a single agent step within a task.
+
+        This creates fine-grained visibility into what happened during task execution.
+        Steps are buffered and written as a W&B Table artifact when end_task() is called.
+
+        Args:
+            agent: Agent name (planner, cortex, executor, orchestrator)
+            action: Action type (plan_created, verify_state, tool_call, replan, etc.)
+            tool: Tool name if action is "tool_call"
+            tokens: Tokens used in this step
+            duration_ms: Duration of this step in milliseconds
+            is_replan: True if this is a replanning event
+        """
+        if not self.enabled:
+            return
+
+        self._agent_step_counter += 1
+        if is_replan:
+            self._replan_counter += 1
+
+        self._step_buffer.append({
+            "step": self._agent_step_counter,
+            "agent": agent,
+            "action": action,
+            "tool": tool,
+            "tokens": tokens,
+            "duration_ms": round(duration_ms, 1),
+            "is_replan": is_replan,
+            "timestamp": time.time(),
+        })
+
+    def _create_step_table_artifact(self) -> None:
+        """Create a W&B Table artifact with detailed steps for this task.
+
+        The artifact is named "task_steps/{idx}_{task_name}" for easy identification.
+        """
+        if not self.enabled or not self.run or not self._step_buffer:
+            return
+
+        try:
+            import wandb
+
+            # Define columns
+            columns = ["step", "agent", "action", "tool", "tokens", "duration_ms", "is_replan"]
+            data = [[row.get(col) for col in columns] for row in self._step_buffer]
+
+            table = wandb.Table(columns=columns, data=data)
+
+            # Create artifact name with task index and name
+            task_name = getattr(self, "_task_name", "unknown")
+            task_idx = self._current_step
+            artifact_key = f"task_steps/{task_idx:03d}_{task_name}"
+
+            # Log the table
+            self.run.log({artifact_key: table})
+
+            print(
+                f"[W&B] Logged {len(self._step_buffer)} agent steps for task "
+                f"{task_idx}: {task_name} ({self._replan_counter} replans)"
+            )
+
+        except Exception as e:
+            print(f"[W&B] Failed to create step table: {e}")
 
     # === ObservabilityProvider Protocol Implementation ===
 

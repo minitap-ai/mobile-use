@@ -78,6 +78,25 @@ class ExecutorNode:
             main_call=lambda: invoke_llm_with_timeout_message(llm.ainvoke(messages)),
             fallback_call=lambda: invoke_llm_with_timeout_message(llm_fallback.ainvoke(messages)),
         )
+
+        # Log agent steps for each tool call in the response
+        if self.ctx.observability and hasattr(self.ctx.observability, "log_agent_step"):
+            tool_calls = getattr(response, "tool_calls", [])
+            if tool_calls:
+                for tool_call in tool_calls:
+                    tool_name = tool_call.get("name", "unknown") if isinstance(tool_call, dict) else getattr(tool_call, "name", "unknown")
+                    self.ctx.observability.log_agent_step(
+                        agent="executor",
+                        action="tool_call",
+                        tool=tool_name,
+                    )
+            else:
+                # No tool calls, but executor still ran
+                self.ctx.observability.log_agent_step(
+                    agent="executor",
+                    action="no_tool_call",
+                )
+
         return await state.asanitize_update(
             ctx=self.ctx,
             update={

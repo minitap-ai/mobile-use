@@ -93,6 +93,15 @@ class PlannerNode:
         logger.info("📜 Generated plan:")
         logger.info("\n".join(str(s) for s in subgoals_plan))
 
+        # Log agent step for detailed W&B tracking
+        if self.ctx.observability and hasattr(self.ctx.observability, "log_agent_step"):
+            action = "replan" if needs_replan else "plan_created"
+            self.ctx.observability.log_agent_step(
+                agent="planner",
+                action=action,
+                is_replan=needs_replan,
+            )
+
         if self.ctx.on_plan_changes:
             await self.ctx.on_plan_changes(subgoals_plan, needs_replan)
 
