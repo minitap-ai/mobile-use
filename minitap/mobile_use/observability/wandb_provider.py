@@ -301,6 +301,7 @@ class WandbProvider(WandbBaseManager):
         self._increment("totals/llm_invocations")
 
         # Log immediately for real-time visibility in W&B
+        # Use current task step as x-axis so all metrics for a task align
         self._safe_log(
             {
                 f"agents/{agent}/input_tokens": input_tokens,
@@ -308,7 +309,8 @@ class WandbProvider(WandbBaseManager):
                 f"agents/{agent}/total_tokens": total_tokens,
                 f"agents/{agent}/duration_ms": duration_ms,
                 "model": model,
-            }
+            },
+            step=self._current_step,
         )
 
     def log_tool_call(
@@ -339,13 +341,15 @@ class WandbProvider(WandbBaseManager):
             self._increment("totals/tool_failures")
 
         # Log immediately for real-time visibility
+        # Use current task step as x-axis so all metrics for a task align
         self._safe_log(
             {
                 f"tools/{tool_key}/call": 1,
                 f"tools/{tool_key}/success": 1 if success else 0,
                 f"tools/{tool_key}/duration_ms": duration_ms,
                 "tool_name": tool,
-            }
+            },
+            step=self._current_step,
         )
 
     def log_agent_thought(self, agent: str, thought: str) -> None:
@@ -378,12 +382,13 @@ class WandbProvider(WandbBaseManager):
         self._increment("totals/errors")
 
         # Log error details immediately (not buffered)
+        # Use current task step as x-axis
         self._safe_log(
             {
-                "step": self._current_step,
                 "error_source": source,
                 "error_message": error[:500],  # Truncate long errors
-            }
+            },
+            step=self._current_step,
         )
 
     def flush(self, step: int) -> None:

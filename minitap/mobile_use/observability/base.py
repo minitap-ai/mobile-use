@@ -38,11 +38,11 @@ class WandbBaseManager(ABC):
         self.enabled = enabled and os.getenv("WANDB_MODE") != "disabled"
         self.run = None
         self.run_id: str | None = None
-        self._failed_logs: list[tuple[dict, float]] = []
+        self._failed_logs: list[tuple[dict, float, int | None]] = []
         self._metrics_buffer: dict[str, Any] = {}
         self._max_failed_logs = 100
 
-    def _safe_log(self, data: dict[str, Any]) -> None:
+    def _safe_log(self, data: dict[str, Any], step: int | None = None) -> None:
         """Thread-safe, retry-capable logging.
         
         If logging fails, the data is buffered and will be retried
@@ -50,16 +50,21 @@ class WandbBaseManager(ABC):
         
         Args:
             data: Dictionary of metrics to log
+            step: Optional W&B step (task index). If provided, this sets the x-axis
+                  value in W&B charts. All metrics for a task should use the same step.
         """
         if not self.enabled or not self.run:
             return
 
         try:
-            self.run.log(data)
+            if step is not None:
+                self.run.log(data, step=step)
+            else:
+                self.run.log(data)
             self._retry_failed_logs()
         except Exception as e:
             print(f"[W&B] Log failed (buffered for retry): {e}")
-            self._failed_logs.append((data, time.time()))
+            self._failed_logs.append((data, time.time(), step))
             # Cap the buffer to prevent memory issues
             if len(self._failed_logs) > self._max_failed_logs:
                 self._failed_logs = self._failed_logs[-self._max_failed_logs:]
@@ -72,15 +77,18 @@ class WandbBaseManager(ABC):
         if not self._failed_logs or not self.run:
             return
 
-        remaining = []
-        for data, timestamp in self._failed_logs:
+        remaining: list[tuple[dict, float, int | None]] = []
+        for data, timestamp, step in self._failed_logs:
             # Skip logs older than 5 minutes
             if time.time() - timestamp > 300:
                 continue
             try:
-                self.run.log(data)
+                if step is not None:
+                    self.run.log(data, step=step)
+                else:
+                    self.run.log(data)
             except Exception:
-                remaining.append((data, timestamp))
+                remaining.append((data, timestamp, step))
 
         self._failed_logs = remaining
 
@@ -103,10 +111,12 @@ class WandbBaseManager(ABC):
         """Flush accumulated metrics with step index.
         
         Args:
-            step: The step/task index for this batch
+            step: The task index in the benchmark (0 = first task, 1 = second task, etc.)
+                  This becomes the x-axis value in W&B charts.
         """
         if self._metrics_buffer:
-            self._safe_log({"step": step, **self._metrics_buffer})
+            # Pass step as keyword argument so W&B uses it as x-axis, not as a metric
+            self._safe_log(self._metrics_buffer, step=step)
             self._metrics_buffer = {}
 
     def _increment(self, key: str) -> None:
