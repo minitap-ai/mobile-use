@@ -122,6 +122,43 @@ def _llm_config_to_dict(llm_config: LLMConfig) -> dict[str, Any]:
     return result
 
 
+def _log_llm_config(llm_config: LLMConfig, profile_name: str | None = None) -> None:
+    """Log the LLM configuration being used for this task.
+    
+    Args:
+        llm_config: The LLMConfig object from mobile-use
+        profile_name: Optional profile name if known
+    """
+    logger.info("=" * 60)
+    logger.info("LLM CONFIGURATION")
+    logger.info("=" * 60)
+    if profile_name:
+        logger.info(f"Profile: {profile_name}")
+    logger.info("-" * 60)
+    
+    # Core agents
+    for agent_name in ["planner", "orchestrator", "contextor", "cortex", "executor"]:
+        agent_config = getattr(llm_config, agent_name, None)
+        if agent_config:
+            model_str = f"{agent_config.provider}/{agent_config.model}"
+            fallback_str = ""
+            if hasattr(agent_config, "fallback") and agent_config.fallback:
+                fallback_str = f" (fallback: {agent_config.fallback.model})"
+            logger.info(f"  {agent_name:12s}: {model_str}{fallback_str}")
+    
+    # Utils agents
+    if llm_config.utils:
+        logger.info("-" * 60)
+        logger.info("Utils:")
+        for util_name in ["outputter", "hopper", "video_analyzer"]:
+            util_config = getattr(llm_config.utils, util_name, None)
+            if util_config:
+                model_str = f"{util_config.provider}/{util_config.model}"
+                logger.info(f"  {util_name:12s}: {model_str}")
+    
+    logger.info("=" * 60)
+
+
 class Agent:
     _config: AgentConfig
     _tasks: list[Task] = []
@@ -708,6 +745,9 @@ class Agent:
         api_key = None
         if platform_service:
             api_key = platform_service._api_key
+
+        # Log the LLM configuration being used
+        _log_llm_config(agent_profile.llm_config, profile_name=agent_profile.name)
 
         # Initialize W&B observability if run ID is provided
         wandb_provider = None
