@@ -97,21 +97,12 @@ class LimrunIosClient:
         self,
         api_url: str,
         token: str,
-        max_reconnect_attempts: int = 6,
-        reconnect_delay: float = 1.0,
-        max_reconnect_delay: float = 30.0,
-        request_timeout: float = 30.0,
     ):
         self.api_url = api_url
         self.token = token
-        self.max_reconnect_attempts = max_reconnect_attempts
-        self.reconnect_delay = reconnect_delay
-        self.max_reconnect_delay = max_reconnect_delay
-        self.request_timeout = request_timeout
 
         self._ws: ClientConnection | None = None
         self._connection_state = ConnectionState.DISCONNECTED
-        self._reconnect_attempts = 0
         self._intentional_disconnect = False
         self._pending_requests: dict[str, asyncio.Future] = {}
         self._state_change_callbacks: list[Callable[[ConnectionState], None]] = []
@@ -289,7 +280,7 @@ class LimrunIosClient:
 
         try:
             await self._ws.send(json.dumps(request))
-            result = await asyncio.wait_for(future, timeout=timeout or self.request_timeout)
+            result = await asyncio.wait_for(future, timeout=timeout or 30.0)
             return result
         except TimeoutError:
             self._pending_requests.pop(request_id, None)

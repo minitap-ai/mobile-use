@@ -85,9 +85,9 @@ async def run_automation(
             await limrun_controller.connect()
             config.with_limrun_android_controller(limrun_controller)
         else:
-            instance, limrun_controller = await create_limrun_ios_instance(limrun_config)
+            instance, _, limrun_controller = await create_limrun_ios_instance(limrun_config)
             limrun_instance_id = instance.metadata.id
-            await limrun_controller.connect()
+            # Connection is done in the factory, no need to call connect()
             config.with_limrun_ios_controller(limrun_controller)
 
         logger.info(f"Limrun {limrun_platform.value} device ready: {limrun_instance_id}")

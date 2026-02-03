@@ -1085,18 +1085,13 @@ class Agent:
                 device_height=controller.device_height,
             )
         else:
-            instance, controller = await create_limrun_ios_instance(instance_config)
+            instance, controller, limrun_ctrl = await create_limrun_ios_instance(instance_config)
             self._limrun_instance_id = instance.metadata.id
-            self._limrun_controller = controller
-            try:
-                await controller.connect()
-            except Exception:
-                await self._cleanup_limrun_device()
-                raise
+            self._limrun_controller = limrun_ctrl  # Store underlying controller for cleanup
 
             self._adb_client = None
             self._ui_adb_client = None
-            self._ios_client = controller
+            self._ios_client = controller.ios_client  # Use the LimrunIosController as ios_client
             self._ios_device_type = DeviceType.LIMRUN
 
             self._device_context = DeviceContext(
@@ -1127,28 +1122,32 @@ class Agent:
             delete_limrun_ios_instance,
         )
 
-        if not self._limrun_instance_id or not self._config.limrun_config:
-            return
-
-        logger.info(f"Cleaning up Limrun device: {self._limrun_instance_id}")
-
+        # Always cleanup controller if present
         if self._limrun_controller:
+            logger.info("Cleaning up Limrun controller...")
             await self._limrun_controller.cleanup()
             self._limrun_controller = None
 
-        limrun_config = self._config.limrun_config
-        instance_config = LimrunInstanceConfig(
-            api_key=limrun_config.api_key,
-            base_url=limrun_config.base_url,
-        )
+        # Only attempt instance deletion if limrun_config is present
+        if self._config.limrun_config and self._limrun_instance_id:
+            logger.info(f"Deleting Limrun instance: {self._limrun_instance_id}")
+            limrun_config = self._config.limrun_config
+            instance_config = LimrunInstanceConfig(
+                api_key=limrun_config.api_key,
+                base_url=limrun_config.base_url,
+            )
 
-        try:
-            if limrun_config.platform == LimrunPlatform.ANDROID:
-                await delete_limrun_android_instance(instance_config, self._limrun_instance_id)
-            else:
-                await delete_limrun_ios_instance(instance_config, self._limrun_instance_id)
-        except Exception as e:
-            logger.warning(f"Failed to delete Limrun instance: {e}")
+            try:
+                if limrun_config.platform == LimrunPlatform.ANDROID:
+                    await delete_limrun_android_instance(instance_config, self._limrun_instance_id)
+                else:
+                    await delete_limrun_ios_instance(instance_config, self._limrun_instance_id)
+            except Exception as e:
+                logger.warning(f"Failed to delete Limrun instance: {e}")
+        elif self._limrun_instance_id:
+            logger.info(
+                f"Skipping Limrun instance deletion (no limrun_config): {self._limrun_instance_id}"
+            )
 
         self._limrun_instance_id = None
 

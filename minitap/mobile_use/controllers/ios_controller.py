@@ -11,7 +11,7 @@ from pathlib import Path
 from idb.common.types import HIDButtonType
 from PIL import Image
 
-from minitap.mobile_use.clients.idb_client import IdbClientWrapper
+from minitap.mobile_use.clients.idb_client import IdbClientWrapper, IOSAppInfo
 from minitap.mobile_use.clients.ios_client import IosClientWrapper
 from minitap.mobile_use.controllers.device_controller import (
     MobileDeviceController,
@@ -58,11 +58,6 @@ class iOSDeviceController(MobileDeviceController):
         """Tap at specific coordinates using IDB."""
         try:
             duration = long_press_duration / 1000.0 if long_press else None
-            # LimrunIosController has a different tap signature (takes CoordinatesSelectorRequest)
-            from minitap.mobile_use.controllers.limrun_controller import LimrunIosController
-
-            if isinstance(self.ios_client, LimrunIosController):
-                return await self.ios_client.tap(coords, long_press, long_press_duration)
             await self.ios_client.tap(x=coords.x, y=coords.y, duration=duration)  # type: ignore[call-arg]
             return TapOutput(error=None)
         except Exception as e:
@@ -76,10 +71,6 @@ class iOSDeviceController(MobileDeviceController):
     ) -> str | None:
         """Swipe from start to end coordinates using IDB."""
         try:
-            from minitap.mobile_use.controllers.limrun_controller import LimrunIosController
-
-            if isinstance(self.ios_client, LimrunIosController):
-                return await self.ios_client.swipe(start, end, duration)
             # IDB delta is the number of steps, approximating from duration
             ms_duration_to_percentage = duration / 1000.0
             await self.ios_client.swipe(  # type: ignore[call-arg]
@@ -144,10 +135,6 @@ class iOSDeviceController(MobileDeviceController):
     async def launch_app(self, package_or_bundle_id: str) -> bool:
         """Launch an iOS app using IDB."""
         try:
-            from minitap.mobile_use.controllers.limrun_controller import LimrunIosController
-
-            if isinstance(self.ios_client, LimrunIosController):
-                return await self.ios_client.launch_app(package_or_bundle_id)
             return await self.ios_client.launch(bundle_id=package_or_bundle_id)  # type: ignore[call-arg]
         except Exception as e:
             logger.error(f"Failed to launch app {package_or_bundle_id}: {e}")
@@ -225,24 +212,28 @@ class iOSDeviceController(MobileDeviceController):
 
     def _process_flat_ios_hierarchy(self, accessibility_data: list[dict]) -> list[dict]:
         """
-        Process flat iOS accessibility info into our standard format.
+        Process iOS accessibility info into our standard format.
 
-        IDB with nested=False returns a flat list of all elements.
+        Recursively flattens nested children into a flat list.
         """
-        elements = []
+        elements: list[dict] = []
+        self._flatten_hierarchy(accessibility_data, elements)
+        return elements
 
-        for node in accessibility_data:
+    def _flatten_hierarchy(self, nodes: list[dict], elements: list[dict]) -> None:
+        """Recursively flatten the hierarchy tree into a flat list."""
+        for node in nodes:
             if not isinstance(node, dict):
                 continue
 
             # Extract element info
             element = {
                 "type": node.get("type", ""),
-                "value": node.get("AXValue", ""),
-                "label": node.get("AXLabel", node.get("label", "")),
+                "value": node.get("AXValue") or node.get("value", ""),
+                "label": node.get("AXLabel") or node.get("label", ""),
                 "frame": node.get("frame", {}),
                 "enabled": node.get("enabled", False),
-                "visible": True,  # Elements in the list are generally visible
+                "visible": True,
             }
 
             # Add bounds if frame is available
@@ -256,7 +247,10 @@ class iOSDeviceController(MobileDeviceController):
 
             elements.append(element)
 
-        return elements
+            # Recursively process children
+            children = node.get("children", [])
+            if children:
+                self._flatten_hierarchy(children, elements)
 
     def find_element(
         self,
@@ -328,6 +322,14 @@ class iOSDeviceController(MobileDeviceController):
         except Exception as e:
             logger.error(f"Failed to erase text: {e}")
             return False
+
+    async def app_current(self) -> IOSAppInfo | None:
+        """Get information about the currently active app."""
+        try:
+            return await self.ios_client.app_current()
+        except Exception as e:
+            logger.error(f"Failed to get current app: {e}")
+            return None
 
     async def cleanup(self) -> None:
         """Cleanup iOS controller resources."""
