@@ -12,8 +12,8 @@ from io import BytesIO
 from adbutils import AdbClient
 from PIL import Image
 
-from minitap.mobile_use.clients.idb_client import IOSAppInfo
 from minitap.mobile_use.clients.adb_tunnel import AdbTunnel
+from minitap.mobile_use.clients.idb_client import IOSAppInfo
 from minitap.mobile_use.clients.limrun_client import LimrunIosClient
 from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
 from minitap.mobile_use.controllers.device_controller import (
@@ -776,12 +776,16 @@ class LimrunIosController(MobileDeviceController):
             self._client = None
         logger.debug("Limrun iOS controller cleanup complete")
 
-    def get_compressed_b64_screenshot(self, image_base64: str, quality: int = 50) -> str:
-        """Compress a base64 image."""
-        if image_base64.startswith("data:image"):
-            image_base64 = image_base64.split(",")[1]
+    def get_compressed_b64_screenshot(self, image_base64: str | bytes, quality: int = 50) -> str:
+        """Compress a base64 image or raw bytes."""
+        # Handle raw bytes (from screenshot() which returns bytes for iOS)
+        if isinstance(image_base64, bytes):
+            image_data = image_base64
+        else:
+            if image_base64.startswith("data:image"):
+                image_base64 = image_base64.split(",")[1]
+            image_data = base64.b64decode(image_base64)
 
-        image_data = base64.b64decode(image_base64)
         image = Image.open(BytesIO(image_data))
 
         if image.mode in ("RGBA", "LA", "P"):
