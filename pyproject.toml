@@ -40,6 +40,8 @@ dependencies = [
     "Appium-Python-Client>=5.0.0",
     "posthog>=7.4.2",
     "uuid-utils>=0.12.0",
+    "limrun-api>=0.1.0",
+    "websockets>=12.0",
 ]
 
 [project.optional-dependencies]
