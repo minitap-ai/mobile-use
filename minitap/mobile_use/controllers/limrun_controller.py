@@ -72,27 +72,6 @@ class LimrunAndroidController(MobileDeviceController):
             # Give the tunnel thread a moment to be fully ready
             await asyncio.sleep(0.5)
 
-            # Kill any existing ADB server to ensure clean state
-            proc = await asyncio.create_subprocess_exec(
-                "adb",
-                "kill-server",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            await proc.communicate()
-            await asyncio.sleep(0.5)
-
-            # Start the ADB server explicitly
-            proc = await asyncio.create_subprocess_exec(
-                "adb",
-                "start-server",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, stderr = await proc.communicate()
-            logger.info(f"ADB start-server: {stderr.decode().strip()}")
-            await asyncio.sleep(1.0)
-
             # Now connect to the tunnel
             logger.info(f"Running: adb connect {tunnel_addr}")
             proc = await asyncio.create_subprocess_exec(
