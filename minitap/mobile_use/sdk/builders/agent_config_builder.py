@@ -9,8 +9,18 @@ from langchain_core.callbacks.base import Callbacks
 from minitap.mobile_use.clients.ios_client_config import BrowserStackClientConfig, IosClientConfig
 from minitap.mobile_use.config import get_default_llm_config, get_default_minitap_llm_config
 from minitap.mobile_use.context import DevicePlatform
+from minitap.mobile_use.controllers.limrun_controller import (
+    LimrunAndroidController,
+    LimrunIosController,
+)
 from minitap.mobile_use.sdk.constants import DEFAULT_PROFILE_NAME
-from minitap.mobile_use.sdk.types.agent import AgentConfig, AgentProfile, ServerConfig
+from minitap.mobile_use.sdk.types.agent import (
+    AgentConfig,
+    AgentProfile,
+    LimrunConfig,
+    LimrunPlatform,
+    ServerConfig,
+)
 from minitap.mobile_use.sdk.types.task import TaskRequestCommon
 
 
@@ -46,6 +56,9 @@ class AgentConfigBuilder:
         self._ios_client_config: IosClientConfig | None = None
         self._browserstack_config: BrowserStackClientConfig | None = None
         self._video_recording_enabled: bool = False
+        self._limrun_config: LimrunConfig | None = None
+        self._limrun_android_controller: LimrunAndroidController | None = None
+        self._limrun_ios_controller: LimrunIosController | None = None
 
     def add_profile(self, profile: AgentProfile, validate: bool = True) -> "AgentConfigBuilder":
         """
@@ -160,6 +173,75 @@ class AgentConfigBuilder:
         self._device_platform = DevicePlatform.IOS
         return self
 
+    def for_limrun(
+        self,
+        platform: LimrunPlatform,
+        *,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        inactivity_timeout: str = "10m",
+        hard_timeout: str | None = None,
+        display_name: str | None = None,
+        labels: dict[str, str] | None = None,
+    ) -> "AgentConfigBuilder":
+        """
+        Configure the agent to use a Limrun cloud device.
+
+        The SDK will automatically provision the device during agent initialization
+        and clean it up when the agent is stopped.
+
+        Args:
+            platform: The device platform (LimrunPlatform.ANDROID or LimrunPlatform.IOS).
+            api_key: API key for Limrun. If not provided, uses MINITAP_API_KEY
+                     or LIM_API_KEY environment variable.
+            base_url: Base URL for Limrun API. Defaults to https://platform.minitap.ai.
+            inactivity_timeout: Timeout for device inactivity (e.g., "10m").
+            hard_timeout: Hard timeout for device lifetime.
+            display_name: Optional display name for the device.
+            labels: Optional labels for the device.
+
+        Example:
+            >>> config = (Builders.AgentConfig
+            ...     .for_limrun(LimrunPlatform.ANDROID)
+            ...     .build())
+            >>> agent = Agent(config=config)
+            >>> await agent.init()  # Provisions Limrun device automatically
+        """
+        if self._device_id is not None:
+            raise ValueError(
+                "Limrun cannot be set when a device is already configured.\n"
+                "> for_device() and for_limrun() are mutually exclusive"
+            )
+        if self._browserstack_config is not None:
+            raise ValueError(
+                "Limrun cannot be set when BrowserStack is already configured.\n"
+                "> for_browserstack() and for_limrun() are mutually exclusive"
+            )
+        if self._cloud_mobile_id_or_ref is not None:
+            raise ValueError(
+                "Limrun cannot be set when a cloud mobile is already configured.\n"
+                "> for_cloud_mobile() and for_limrun() are mutually exclusive"
+            )
+        if self._limrun_android_controller is not None or self._limrun_ios_controller is not None:
+            raise ValueError(
+                "Limrun config cannot be set when a Limrun controller is already configured.\n"
+                "> for_limrun() and with_limrun_*_controller() are mutually exclusive"
+            )
+
+        self._limrun_config = LimrunConfig(
+            platform=platform,
+            api_key=api_key,
+            base_url=base_url,
+            inactivity_timeout=inactivity_timeout,
+            hard_timeout=hard_timeout,
+            display_name=display_name,
+            labels=labels,
+        )
+        self._device_platform = (
+            DevicePlatform.ANDROID if platform == LimrunPlatform.ANDROID else DevicePlatform.IOS
+        )
+        return self
+
     def with_default_task_config(self, config: TaskRequestCommon) -> "AgentConfigBuilder":
         """
         Set the default task configuration.
@@ -205,6 +287,70 @@ class AgentConfigBuilder:
 
     def with_ios_client_config(self, config: IosClientConfig) -> "AgentConfigBuilder":
         self._ios_client_config = copy.deepcopy(config)
+        return self
+
+    def with_limrun_android_controller(
+        self, controller: "LimrunAndroidController"
+    ) -> "AgentConfigBuilder":
+        """
+        Configure the agent to use a pre-provisioned Limrun Android controller.
+
+        Args:
+            controller: A connected LimrunAndroidController instance
+        """
+        if self._device_id is not None:
+            raise ValueError(
+                "Limrun controller cannot be set when a device is already configured.\n"
+                "> for_device() and with_limrun_android_controller() are mutually exclusive"
+            )
+        if self._browserstack_config is not None:
+            raise ValueError(
+                "Limrun controller cannot be set when BrowserStack is already configured.\n"
+                "> for_browserstack() and with_limrun_android_controller() are mutually exclusive"
+            )
+        if self._cloud_mobile_id_or_ref is not None:
+            raise ValueError(
+                "Limrun controller cannot be set when a cloud mobile is already configured.\n"
+                "> for_cloud_mobile() and with_limrun_android_controller() are mutually exclusive"
+            )
+        if self._limrun_config is not None:
+            raise ValueError(
+                "Limrun controller cannot be set when Limrun config is already configured.\n"
+                "> for_limrun() and with_limrun_android_controller() are mutually exclusive"
+            )
+        self._limrun_android_controller = controller
+        self._device_platform = DevicePlatform.ANDROID
+        return self
+
+    def with_limrun_ios_controller(self, controller: "LimrunIosController") -> "AgentConfigBuilder":
+        """
+        Configure the agent to use a pre-provisioned Limrun iOS controller.
+
+        Args:
+            controller: A connected LimrunIosController instance
+        """
+        if self._device_id is not None:
+            raise ValueError(
+                "Limrun controller cannot be set when a device is already configured.\n"
+                "> for_device() and with_limrun_ios_controller() are mutually exclusive"
+            )
+        if self._browserstack_config is not None:
+            raise ValueError(
+                "Limrun controller cannot be set when BrowserStack is already configured.\n"
+                "> for_browserstack() and with_limrun_ios_controller() are mutually exclusive"
+            )
+        if self._cloud_mobile_id_or_ref is not None:
+            raise ValueError(
+                "Limrun controller cannot be set when a cloud mobile is already configured.\n"
+                "> for_cloud_mobile() and with_limrun_ios_controller() are mutually exclusive"
+            )
+        if self._limrun_config is not None:
+            raise ValueError(
+                "Limrun controller cannot be set when Limrun config is already configured.\n"
+                "> for_limrun() and with_limrun_ios_controller() are mutually exclusive"
+            )
+        self._limrun_ios_controller = controller
+        self._device_platform = DevicePlatform.IOS
         return self
 
     def with_video_recording_tools(self) -> "AgentConfigBuilder":
@@ -293,6 +439,9 @@ class AgentConfigBuilder:
             ios_client_config=self._ios_client_config,
             browserstack_config=self._browserstack_config,
             video_recording_enabled=self._video_recording_enabled,
+            limrun_config=self._limrun_config,
+            limrun_android_controller=self._limrun_android_controller,
+            limrun_ios_controller=self._limrun_ios_controller,
         )
 
 

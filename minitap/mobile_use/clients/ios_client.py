@@ -8,6 +8,7 @@ from minitap.mobile_use.clients.browserstack_client import BrowserStackClientWra
 from minitap.mobile_use.clients.idb_client import IdbClientWrapper
 from minitap.mobile_use.clients.ios_client_config import IosClientConfig
 from minitap.mobile_use.clients.wda_client import WdaClientWrapper
+from minitap.mobile_use.controllers.limrun_controller import LimrunIosController
 from minitap.mobile_use.utils.logger import get_logger
 from minitap.mobile_use.utils.shell_utils import run_shell_command_on_host
 
@@ -19,7 +20,9 @@ def _run_host_cmd(cmd: list[str]) -> str:
 
 
 # Type alias for the union of all client wrappers
-IosClientWrapper = IdbClientWrapper | WdaClientWrapper | BrowserStackClientWrapper
+IosClientWrapper = (
+    IdbClientWrapper | WdaClientWrapper | BrowserStackClientWrapper | LimrunIosController
+)
 
 
 class DeviceType(str, Enum):
@@ -28,6 +31,7 @@ class DeviceType(str, Enum):
     SIMULATOR = "SIMULATOR"
     PHYSICAL = "PHYSICAL"
     BROWSERSTACK = "BROWSERSTACK"
+    LIMRUN = "LIMRUN"
     UNKNOWN = "UNKNOWN"
 
 

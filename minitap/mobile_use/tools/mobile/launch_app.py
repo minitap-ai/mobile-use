@@ -9,7 +9,7 @@ from langgraph.types import Command
 from minitap.mobile_use.agents.hopper.hopper import HopperOutput, hopper
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
-from minitap.mobile_use.controllers.platform_specific_commands_controller import list_packages
+from minitap.mobile_use.controllers.platform_specific_commands_controller import list_packages_async
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 from minitap.mobile_use.utils.app_launch_utils import launch_app_with_retries
@@ -20,7 +20,7 @@ async def find_package(ctx: MobileUseContext, app_name: str) -> str | None:
     Finds the package name for a given application name.
     Returns None if package not found or on error.
     """
-    all_packages = list_packages(ctx=ctx)
+    all_packages = await list_packages_async(ctx=ctx)
     try:
         hopper_output: HopperOutput = await hopper(
             ctx=ctx,

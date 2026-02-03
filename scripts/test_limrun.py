@@ -7,7 +7,6 @@ Usage:
 """
 
 import asyncio
-import base64
 import os
 from pathlib import Path
 
@@ -19,6 +18,9 @@ from minitap.mobile_use.clients.limrun_factory import (
     delete_limrun_ios_instance,
 )
 from minitap.mobile_use.controllers.types import CoordinatesSelectorRequest
+from minitap.mobile_use.sdk import Agent
+from minitap.mobile_use.sdk.builders import Builders
+from minitap.mobile_use.sdk.types import LimrunPlatform
 
 load_dotenv()
 
@@ -50,12 +52,27 @@ async def main():
         print("Taking screenshot...")
         screenshot_b64 = await controller.screenshot()
         screenshot_path = Path("limrun_screenshot.png")
-        screenshot_path.write_bytes(base64.b64decode(screenshot_b64))
-        print(f"Screenshot saved to: {screenshot_path}")
+        if screenshot_b64:
+            screenshot_path.write_bytes(screenshot_b64)
+            print(f"Screenshot saved to: {screenshot_path}")
 
-        print("Getting UI hierarchy...")
+        print("Getting raw accessibility data...")
+        raw_data = await controller.describe_all()
+        print(f"Raw data has {len(raw_data)} elements")
+        if raw_data:
+            print(f"Sample raw element keys: {list(raw_data[0].keys())}")
+            print(f"Sample raw element: {raw_data[0]}")
+
+        print("\nGetting UI hierarchy...")
         hierarchy = await controller.get_ui_hierarchy()
         print(f"Found {len(hierarchy)} UI elements")
+        # Print first 10 elements with labels
+        for i, elem in enumerate(hierarchy[:10]):
+            label = elem.get("label", "")
+            value = elem.get("value", "")
+            print(f"  [{i}] type={elem.get('type')}, label={label}, value={value}")
+
+        print("Current app:", await controller.app_current())
 
         print("Pressing home button...")
         await controller.press_home()
@@ -67,8 +84,11 @@ async def main():
         print("Taking another screenshot...")
         screenshot_b64 = await controller.screenshot()
         screenshot_path = Path("limrun_screenshot_settings.png")
-        screenshot_path.write_bytes(base64.b64decode(screenshot_b64))
-        print(f"Screenshot saved to: {screenshot_path}")
+        if screenshot_b64:
+            screenshot_path.write_bytes(screenshot_b64)
+            print(f"Screenshot saved to: {screenshot_path}")
+
+        print("Current app:", await controller.app_current())
 
         print("Tapping at coordinates (200, 300)...")
         result = await controller.tap(CoordinatesSelectorRequest(x=200, y=300))
@@ -90,5 +110,20 @@ async def main():
         print("Instance deleted")
 
 
+async def main2():
+    # Configure agent with limrun device
+    config = Builders.AgentConfig.for_limrun(LimrunPlatform.IOS).build()  # or LimrunPlatform.IOS
+
+    agent = Agent(config=config)
+    await agent.init()  # Provisions limrun device automatically
+
+    try:
+        await agent.run_task(
+            goal="Open settings app, find the apps section, tap on it and search for Reddit"
+        )
+    finally:
+        await agent.clean()  # Cleans up limrun device automatically
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main2())

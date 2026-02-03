@@ -7,7 +7,7 @@ from minitap.mobile_use.agents.planner.types import PlannerOutput, Subgoal, Subg
 from minitap.mobile_use.agents.planner.utils import generate_id, one_of_them_is_failure
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.platform_specific_commands_controller import (
-    get_current_foreground_package,
+    get_current_foreground_package_async,
 )
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message, with_fallback
@@ -37,7 +37,7 @@ class PlannerNode:
         current_locked_app_package = (
             self.ctx.execution_setup.get_locked_app_package() if self.ctx.execution_setup else None
         )
-        current_foreground_app = get_current_foreground_package(self.ctx)
+        current_foreground_app = await get_current_foreground_package_async(self.ctx)
 
         executor_wrappers = list(EXECUTOR_WRAPPERS_TOOLS)
         if self.ctx.video_recording_enabled:

@@ -6,7 +6,7 @@ import asyncio
 
 from minitap.mobile_use.context import AppLaunchResult, MobileUseContext
 from minitap.mobile_use.controllers.platform_specific_commands_controller import (
-    get_current_foreground_package,
+    get_current_foreground_package_async,
 )
 from minitap.mobile_use.controllers.unified_controller import UnifiedMobileController
 from minitap.mobile_use.utils.logger import get_logger
@@ -38,7 +38,7 @@ async def _poll_for_app_ready(
     polls = int(max_poll_seconds / poll_interval)
 
     for i in range(polls):
-        current_package = get_current_foreground_package(ctx)
+        current_package = await get_current_foreground_package_async(ctx)
 
         if current_package == app_package:
             logger.success(f"App {app_package} is ready (took ~{i * poll_interval:.1f}s)")
@@ -56,7 +56,7 @@ async def _poll_for_app_ready(
         if i < polls - 1:
             await asyncio.sleep(poll_interval)
 
-    current_package = get_current_foreground_package(ctx)
+    current_package = await get_current_foreground_package_async(ctx)
     error_msg = (
         f"Timeout waiting for {app_package} to load after {max_poll_seconds}s. "
         f"Current foreground: {current_package}"
@@ -143,7 +143,7 @@ async def _handle_initial_app_launch(
     logger.info(f"Starting initial app launch for package: {locked_app_package}")
 
     try:
-        current_package = get_current_foreground_package(ctx)
+        current_package = await get_current_foreground_package_async(ctx)
         logger.info(f"Current foreground app: {current_package}")
 
         if current_package == locked_app_package:

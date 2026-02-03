@@ -58,6 +58,11 @@ class iOSDeviceController(MobileDeviceController):
         """Tap at specific coordinates using IDB."""
         try:
             duration = long_press_duration / 1000.0 if long_press else None
+            # LimrunIosController has a different tap signature (takes CoordinatesSelectorRequest)
+            from minitap.mobile_use.controllers.limrun_controller import LimrunIosController
+
+            if isinstance(self.ios_client, LimrunIosController):
+                return await self.ios_client.tap(coords, long_press, long_press_duration)
             await self.ios_client.tap(x=coords.x, y=coords.y, duration=duration)  # type: ignore[call-arg]
             return TapOutput(error=None)
         except Exception as e:
@@ -71,6 +76,10 @@ class iOSDeviceController(MobileDeviceController):
     ) -> str | None:
         """Swipe from start to end coordinates using IDB."""
         try:
+            from minitap.mobile_use.controllers.limrun_controller import LimrunIosController
+
+            if isinstance(self.ios_client, LimrunIosController):
+                return await self.ios_client.swipe(start, end, duration)
             # IDB delta is the number of steps, approximating from duration
             ms_duration_to_percentage = duration / 1000.0
             await self.ios_client.swipe(  # type: ignore[call-arg]
@@ -135,6 +144,10 @@ class iOSDeviceController(MobileDeviceController):
     async def launch_app(self, package_or_bundle_id: str) -> bool:
         """Launch an iOS app using IDB."""
         try:
+            from minitap.mobile_use.controllers.limrun_controller import LimrunIosController
+
+            if isinstance(self.ios_client, LimrunIosController):
+                return await self.ios_client.launch_app(package_or_bundle_id)
             return await self.ios_client.launch(bundle_id=package_or_bundle_id)  # type: ignore[call-arg]
         except Exception as e:
             logger.error(f"Failed to launch app {package_or_bundle_id}: {e}")
