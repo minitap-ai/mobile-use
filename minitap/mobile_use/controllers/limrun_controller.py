@@ -7,9 +7,11 @@ Supports both Android (via ADB forwarding with SDK-based WebSocket tunnel) and i
 import asyncio
 import base64
 import re
+import shlex
 from io import BytesIO
 
 from adbutils import AdbClient
+from idb.common.types import HIDButtonType
 from PIL import Image
 
 from minitap.mobile_use.clients.adb_tunnel import AdbTunnel
@@ -41,15 +43,13 @@ class LimrunAndroidController(MobileDeviceController):
         adb_ws_url: str,
         endpoint_ws_url: str,
         token: str,
-        device_width: int,
-        device_height: int,
     ):
         self.instance_id = instance_id
         self.adb_ws_url = adb_ws_url
         self.endpoint_ws_url = endpoint_ws_url
         self.token = token
-        self.device_width = device_width
-        self.device_height = device_height
+        self.device_width: int = 0
+        self.device_height: int = 0
 
         self._adb_client: AdbClient | None = None
         self._ui_client: UIAutomatorClient | None = None
@@ -119,6 +119,14 @@ class LimrunAndroidController(MobileDeviceController):
                 # Enable fast input IME keyboard
                 device = await asyncio.to_thread(self._ui_client._ensure_connected)
                 await asyncio.to_thread(device.set_fastinput_ime, True)
+
+                # Fetch actual screen dimensions
+                screen_data = await self.get_screen_data()
+                self.device_width = screen_data.width
+                self.device_height = screen_data.height
+                logger.info(
+                    f"Limrun Android screen dimensions: {self.device_width}x{self.device_height}"
+                )
 
         except Exception as e:
             logger.error(f"Failed to connect to Limrun Android: {e}")
@@ -204,17 +212,14 @@ class LimrunAndroidController(MobileDeviceController):
         try:
             parts = text.split("%s")
             for i, part in enumerate(parts):
-                to_write = ""
-                for char in part:
-                    if char == " ":
-                        to_write += "%s"
-                    elif char in ["&", "<", ">", "|", ";", "(", ")", "$", "`", "\\", '"', "'"]:
-                        to_write += f"\\{char}"
-                    else:
-                        to_write += char
-
-                if to_write:
-                    self.device.shell(f"input text '{to_write}'")
+                # Split on spaces and send each word separately with keyevent 62 for spaces
+                words = part.split(" ")
+                for j, word in enumerate(words):
+                    if word:
+                        quoted = shlex.quote(word)
+                        self.device.shell(f"input text {quoted}")
+                    if j < len(words) - 1:
+                        self.device.shell("input keyevent 62")
 
                 if i < len(parts) - 1:
                     self.device.shell("input keyevent 62")
@@ -422,11 +427,11 @@ class LimrunAndroidController(MobileDeviceController):
         )
 
 
-class LimrunIosController(MobileDeviceController):
+class LimrunIosController:
     """
     Limrun iOS controller using WebSocket communication.
 
-    Uses the LimrunIosClient to communicate with Limrun iOS instances.
+    Implements IosClientWrapper interface for use with iOSDeviceController.
     """
 
     def __init__(
@@ -434,14 +439,12 @@ class LimrunIosController(MobileDeviceController):
         instance_id: str,
         api_url: str,
         token: str,
-        device_width: int,
-        device_height: int,
     ):
         self.instance_id = instance_id
         self.api_url = api_url
         self.token = token
-        self.device_width = device_width
-        self.device_height = device_height
+        self.device_width: int = 0
+        self.device_height: int = 0
 
         self._client: LimrunIosClient | None = None
 
@@ -471,38 +474,33 @@ class LimrunIosController(MobileDeviceController):
             raise RuntimeError("Not connected to Limrun iOS instance")
         return self._client
 
-    async def tap(
-        self,
-        coords: CoordinatesSelectorRequest,
-        long_press: bool = False,
-        long_press_duration: int = 1000,
-    ) -> TapOutput:
-        """Tap at specific coordinates."""
+    async def cleanup(self) -> None:
+        """Cleanup resources."""
+        if self._client:
+            await self._client.cleanup()
+            self._client = None
+        logger.debug("Limrun iOS controller cleanup complete")
+
+    # IosClientWrapper interface methods (matching IdbClientWrapper)
+
+    async def tap(self, x: int, y: int, duration: float | None = None) -> bool:
+        """Tap at coordinates."""
         try:
-            duration = long_press_duration / 1000.0 if long_press else None
-            await self.client.tap(x=coords.x, y=coords.y, duration=duration)
-            return TapOutput(error=None)
+            await self.client.tap(x=x, y=y, duration=duration)
+            return True
         except Exception as e:
-            return TapOutput(error=f"Limrun iOS tap failed: {str(e)}")
+            logger.error(f"Limrun iOS tap failed: {e}")
+            return False
 
     async def swipe(
-        self,
-        start: CoordinatesSelectorRequest,
-        end: CoordinatesSelectorRequest,
-        duration: int = 400,
-    ) -> str | None:
-        """Swipe from start to end coordinates (MobileDeviceController interface)."""
-        return await self.swipe_coords(start.x, start.y, end.x, end.y, duration / 1000.0)
-
-    async def swipe_coords(
         self,
         x_start: int,
         y_start: int,
         x_end: int,
         y_end: int,
         duration: float = 0.4,
-    ) -> str | None:
-        """Swipe from start to end coordinates (IosClientWrapper interface)."""
+    ) -> bool:
+        """Swipe from start to end coordinates."""
         try:
             await self.client.swipe(
                 x_start=x_start,
@@ -511,78 +509,68 @@ class LimrunIosController(MobileDeviceController):
                 y_end=y_end,
                 duration=duration,
             )
-            return None
+            return True
         except Exception as e:
-            return f"Limrun iOS swipe failed: {str(e)}"
+            logger.error(f"Limrun iOS swipe failed: {e}")
+            return False
 
-    async def get_screen_data(self) -> ScreenDataResponse:
-        """Get screen data (screenshot and hierarchy)."""
+    async def screenshot(self, output_path: str | None = None) -> bytes | None:
+        """Take a screenshot and return raw image bytes."""
         try:
-            screenshot_data = await self.client.screenshot_data()
-            accessibility_info = await self.client.describe_all()
-
-            elements = self._process_flat_ios_hierarchy(accessibility_info)
-
-            return ScreenDataResponse(
-                base64=screenshot_data.base64,
-                elements=elements,
-                width=screenshot_data.width,
-                height=screenshot_data.height,
-                platform="ios",
-            )
-        except Exception as e:
-            logger.error(f"Failed to get screen data: {e}")
-            raise
-
-    async def screenshot(  # type: ignore[override]
-        self, output_path: str | None = None
-    ) -> bytes | None:
-        """Take a screenshot and return raw image bytes.
-
-        Note: This signature matches IosClientWrapper interface rather than
-        MobileDeviceController to allow use as an iOS client.
-        """
-        try:
-            screenshot_bytes = await self.client.screenshot()
+            screenshot_data = await self.client.screenshot()
             if output_path:
                 with open(output_path, "wb") as f:
-                    f.write(screenshot_bytes)
-            return screenshot_bytes
+                    f.write(screenshot_data)
+            return screenshot_data
         except Exception as e:
             logger.error(f"Failed to take screenshot: {e}")
             return None
 
-    async def input_text(self, text: str) -> bool:
+    async def describe_all(self) -> list[dict]:
+        """Get accessibility info for all elements."""
+        return await self.client.describe_all()
+
+    async def text(self, text: str) -> bool:
         """Input text at the currently focused field."""
         return await self.client.text(text)
 
-    async def launch_app(self, package_or_bundle_id: str) -> bool:
+    async def launch(self, bundle_id: str) -> bool:
         """Launch an application."""
-        return await self.client.launch(bundle_id=package_or_bundle_id)
+        return await self.client.launch(bundle_id=bundle_id)
 
-    async def terminate_app(self, package_or_bundle_id: str | None) -> bool:
+    async def terminate(self, bundle_id: str) -> bool:
         """Terminate an application."""
-        if package_or_bundle_id is None:
-            logger.warning("Cannot terminate app: bundle_id is None")
-            return False
-        return await self.client.terminate(bundle_id=package_or_bundle_id)
+        return await self.client.terminate(bundle_id=bundle_id)
 
     async def open_url(self, url: str) -> bool:
         """Open a URL."""
         return await self.client.open_url(url)
 
-    async def press_back(self) -> bool:
-        """iOS doesn't have a back button - swipe from left edge."""
+    async def key(self, key_code: int) -> bool:
+        """Press a key by code."""
         try:
-            start = CoordinatesSelectorRequest(x=10, y=self.device_height // 4)
-            end = CoordinatesSelectorRequest(x=300, y=self.device_height // 4)
-            await self.swipe(start, end, duration=300)
+            await self.client.key(key_code)
             return True
         except Exception as e:
-            logger.error(f"Failed to press back: {e}")
+            logger.error(f"Failed to press key {key_code}: {e}")
             return False
 
-    async def press_home(self) -> bool:
+    async def button(self, button_type: HIDButtonType) -> bool:
+        """Press a hardware button."""
+        try:
+            if button_type == HIDButtonType.HOME:
+                await self.client.press_key("home")
+            elif button_type == HIDButtonType.LOCK:
+                await self.client.press_key("lock")
+            else:
+                logger.warning(f"Unsupported button type: {button_type}")
+                return False
+            return True
+        except Exception as e:
+            logger.error(f"Failed to press button {button_type}: {e}")
+            return False
+
+    async def home(self) -> bool:
         """Press the home button."""
         try:
             await self.client.press_key("home")
@@ -591,39 +579,12 @@ class LimrunIosController(MobileDeviceController):
             logger.error(f"Failed to press home: {e}")
             return False
 
-    async def press_enter(self) -> bool:
-        """Press the enter key."""
-        try:
-            await self.client.key(40)
-            return True
-        except Exception as e:
-            logger.error(f"Failed to press enter: {e}")
-            return False
-
-    async def get_ui_hierarchy(self) -> list[dict]:
-        """Get the UI element hierarchy."""
-        try:
-            accessibility_info = await asyncio.wait_for(self.client.describe_all(), timeout=40.0)
-            return self._process_flat_ios_hierarchy(accessibility_info)
-        except TimeoutError:
-            logger.error("Timeout waiting for UI hierarchy (40s)")
-            return []
-        except Exception as e:
-            logger.error(f"Failed to get UI hierarchy: {e}")
-            return []
-
-    async def describe_all(self) -> list[dict]:
-        """Get accessibility info for all elements (flat list)."""
-        return await self.client.describe_all()
-
-    async def app_current(self) -> "IOSAppInfo | None":
+    async def app_current(self) -> IOSAppInfo | None:
         """Get information about the currently active app.
 
         Uses describe_all to find the app name from the Application element,
         then looks up the bundle ID from list_apps.
         """
-        from minitap.mobile_use.clients.idb_client import IOSAppInfo
-
         try:
             elements = await self.client.describe_all()
             if not elements:
@@ -650,167 +611,3 @@ class LimrunIosController(MobileDeviceController):
         except Exception as e:
             logger.error(f"Failed to get current app: {e}")
             return None
-
-    def _process_flat_ios_hierarchy(self, accessibility_data: list[dict]) -> list[dict]:
-        """Process iOS accessibility info into flat list, recursively flattening children."""
-        elements: list[dict] = []
-        self._flatten_hierarchy(accessibility_data, elements)
-        logger.debug(f"Flattened hierarchy: {len(elements)} elements")
-        return elements
-
-    def _flatten_hierarchy(self, nodes: list[dict], elements: list[dict]) -> None:
-        """Recursively flatten the hierarchy tree into a flat list."""
-        for node in nodes:
-            if not isinstance(node, dict):
-                continue
-
-            element = {
-                "type": node.get("type", ""),
-                "value": node.get("AXValue", node.get("value", "")),
-                "label": node.get("AXLabel", node.get("label", "")),
-                "frame": node.get("frame", {}),
-                "enabled": node.get("enabled", False),
-                "visible": True,
-            }
-
-            if "frame" in node and isinstance(node["frame"], dict):
-                frame = node["frame"]
-                if all(k in frame for k in ["x", "y", "width", "height"]):
-                    element["bounds"] = (
-                        f"[{int(frame['x'])},{int(frame['y'])}]"
-                        f"[{int(frame['x'] + frame['width'])},{int(frame['y'] + frame['height'])}]"
-                    )
-
-            elements.append(element)
-
-            # Recursively process children
-            children = node.get("children", [])
-            if children:
-                self._flatten_hierarchy(children, elements)
-
-    def find_element(
-        self,
-        ui_hierarchy: list[dict],
-        resource_id: str | None = None,
-        text: str | None = None,
-        index: int = 0,
-    ) -> tuple[dict | None, Bounds | None, str | None]:
-        """Find a UI element in the iOS hierarchy."""
-        if not resource_id and not text:
-            return None, None, "No resource_id or text provided"
-
-        # Debug: log all available labels/values
-        if text:
-            available_texts = []
-            for elem in ui_hierarchy:
-                label = elem.get("label", "")
-                value = elem.get("value", "")
-                if label or value:
-                    available_texts.append(f"label='{label}', value='{value}'")
-            if available_texts:
-                logger.debug(f"Available elements: {available_texts[:20]}")  # First 20
-
-        matches = []
-        for element in ui_hierarchy:
-            if resource_id and element.get("type") == resource_id:
-                matches.append(element)
-            elif text:
-                # Check value, label, and text fields (case-insensitive contains)
-                elem_value = str(element.get("value", "")).lower()
-                elem_label = str(element.get("label", "")).lower()
-                elem_text = str(element.get("text", "")).lower()
-                search_text = text.lower()
-                if (
-                    search_text in elem_value
-                    or search_text in elem_label
-                    or search_text in elem_text
-                ):
-                    matches.append(element)
-
-        if not matches:
-            criteria = f"type='{resource_id}'" if resource_id else f"text='{text}'"
-            return None, None, f"No element found with {criteria}"
-
-        if index >= len(matches):
-            return None, None, f"Index {index} out of range (found {len(matches)} matches)"
-
-        element = matches[index]
-        bounds = self._extract_bounds(element)
-        return element, bounds, None
-
-    def _extract_bounds(self, element: dict) -> Bounds | None:
-        """Extract bounds from an iOS UI element."""
-        bounds_str = element.get("bounds")
-        if not bounds_str or not isinstance(bounds_str, str):
-            return None
-
-        try:
-            match = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", bounds_str)
-            if match:
-                return Bounds(
-                    x1=int(match.group(1)),
-                    y1=int(match.group(2)),
-                    x2=int(match.group(3)),
-                    y2=int(match.group(4)),
-                )
-        except (ValueError, IndexError):
-            return None
-        return None
-
-    async def erase_text(self, nb_chars: int | None = None) -> bool:
-        """Erase text by sending delete key presses."""
-        try:
-            if nb_chars is None:
-                nb_chars = 50
-            for _ in range(nb_chars):
-                await self.client.key(42)
-            return True
-        except Exception as e:
-            logger.error(f"Failed to erase text: {e}")
-            return False
-
-    async def cleanup(self) -> None:
-        """Cleanup resources."""
-        if self._client:
-            await self._client.cleanup()
-            self._client = None
-        logger.debug("Limrun iOS controller cleanup complete")
-
-    def get_compressed_b64_screenshot(self, image_base64: str | bytes, quality: int = 50) -> str:
-        """Compress a base64 image or raw bytes."""
-        # Handle raw bytes (from screenshot() which returns bytes for iOS)
-        if isinstance(image_base64, bytes):
-            image_data = image_base64
-        else:
-            if image_base64.startswith("data:image"):
-                image_base64 = image_base64.split(",")[1]
-            image_data = base64.b64decode(image_base64)
-
-        image = Image.open(BytesIO(image_data))
-
-        if image.mode in ("RGBA", "LA", "P"):
-            rgb_image = Image.new("RGB", image.size, (255, 255, 255))
-            rgb_image.paste(image, mask=image.split()[-1] if image.mode == "RGBA" else None)
-            image = rgb_image
-
-        compressed_io = BytesIO()
-        image.save(compressed_io, format="JPEG", quality=quality, optimize=True)
-
-        return base64.b64encode(compressed_io.getvalue()).decode("utf-8")
-
-    async def start_video_recording(
-        self,
-        max_duration_seconds: int = DEFAULT_MAX_DURATION_SECONDS,
-    ) -> VideoRecordingResult:
-        """Start screen recording."""
-        return VideoRecordingResult(
-            success=False,
-            message="Video recording not yet supported for Limrun iOS",
-        )
-
-    async def stop_video_recording(self) -> VideoRecordingResult:
-        """Stop screen recording."""
-        return VideoRecordingResult(
-            success=False,
-            message="Video recording not yet supported for Limrun iOS",
-        )

@@ -31,37 +31,61 @@ def find_element_by_text(
     """
     Find a UI element by its text content (adapted to both flat and rich hierarchy)
 
-    This function performs a recursive, case-insensitive partial search.
+    This function performs a recursive, case-insensitive search.
+    Checks text, label, and value fields for iOS compatibility.
 
     Args:
         ui_hierarchy: List of UI element dictionaries.
         text: The text content to search for.
+        index: Optional index to select nth matching element.
 
     Returns:
         The complete UI element dictionary if found, None otherwise.
     """
+    matches: list[dict] = []
 
-    def search_recursive(elements: list[dict]) -> dict | None:
+    def search_recursive(elements: list[dict]) -> None:
         for element in elements:
             if isinstance(element, dict):
                 src = element.get("attributes", element)
+                # Check text (Android), label (iOS), and value (iOS)
                 element_text = src.get("text", "")
-                # Guard against non-string text values (e.g., dict)
+                element_label = src.get("label", "")
+                element_value = src.get("value", "")
+
+                # Guard against non-string values
                 if not isinstance(element_text, str):
                     element_text = ""
-                if text and text.lower() == element_text.lower():
-                    idx = index or 0
-                    if idx == 0:
-                        return element
-                    idx -= 1
-                    continue
-                if (children := element.get("children", [])) and (
-                    found := search_recursive(children)
+                if not isinstance(element_label, str):
+                    element_label = ""
+                if not isinstance(element_value, str):
+                    element_value = ""
+
+                text_lower = text.lower()
+                if (
+                    (element_text and text_lower == element_text.lower())
+                    or (element_label and text_lower == element_label.lower())
+                    or (element_value and text_lower == element_value.lower())
                 ):
-                    return found
+                    matches.append(element)
+
+                if children := element.get("children", []):
+                    search_recursive(children)
+
+    search_recursive(ui_hierarchy)
+
+    if not matches:
         return None
 
-    return search_recursive(ui_hierarchy)
+    if index is None:
+        idx = 0
+    elif index < 0:
+        return None
+    else:
+        idx = index
+    if idx < len(matches):
+        return matches[idx]
+    return None
 
 
 async def tap_bottom_right_of_element(bounds: ElementBounds, ctx: MobileUseContext):
@@ -128,10 +152,18 @@ async def move_cursor_to_end_if_bounds(
 
 async def focus_element_if_needed(
     ctx: MobileUseContext, target: Target
-) -> Literal["resource_id", "coordinates", "text"] | None:
+) -> Literal["resource_id", "coordinates", "text", "already_focused"] | None:
     """
     Ensures the element is focused, with a sanity check to prevent trusting misleading IDs.
+
+    If no target locator is provided (empty target), assumes the field is already focused
+    and returns "already_focused" to allow typing without re-focusing.
     """
+    # If no locator is provided, assume already focused (e.g., keyboard is visible)
+    if not target.resource_id and not target.bounds and not target.text:
+        logger.debug("No target locator provided, assuming element is already focused")
+        return "already_focused"
+
     controller = UnifiedMobileController(ctx)
     rich_hierarchy = await controller.get_ui_elements()
     elt_from_id = None
@@ -154,7 +186,7 @@ async def focus_element_if_needed(
 
     if elt_from_id:
         if not is_element_focused(elt_from_id):
-            tap(
+            await tap(
                 ctx=ctx,
                 selector_request=IdSelectorRequest(id=target.resource_id),  # type: ignore
                 index=target.resource_id_index,

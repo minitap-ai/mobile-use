@@ -12,6 +12,7 @@ from enum import Enum
 from limrun_api import AsyncLimrun
 from limrun_api.types import AndroidInstance, IosInstance
 
+from minitap.mobile_use.controllers.ios_controller import iOSDeviceController
 from minitap.mobile_use.controllers.limrun_controller import (
     LimrunAndroidController,
     LimrunIosController,
@@ -79,6 +80,7 @@ async def create_limrun_android_instance(
             await delete_limrun_android_instance(config, instance.metadata.id)
     """
     client = AsyncLimrun(api_key=config.api_key, base_url=f"{config.base_url}/api/v1/limrun")
+    instance: AndroidInstance | IosInstance | None = None
 
     try:
         logger.info("Creating Limrun Android instance...")
@@ -120,11 +122,18 @@ async def create_limrun_android_instance(
             adb_ws_url=instance.status.adb_web_socket_url,
             endpoint_ws_url=instance.status.endpoint_web_socket_url,
             token=instance.status.token,
-            device_width=1080,
-            device_height=1920,
         )
 
         return instance, controller
+
+    except Exception:
+        if instance is not None:
+            try:
+                await client.android_instances.delete(instance.metadata.id)
+                logger.warning(f"Cleaned up Android instance after failure: {instance.metadata.id}")
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to delete Android instance: {cleanup_error}")
+        raise
 
     finally:
         await client.close()
@@ -132,7 +141,7 @@ async def create_limrun_android_instance(
 
 async def create_limrun_ios_instance(
     config: LimrunInstanceConfig,
-) -> tuple[IosInstance, LimrunIosController]:
+) -> tuple[IosInstance, iOSDeviceController, LimrunIosController]:
     """
     Create a Limrun iOS instance and return the controller.
 
@@ -140,7 +149,7 @@ async def create_limrun_ios_instance(
         config: Configuration for the Limrun instance.
 
     Returns:
-        Tuple of (IosInstance, LimrunIosController)
+        Tuple of (IosInstance, iOSDeviceController, LimrunIosController)
 
     Example:
         config = LimrunInstanceConfig(api_key="your-api-key")
@@ -154,6 +163,7 @@ async def create_limrun_ios_instance(
             await delete_limrun_ios_instance(config, instance.metadata.id)
     """
     client = AsyncLimrun(api_key=config.api_key, base_url=f"{config.base_url}/api/v1/limrun")
+    instance: AndroidInstance | IosInstance | None = None
 
     try:
         logger.info("Creating Limrun iOS instance...")
@@ -180,25 +190,36 @@ async def create_limrun_ios_instance(
 
         logger.info(f"Created iOS instance: {instance.metadata.id}")
 
-        instance = await _wait_for_instance_ready(
-            client, instance.metadata.id, platform=LimrunPlatform.IOS
-        )
-
-        if not isinstance(instance, IosInstance):
-            raise RuntimeError("iOS instance missing api_url")
-
         if instance.status.api_url is None:
             raise RuntimeError("iOS instance missing api_url")
 
-        controller = LimrunIosController(
+        limrun_controller = LimrunIosController(
             instance_id=instance.metadata.id,
             api_url=instance.status.api_url,
             token=instance.status.token,
-            device_width=390,
-            device_height=844,
         )
 
-        return instance, controller
+        # Connect to get device dimensions
+        await limrun_controller.connect()
+
+        # Wrap in iOSDeviceController for unified interface
+        controller = iOSDeviceController(
+            ios_client=limrun_controller,
+            device_id=instance.metadata.id,
+            device_width=limrun_controller.device_width,
+            device_height=limrun_controller.device_height,
+        )
+
+        return instance, controller, limrun_controller
+
+    except Exception:
+        if instance is not None:
+            try:
+                await client.ios_instances.delete(instance.metadata.id)
+                logger.warning(f"Cleaned up iOS instance after failure: {instance.metadata.id}")
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to delete iOS instance: {cleanup_error}")
+        raise
 
     finally:
         await client.close()

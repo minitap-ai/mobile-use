@@ -2,7 +2,6 @@ from minitap.mobile_use.context import DevicePlatform, MobileUseContext
 from minitap.mobile_use.controllers.android_controller import AndroidDeviceController
 from minitap.mobile_use.controllers.device_controller import MobileDeviceController
 from minitap.mobile_use.controllers.ios_controller import iOSDeviceController
-from minitap.mobile_use.controllers.limrun_controller import LimrunIosController
 from minitap.mobile_use.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -30,12 +29,6 @@ def create_device_controller(ctx: MobileUseContext) -> MobileDeviceController:
     elif platform == DevicePlatform.IOS:
         if ctx.ios_client is None:
             raise ValueError("iOS client not initialized for iOS device")
-
-        # If ios_client is already a LimrunIosController, use it directly
-        # (it implements MobileDeviceController interface)
-        if isinstance(ctx.ios_client, LimrunIosController):
-            logger.info(f"Using Limrun iOS controller for device {ctx.device.device_id}")
-            return ctx.ios_client
 
         logger.info(f"Creating iOS controller for device {ctx.device.device_id}")
         return iOSDeviceController(

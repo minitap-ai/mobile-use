@@ -26,6 +26,7 @@ load_dotenv()
 
 
 async def main():
+    """Test the Limrun iOS controller via iOSDeviceController wrapper."""
     api_key = os.getenv("MINITAP_API_KEY") or os.getenv("LIM_API_KEY")
     if not api_key:
         print("Error: MINITAP_API_KEY or LIM_API_KEY environment variable is not set")
@@ -41,38 +42,49 @@ async def main():
         inactivity_timeout="10m",
     )
 
-    instance, controller = await create_limrun_ios_instance(config)
+    # Factory now returns (instance, iOSDeviceController, LimrunIosController)
+    # Connection is done in the factory
+    instance, controller, limrun_ctrl = await create_limrun_ios_instance(config)
     print(f"Instance created: {instance.metadata.id}")
+    print(f"Connected! Device: {controller.device_width}x{controller.device_height}")
 
     try:
-        print("Connecting to device...")
-        await controller.connect()
-        print(f"Connected! Device: {controller.device_width}x{controller.device_height}")
-
         print("Taking screenshot...")
         screenshot_b64 = await controller.screenshot()
         screenshot_path = Path("limrun_screenshot.png")
         if screenshot_b64:
-            screenshot_path.write_bytes(screenshot_b64)
+            import base64
+
+            screenshot_path.write_bytes(base64.b64decode(screenshot_b64))
             print(f"Screenshot saved to: {screenshot_path}")
 
-        print("Getting raw accessibility data...")
-        raw_data = await controller.describe_all()
-        print(f"Raw data has {len(raw_data)} elements")
-        if raw_data:
-            print(f"Sample raw element keys: {list(raw_data[0].keys())}")
-            print(f"Sample raw element: {raw_data[0]}")
+        print("Getting screen data (screenshot + hierarchy)...")
+        screen_data = await controller.get_screen_data()
+        print(f"Found {len(screen_data.elements)} UI elements")
 
-        print("\nGetting UI hierarchy...")
-        hierarchy = await controller.get_ui_hierarchy()
-        print(f"Found {len(hierarchy)} UI elements")
-        # Print first 10 elements with labels
-        for i, elem in enumerate(hierarchy[:10]):
+        # Debug: print all elements with their full structure
+        print("\n=== FULL UI HIERARCHY DEBUG ===")
+        for i, elem in enumerate(screen_data.elements):
             label = elem.get("label", "")
             value = elem.get("value", "")
-            print(f"  [{i}] type={elem.get('type')}, label={label}, value={value}")
+            text = elem.get("text", "")
+            bounds = elem.get("bounds", "")
+            elem_type = elem.get("type", "")
+            # Only print elements with some content
+            if label or value or text:
+                print(
+                    f"  [{i}] type={elem_type}, label='{label}', value='{value}', "
+                    f"text='{text}', bounds={bounds}"
+                )
+        print("=== END UI HIERARCHY DEBUG ===\n")
 
-        print("Current app:", await controller.app_current())
+        # Also get raw accessibility data from limrun controller
+        print("\n=== RAW ACCESSIBILITY DATA ===")
+        raw_data = await limrun_ctrl.describe_all()
+        print(f"Raw data has {len(raw_data)} elements")
+        for i, elem in enumerate(raw_data[:20]):
+            print(f"  [{i}] {elem}")
+        print("=== END RAW DATA ===\n")
 
         print("Pressing home button...")
         await controller.press_home()
@@ -81,14 +93,17 @@ async def main():
         await controller.launch_app("com.apple.Preferences")
         await asyncio.sleep(2)
 
+        app_info = await controller.app_current()
+        print(f"Current app: {app_info}")
+
         print("Taking another screenshot...")
         screenshot_b64 = await controller.screenshot()
         screenshot_path = Path("limrun_screenshot_settings.png")
         if screenshot_b64:
-            screenshot_path.write_bytes(screenshot_b64)
-            print(f"Screenshot saved to: {screenshot_path}")
+            import base64
 
-        print("Current app:", await controller.app_current())
+            screenshot_path.write_bytes(base64.b64decode(screenshot_b64))
+            print(f"Screenshot saved to: {screenshot_path}")
 
         print("Tapping at coordinates (200, 300)...")
         result = await controller.tap(CoordinatesSelectorRequest(x=200, y=300))
@@ -105,7 +120,7 @@ async def main():
 
     finally:
         print("Cleaning up...")
-        await controller.cleanup()
+        await limrun_ctrl.cleanup()
         await delete_limrun_ios_instance(config, instance.metadata.id)
         print("Instance deleted")
 
@@ -126,4 +141,4 @@ async def main2():
 
 
 if __name__ == "__main__":
-    asyncio.run(main2())
+    asyncio.run(main())
