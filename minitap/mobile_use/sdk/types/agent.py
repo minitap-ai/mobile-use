@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Literal
 from urllib.parse import urlparse
 
@@ -6,7 +7,45 @@ from pydantic import BaseModel
 
 from minitap.mobile_use.clients.ios_client_config import BrowserStackClientConfig, IosClientConfig
 from minitap.mobile_use.context import DevicePlatform
+from minitap.mobile_use.controllers.limrun_controller import (
+    LimrunAndroidController,
+    LimrunIosController,
+)
 from minitap.mobile_use.sdk.types.task import AgentProfile, TaskRequestCommon
+
+
+class LimrunPlatform(str, Enum):
+    """Limrun device platform."""
+
+    ANDROID = "android"
+    IOS = "ios"
+
+
+class LimrunConfig(BaseModel):
+    """
+    Configuration for Limrun cloud device provisioning.
+
+    When set, the SDK will automatically provision a Limrun device
+    during agent initialization and clean it up when the agent is stopped.
+
+    Attributes:
+        platform: The device platform (android or ios).
+        api_key: API key for Limrun. If not provided, uses MINITAP_API_KEY
+                 or LIM_API_KEY environment variable.
+        base_url: Base URL for Limrun API. Defaults to https://platform.minitap.ai.
+        inactivity_timeout: Timeout for device inactivity (e.g., "10m").
+        hard_timeout: Hard timeout for device lifetime.
+        display_name: Optional display name for the device.
+        labels: Optional labels for the device.
+    """
+
+    platform: LimrunPlatform
+    api_key: str | None = None
+    base_url: str | None = None
+    inactivity_timeout: str = "10m"
+    hard_timeout: str | None = None
+    display_name: str | None = None
+    labels: dict[str, str] | None = None
 
 
 class ApiBaseUrl(BaseModel):
@@ -67,6 +106,10 @@ class AgentConfig(BaseModel):
         cloud_mobile_id_or_ref: ID or reference name of cloud mobile (virtual mobile)
                                 to use for remote execution.
         video_recording_enabled: Whether video recording tools are enabled.
+        limrun_config: Configuration for Limrun cloud device provisioning.
+            When set, the SDK will automatically provision a Limrun device.
+        limrun_android_controller: Pre-configured Limrun Android controller.
+        limrun_ios_controller: Pre-configured Limrun iOS controller.
     """
 
     agent_profiles: dict[str, AgentProfile]
@@ -80,5 +123,8 @@ class AgentConfig(BaseModel):
     ios_client_config: IosClientConfig | None = None
     browserstack_config: BrowserStackClientConfig | None = None
     video_recording_enabled: bool = False
+    limrun_config: LimrunConfig | None = None
+    limrun_android_controller: LimrunAndroidController | None = None
+    limrun_ios_controller: LimrunIosController | None = None
 
     model_config = {"arbitrary_types_allowed": True}

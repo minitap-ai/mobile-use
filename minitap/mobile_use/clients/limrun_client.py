@@ -326,7 +326,7 @@ class LimrunIosClient:
     async def element_tree(self, point: tuple[float, float] | None = None) -> str:
         """Get the element tree (accessibility hierarchy) as JSON string."""
         params = {"point": {"x": point[0], "y": point[1]}} if point else {}
-        response = await self._send_request("elementTree", params)
+        response = await self._send_request("elementTree", params, timeout=60.0)
         return response.get("json", "")
 
     async def tap(self, x: float, y: float, duration: float | None = None) -> None:
@@ -430,14 +430,19 @@ class LimrunIosClient:
     def _calculate_swipe_direction(
         self, x_start: float, y_start: float, x_end: float, y_end: float
     ) -> str:
-        """Calculate swipe direction from coordinates."""
+        """Calculate scroll direction from swipe coordinates.
+
+        Limrun uses scroll semantics: "down" scrolls content down (reveals content below).
+        A swipe from bottom to top (y_start > y_end) should scroll "down".
+        """
         dx = x_end - x_start
         dy = y_end - y_start
 
         if abs(dx) > abs(dy):
-            return "right" if dx > 0 else "left"
+            return "left" if dx > 0 else "right"
         else:
-            return "down" if dy > 0 else "up"
+            # Invert: swipe up (dy < 0) = scroll down, swipe down (dy > 0) = scroll up
+            return "down" if dy < 0 else "up"
 
     def _calculate_swipe_distance(
         self, x_start: float, y_start: float, x_end: float, y_end: float

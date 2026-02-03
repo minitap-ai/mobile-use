@@ -1,5 +1,4 @@
 import asyncio
-from concurrent.futures.thread import ThreadPoolExecutor
 from datetime import date
 from shutil import which
 
@@ -78,6 +77,7 @@ def get_device_date(ctx: MobileUseContext) -> str:
 
 
 def list_packages(ctx: MobileUseContext) -> str:
+    """List installed packages. For Limrun iOS, use list_packages_async instead."""
     if ctx.device.mobile_platform == DevicePlatform.IOS:
         udid = ctx.device.device_id
         device_type = get_device_type(udid)
@@ -136,12 +136,46 @@ def list_packages(ctx: MobileUseContext) -> str:
         return "\n".join(sorted(packages))
 
 
+async def list_packages_async(ctx: MobileUseContext) -> str:
+    """
+    Async version of list_packages. Use this for Limrun iOS devices.
+    """
+    if ctx.device.mobile_platform == DevicePlatform.IOS:
+        # Try to use ios_client.list_apps() for Limrun/cloud devices
+        if ctx.ios_client:
+            try:
+                # Import here to avoid circular imports
+                from minitap.mobile_use.clients.idb_client import IdbClientWrapper
+                from minitap.mobile_use.controllers.limrun_controller import LimrunIosController
+
+                if isinstance(ctx.ios_client, LimrunIosController):
+                    apps = await ctx.ios_client.client.list_apps()
+                    packages = [f"{app.bundle_id} ({app.name})" for app in apps]
+                    return "\n".join(sorted(packages))
+                elif isinstance(ctx.ios_client, IdbClientWrapper):
+                    apps = await ctx.ios_client.list_apps()
+                    if apps:
+                        packages = [f"{app.bundle_id} ({app.name})" for app in apps]
+                        return "\n".join(sorted(packages))
+            except Exception as e:
+                logger.debug(f"ios_client.list_apps() failed: {e}")
+
+        # Fallback to sync version for local devices
+        return list_packages(ctx)
+    else:
+        # Android - use sync version
+        return list_packages(ctx)
+
+
 def get_current_foreground_package(ctx: MobileUseContext) -> str | None:
     """
     Get the package name of the currently focused/foreground app.
 
     Returns only the clean package/bundle name (e.g., 'com.whatsapp'),
     without any metadata or window information.
+
+    Note: For iOS with Limrun, prefer using get_current_foreground_package_async()
+    to avoid event loop issues.
 
     Returns:
         The package/bundle name, or None if unable to determine
@@ -174,24 +208,86 @@ def get_current_foreground_package(ctx: MobileUseContext) -> str | None:
         return None
 
 
-def _get_ios_foreground_package(ctx: MobileUseContext) -> str | None:
-    """Get foreground package for iOS devices (simulator or physical)."""
+async def get_current_foreground_package_async(ctx: MobileUseContext) -> str | None:
+    """
+    Async version of get_current_foreground_package.
 
+    Use this when calling from an async context, especially with Limrun iOS
+    where the WebSocket connection is tied to the event loop.
+
+    Returns:
+        The package/bundle name, or None if unable to determine
+    """
+    try:
+        if ctx.device.mobile_platform == DevicePlatform.IOS:
+            return await _get_ios_foreground_package_async(ctx)
+
+        device = get_adb_device(ctx)
+        output = str(device.shell("dumpsys window | grep mCurrentFocus"))
+
+        if "mCurrentFocus=" not in output:
+            return None
+
+        segment = output.split("mCurrentFocus=")[-1]
+
+        if "/" in segment:
+            tokens = segment.split()
+            for token in tokens:
+                if "." in token and not token.startswith("Window"):
+                    package = token.split("/")[0]
+                    package = package.rstrip("}")
+                    if package and "." in package:
+                        return package
+
+        return None
+
+    except Exception as e:
+        logger.debug(f"Failed to get current foreground package: {e}")
+        return None
+
+
+def _get_ios_foreground_package(ctx: MobileUseContext) -> str | None:
+    """Get foreground package for iOS devices (simulator or physical).
+
+    Note: This sync version doesn't work well with Limrun iOS because the
+    WebSocket is tied to the event loop. Use _get_ios_foreground_package_async instead.
+    """
     ios_client = ctx.ios_client
 
     if not ios_client:
         return None
 
     try:
-        # Handle both running and non-running event loops
+        # Check if we're in an async context
         try:
             asyncio.get_running_loop()
-            # Already in async context - run in separate thread
-            with ThreadPoolExecutor() as pool:
-                app_info = pool.submit(asyncio.run, ios_client.app_current()).result(timeout=10)
+            # Already in async context - this won't work well with Limrun
+            # because the WebSocket is tied to the original event loop.
+            # Return None and let the caller use the async version.
+            logger.debug(
+                "_get_ios_foreground_package called from async context. "
+                "Use get_current_foreground_package_async() for Limrun iOS."
+            )
+            return None
         except RuntimeError:
-            # No running loop - use asyncio.run()
+            # No running loop - safe to use asyncio.run()
             app_info = asyncio.run(ios_client.app_current())
+        if app_info and app_info.bundle_id:
+            return app_info.bundle_id
+    except Exception as e:
+        logger.debug(f"Failed to get foreground app: {e}")
+    return None
+
+
+async def _get_ios_foreground_package_async(ctx: MobileUseContext) -> str | None:
+    """Async version - properly handles Limrun iOS WebSocket in the same event loop."""
+    ios_client = ctx.ios_client
+
+    if not ios_client:
+        return None
+
+    try:
+        app_info = await ios_client.app_current()
         if app_info and app_info.bundle_id:
             return app_info.bundle_id
     except Exception as e:

@@ -13,6 +13,7 @@ from io import BytesIO
 from adbutils import AdbClient
 from PIL import Image
 
+from minitap.mobile_use.clients.idb_client import IOSAppInfo
 from minitap.mobile_use.clients.limrun_client import LimrunIosClient
 from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
 from minitap.mobile_use.controllers.device_controller import (
@@ -472,14 +473,25 @@ class LimrunIosController(MobileDeviceController):
         end: CoordinatesSelectorRequest,
         duration: int = 400,
     ) -> str | None:
-        """Swipe from start to end coordinates."""
+        """Swipe from start to end coordinates (MobileDeviceController interface)."""
+        return await self.swipe_coords(start.x, start.y, end.x, end.y, duration / 1000.0)
+
+    async def swipe_coords(
+        self,
+        x_start: int,
+        y_start: int,
+        x_end: int,
+        y_end: int,
+        duration: float = 0.4,
+    ) -> str | None:
+        """Swipe from start to end coordinates (IosClientWrapper interface)."""
         try:
             await self.client.swipe(
-                x_start=start.x,
-                y_start=start.y,
-                x_end=end.x,
-                y_end=end.y,
-                duration=duration / 1000.0,
+                x_start=x_start,
+                y_start=y_start,
+                x_end=x_end,
+                y_end=y_end,
+                duration=duration,
             )
             return None
         except Exception as e:
@@ -504,14 +516,23 @@ class LimrunIosController(MobileDeviceController):
             logger.error(f"Failed to get screen data: {e}")
             raise
 
-    async def screenshot(self) -> str:
-        """Take a screenshot and return base64 encoded string."""
+    async def screenshot(  # type: ignore[override]
+        self, output_path: str | None = None
+    ) -> bytes | None:
+        """Take a screenshot and return raw image bytes.
+
+        Note: This signature matches IosClientWrapper interface rather than
+        MobileDeviceController to allow use as an iOS client.
+        """
         try:
             screenshot_bytes = await self.client.screenshot()
-            return base64.b64encode(screenshot_bytes).decode("utf-8")
+            if output_path:
+                with open(output_path, "wb") as f:
+                    f.write(screenshot_bytes)
+            return screenshot_bytes
         except Exception as e:
             logger.error(f"Failed to take screenshot: {e}")
-            raise
+            return None
 
     async def input_text(self, text: str) -> bool:
         """Input text at the currently focused field."""
@@ -537,8 +558,8 @@ class LimrunIosController(MobileDeviceController):
         try:
             start = CoordinatesSelectorRequest(x=10, y=self.device_height // 4)
             end = CoordinatesSelectorRequest(x=300, y=self.device_height // 4)
-            result = await self.swipe(start, end, duration=300)
-            return result is None
+            await self.swipe(start, end, duration=300)
+            return True
         except Exception as e:
             logger.error(f"Failed to press back: {e}")
             return False
@@ -573,17 +594,61 @@ class LimrunIosController(MobileDeviceController):
             logger.error(f"Failed to get UI hierarchy: {e}")
             return []
 
-    def _process_flat_ios_hierarchy(self, accessibility_data: list[dict]) -> list[dict]:
-        """Process flat iOS accessibility info into standard format."""
-        elements = []
+    async def describe_all(self) -> list[dict]:
+        """Get accessibility info for all elements (flat list)."""
+        return await self.client.describe_all()
 
-        for node in accessibility_data:
+    async def app_current(self) -> "IOSAppInfo | None":
+        """Get information about the currently active app.
+
+        Uses describe_all to find the app name from the Application element,
+        then looks up the bundle ID from list_apps.
+        """
+        from minitap.mobile_use.clients.idb_client import IOSAppInfo
+
+        try:
+            elements = await self.client.describe_all()
+            if not elements:
+                return None
+
+            # Find the Application element - it contains the app name in AXLabel
+            app_name = None
+            for elem in elements:
+                if elem.get("type") == "Application":
+                    app_name = elem.get("AXLabel") or elem.get("label")
+                    break
+
+            if not app_name:
+                return None
+
+            # Get installed apps and find bundle ID by display name
+            installed_apps = await self.client.list_apps()
+            for app in installed_apps:
+                if app.name == app_name:
+                    return IOSAppInfo(name=app_name, bundle_id=app.bundle_id)
+
+            return IOSAppInfo(name=app_name, bundle_id=None)
+
+        except Exception as e:
+            logger.error(f"Failed to get current app: {e}")
+            return None
+
+    def _process_flat_ios_hierarchy(self, accessibility_data: list[dict]) -> list[dict]:
+        """Process iOS accessibility info into flat list, recursively flattening children."""
+        elements: list[dict] = []
+        self._flatten_hierarchy(accessibility_data, elements)
+        logger.debug(f"Flattened hierarchy: {len(elements)} elements")
+        return elements
+
+    def _flatten_hierarchy(self, nodes: list[dict], elements: list[dict]) -> None:
+        """Recursively flatten the hierarchy tree into a flat list."""
+        for node in nodes:
             if not isinstance(node, dict):
                 continue
 
             element = {
                 "type": node.get("type", ""),
-                "value": node.get("AXValue", ""),
+                "value": node.get("AXValue", node.get("value", "")),
                 "label": node.get("AXLabel", node.get("label", "")),
                 "frame": node.get("frame", {}),
                 "enabled": node.get("enabled", False),
@@ -600,7 +665,10 @@ class LimrunIosController(MobileDeviceController):
 
             elements.append(element)
 
-        return elements
+            # Recursively process children
+            children = node.get("children", [])
+            if children:
+                self._flatten_hierarchy(children, elements)
 
     def find_element(
         self,
@@ -613,12 +681,33 @@ class LimrunIosController(MobileDeviceController):
         if not resource_id and not text:
             return None, None, "No resource_id or text provided"
 
+        # Debug: log all available labels/values
+        if text:
+            available_texts = []
+            for elem in ui_hierarchy:
+                label = elem.get("label", "")
+                value = elem.get("value", "")
+                if label or value:
+                    available_texts.append(f"label='{label}', value='{value}'")
+            if available_texts:
+                logger.debug(f"Available elements: {available_texts[:20]}")  # First 20
+
         matches = []
         for element in ui_hierarchy:
             if resource_id and element.get("type") == resource_id:
                 matches.append(element)
-            elif text and (element.get("value") == text or element.get("label") == text):
-                matches.append(element)
+            elif text:
+                # Check value, label, and text fields (case-insensitive contains)
+                elem_value = str(element.get("value", "")).lower()
+                elem_label = str(element.get("label", "")).lower()
+                elem_text = str(element.get("text", "")).lower()
+                search_text = text.lower()
+                if (
+                    search_text in elem_value
+                    or search_text in elem_label
+                    or search_text in elem_text
+                ):
+                    matches.append(element)
 
         if not matches:
             criteria = f"type='{resource_id}'" if resource_id else f"text='{text}'"

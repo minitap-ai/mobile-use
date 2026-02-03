@@ -1,5 +1,6 @@
 import asyncio
 import os
+from enum import Enum
 from shutil import which
 from typing import Annotated
 
@@ -13,6 +14,14 @@ from minitap.mobile_use.clients.ios_client_config import (
     IosClientConfig,
     WdaClientConfig,
 )
+from minitap.mobile_use.clients.limrun_factory import (
+    LimrunInstanceConfig,
+    LimrunPlatform,
+    create_limrun_android_instance,
+    create_limrun_ios_instance,
+    delete_limrun_android_instance,
+    delete_limrun_ios_instance,
+)
 from minitap.mobile_use.config import initialize_llm_config, settings
 from minitap.mobile_use.sdk import Agent
 from minitap.mobile_use.sdk.builders import Builders
@@ -24,6 +33,13 @@ from minitap.mobile_use.utils.video import check_ffmpeg_available
 
 app = typer.Typer(add_completion=False, pretty_exceptions_enable=False)
 logger = get_logger(__name__)
+
+
+class DeviceType(str, Enum):
+    """Device type for mobile-use agent."""
+
+    LOCAL = "local"
+    LIMRUN = "limrun"
 
 
 async def run_automation(
@@ -42,6 +58,8 @@ async def run_automation(
     wda_startup_timeout: float | None = None,
     idb_host: str | None = None,
     idb_port: int | None = None,
+    device_type: DeviceType = DeviceType.LOCAL,
+    limrun_platform: LimrunPlatform | None = None,
 ):
     llm_config = initialize_llm_config()
     agent_profile = AgentProfile(name="default", llm_config=llm_config)
@@ -49,20 +67,46 @@ async def run_automation(
     if video_recording_tools_enabled:
         config.with_video_recording_tools()
 
-    # Build iOS client config from CLI options
-    wda_config = WdaClientConfig.with_overrides(
-        wda_url=wda_url,
-        timeout=wda_timeout,
-        auto_start_iproxy=wda_auto_start_iproxy,
-        auto_start_wda=wda_auto_start_wda,
-        wda_project_path=wda_project_path,
-        wda_startup_timeout=wda_startup_timeout,
-    )
-    idb_config = IdbClientConfig.with_overrides(host=idb_host, port=idb_port)
-    config.with_ios_client_config(IosClientConfig(wda=wda_config, idb=idb_config))
+    # Limrun device provisioning
+    limrun_instance_id: str | None = None
+    limrun_controller = None
+    limrun_config: LimrunInstanceConfig | None = None
 
-    if settings.ADB_HOST:
-        config.with_adb_server(host=settings.ADB_HOST, port=settings.ADB_PORT)
+    if device_type == DeviceType.LIMRUN:
+        if limrun_platform is None:
+            raise ValueError("--limrun-platform is required when using --device-type limrun")
+
+        logger.info(f"Provisioning Limrun {limrun_platform.value} device...")
+        limrun_config = LimrunInstanceConfig()
+
+        if limrun_platform == LimrunPlatform.ANDROID:
+            instance, limrun_controller = await create_limrun_android_instance(limrun_config)
+            limrun_instance_id = instance.metadata.id
+            await limrun_controller.connect()
+            config.with_limrun_android_controller(limrun_controller)
+        else:
+            instance, limrun_controller = await create_limrun_ios_instance(limrun_config)
+            limrun_instance_id = instance.metadata.id
+            await limrun_controller.connect()
+            config.with_limrun_ios_controller(limrun_controller)
+
+        logger.info(f"Limrun {limrun_platform.value} device ready: {limrun_instance_id}")
+    else:
+        # Build iOS client config from CLI options (local device)
+        wda_config = WdaClientConfig.with_overrides(
+            wda_url=wda_url,
+            timeout=wda_timeout,
+            auto_start_iproxy=wda_auto_start_iproxy,
+            auto_start_wda=wda_auto_start_wda,
+            wda_project_path=wda_project_path,
+            wda_startup_timeout=wda_startup_timeout,
+        )
+        idb_config = IdbClientConfig.with_overrides(host=idb_host, port=idb_port)
+        config.with_ios_client_config(IosClientConfig(wda=wda_config, idb=idb_config))
+
+        if settings.ADB_HOST:
+            config.with_adb_server(host=settings.ADB_HOST, port=settings.ADB_PORT)
+
     if graph_config_callbacks:
         config.with_graph_config_callbacks(graph_config_callbacks)
 
@@ -93,6 +137,16 @@ async def run_automation(
     finally:
         if agent is not None:
             await agent.clean()
+
+        # Cleanup Limrun device
+        if limrun_instance_id and limrun_config:
+            logger.info(f"Cleaning up Limrun device: {limrun_instance_id}")
+            if limrun_controller:
+                await limrun_controller.cleanup()
+            if limrun_platform == LimrunPlatform.ANDROID:
+                await delete_limrun_android_instance(limrun_config, limrun_instance_id)
+            else:
+                await delete_limrun_ios_instance(limrun_config, limrun_instance_id)
 
 
 @app.command()
@@ -191,6 +245,22 @@ def main(
             " to analyze dynamic content on the screen.",
         ),
     ] = False,
+    device_type: Annotated[
+        DeviceType,
+        typer.Option(
+            "--device-type",
+            "-d",
+            help="Device type: 'local' for connected devices, 'limrun' for cloud devices.",
+        ),
+    ] = DeviceType.LOCAL,
+    limrun_platform: Annotated[
+        LimrunPlatform | None,
+        typer.Option(
+            "--limrun-platform",
+            help="Platform for Limrun cloud device: 'android' or 'ios'. "
+            "Required when --device-type is 'limrun'.",
+        ),
+    ] = None,
 ):
     """
     Run the Mobile-use agent to automate tasks on a mobile device.
@@ -200,17 +270,25 @@ def main(
 
     console = Console()
 
-    adb_client = None
-    try:
-        if which("adb"):
-            adb_client = AdbClient(
-                host=settings.ADB_HOST or "localhost",
-                port=settings.ADB_PORT or 5037,
-            )
-    except Exception:
-        pass  # ADB not available, will only support iOS devices
+    if device_type == DeviceType.LOCAL:
+        adb_client = None
+        try:
+            if which("adb"):
+                adb_client = AdbClient(
+                    host=settings.ADB_HOST or "localhost",
+                    port=settings.ADB_PORT or 5037,
+                )
+        except Exception:
+            pass  # ADB not available, will only support iOS devices
 
-    display_device_status(console, adb_client=adb_client)
+        display_device_status(console, adb_client=adb_client)
+    else:
+        if limrun_platform is None:
+            console.print(
+                "[red]Error: --limrun-platform is required when using --device-type limrun[/red]"
+            )
+            raise typer.Exit(1)
+        console.print(f"[cyan]Using Limrun cloud device ({limrun_platform.value})...[/cyan]")
 
     # Start telemetry session with CLI context (only non-sensitive flags)
     session_id = telemetry.start_session(
@@ -238,6 +316,8 @@ def main(
                 idb_host=idb_host,
                 idb_port=idb_port,
                 video_recording_tools_enabled=with_video_recording_tools,
+                device_type=device_type,
+                limrun_platform=limrun_platform,
             )
         )
     except KeyboardInterrupt:

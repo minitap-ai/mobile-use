@@ -31,6 +31,10 @@ from minitap.mobile_use.context import (
     IsReplan,
     MobileUseContext,
 )
+from minitap.mobile_use.controllers.limrun_controller import (
+    LimrunAndroidController,
+    LimrunIosController,
+)
 from minitap.mobile_use.controllers.platform_specific_commands_controller import get_first_device
 from minitap.mobile_use.graph.graph import get_graph
 from minitap.mobile_use.graph.state import State
@@ -39,7 +43,7 @@ from minitap.mobile_use.sdk.builders.task_request_builder import TaskRequestBuil
 from minitap.mobile_use.sdk.constants import DEFAULT_PROFILE_NAME
 from minitap.mobile_use.sdk.services.cloud_mobile import CloudMobileService
 from minitap.mobile_use.sdk.services.platform import PlatformService
-from minitap.mobile_use.sdk.types.agent import AgentConfig
+from minitap.mobile_use.sdk.types.agent import AgentConfig, LimrunPlatform
 from minitap.mobile_use.sdk.types.exceptions import (
     AgentError,
     AgentNotInitializedError,
@@ -91,6 +95,8 @@ class Agent:
     _current_task: asyncio.Task | None = None
     _task_lock: asyncio.Lock
     _cloud_mobile_id: str | None = None
+    _limrun_instance_id: str | None = None
+    _limrun_controller: Any = None
 
     def __init__(self, *, config: AgentConfig | None = None):
         self._config = config or get_default_agent_config()
@@ -182,6 +188,16 @@ class Agent:
                 device_id="browserstack",
             )
             return True
+
+        # Handle Limrun cloud device initialization
+        # Check for pre-configured controllers first, then fall back to limrun_config
+        if self._config.limrun_android_controller or self._config.limrun_ios_controller:
+            return await self._init_limrun_device(
+                android_controller=self._config.limrun_android_controller,
+                ios_controller=self._config.limrun_ios_controller,
+            )
+        if self._config.limrun_config:
+            return await self._init_limrun_device()
 
         if not which("adb") and not which("xcrun"):
             raise ExecutableNotFoundError("cli_tools")
@@ -925,6 +941,16 @@ class Agent:
             if telemetry._session_id and telemetry._session_context.get("source") == "sdk":
                 telemetry.end_session(success=True)
             return
+
+        # Cleanup Limrun device if provisioned by SDK
+        if self._limrun_instance_id:
+            await self._cleanup_limrun_device()
+            self._initialized = False
+            logger.info("✅ Limrun agent stopped.")
+            if telemetry._session_id and telemetry._session_context.get("source") == "sdk":
+                telemetry.end_session(success=True)
+            return
+
         if not self._initialized and not force:
             return
 
@@ -938,6 +964,193 @@ class Agent:
         # End telemetry session if started by SDK (not CLI)
         if telemetry._session_id and telemetry._session_context.get("source") == "sdk":
             telemetry.end_session(success=True)
+
+    async def _init_limrun_device(
+        self,
+        android_controller: LimrunAndroidController | None = None,
+        ios_controller: LimrunIosController | None = None,
+    ) -> bool:
+        """
+        Initialize a Limrun cloud device.
+
+        This method either uses pre-configured controllers or provisions a new
+        Limrun device based on limrun_config, connects to it, and sets up the
+        appropriate clients for device interaction.
+
+        Args:
+            android_controller: Pre-configured Limrun Android controller (optional).
+            ios_controller: Pre-configured Limrun iOS controller (optional).
+        """
+
+        # Use pre-configured Android controller
+        if android_controller is not None:
+            logger.info("Using pre-configured Limrun Android controller")
+            self._limrun_controller = android_controller
+            self._limrun_instance_id = android_controller.instance_id
+
+            self._adb_client = android_controller._adb_client
+            self._ui_adb_client = android_controller._ui_client
+            self._ios_client = None
+            self._ios_device_type = None
+
+            self._device_context = DeviceContext(
+                host_platform="LINUX",
+                mobile_platform=DevicePlatform.ANDROID,
+                device_id=android_controller._adb_serial or self._limrun_instance_id,
+                device_width=android_controller.device_width,
+                device_height=android_controller.device_height,
+            )
+
+            logger.info(f"Limrun Android device ready: {self._limrun_instance_id}")
+            logger.info(self._device_context.to_str())
+            logger.info("✅ Mobile-use agent initialized with pre-configured Limrun Android.")
+            self._initialized = True
+            telemetry.capture_agent_initialized(
+                platform=DevicePlatform.ANDROID.value,
+                device_id=self._limrun_instance_id,
+            )
+            return True
+
+        # Use pre-configured iOS controller
+        if ios_controller is not None:
+            logger.info("Using pre-configured Limrun iOS controller")
+            self._limrun_controller = ios_controller
+            self._limrun_instance_id = ios_controller.instance_id
+
+            self._adb_client = None
+            self._ui_adb_client = None
+            self._ios_client = ios_controller
+            self._ios_device_type = DeviceType.LIMRUN
+
+            self._device_context = DeviceContext(
+                host_platform="LINUX",
+                mobile_platform=DevicePlatform.IOS,
+                device_id=self._limrun_instance_id,
+                device_width=ios_controller.device_width,
+                device_height=ios_controller.device_height,
+            )
+
+            logger.info(f"Limrun iOS device ready: {self._limrun_instance_id}")
+            logger.info(self._device_context.to_str())
+            logger.info("✅ Mobile-use agent initialized with pre-configured Limrun iOS.")
+            self._initialized = True
+            telemetry.capture_agent_initialized(
+                platform=DevicePlatform.IOS.value,
+                device_id=self._limrun_instance_id,
+            )
+            return True
+
+        # Fall back to provisioning via limrun_config
+        from minitap.mobile_use.clients.limrun_factory import (
+            LimrunInstanceConfig,
+            create_limrun_android_instance,
+            create_limrun_ios_instance,
+        )
+
+        limrun_config = self._config.limrun_config
+        if limrun_config is None:
+            raise ValueError("limrun_config is not set and no pre-configured controller provided")
+
+        logger.info(f"Provisioning Limrun {limrun_config.platform.value} device...")
+
+        instance_config = LimrunInstanceConfig(
+            api_key=limrun_config.api_key,
+            base_url=limrun_config.base_url,
+            inactivity_timeout=limrun_config.inactivity_timeout,
+            hard_timeout=limrun_config.hard_timeout,
+            display_name=limrun_config.display_name,
+            labels=limrun_config.labels,
+        )
+
+        if limrun_config.platform == LimrunPlatform.ANDROID:
+            instance, controller = await create_limrun_android_instance(instance_config)
+            self._limrun_instance_id = instance.metadata.id
+            self._limrun_controller = controller
+            try:
+                await controller.connect()
+            except Exception:
+                await self._cleanup_limrun_device()
+                raise
+
+            self._adb_client = controller._adb_client
+            self._ui_adb_client = controller._ui_client
+            self._ios_client = None
+            self._ios_device_type = None
+
+            self._device_context = DeviceContext(
+                host_platform="LINUX",
+                mobile_platform=DevicePlatform.ANDROID,
+                device_id=controller._adb_serial or self._limrun_instance_id,
+                device_width=controller.device_width,
+                device_height=controller.device_height,
+            )
+        else:
+            instance, controller = await create_limrun_ios_instance(instance_config)
+            self._limrun_instance_id = instance.metadata.id
+            self._limrun_controller = controller
+            try:
+                await controller.connect()
+            except Exception:
+                await self._cleanup_limrun_device()
+                raise
+
+            self._adb_client = None
+            self._ui_adb_client = None
+            self._ios_client = controller
+            self._ios_device_type = DeviceType.LIMRUN
+
+            self._device_context = DeviceContext(
+                host_platform="LINUX",
+                mobile_platform=DevicePlatform.IOS,
+                device_id=self._limrun_instance_id,
+                device_width=controller.device_width,
+                device_height=controller.device_height,
+            )
+
+        logger.info(
+            f"Limrun {limrun_config.platform.value} device ready: {self._limrun_instance_id}"
+        )
+        logger.info(self._device_context.to_str())
+        logger.info("✅ Mobile-use agent initialized with Limrun.")
+        self._initialized = True
+        telemetry.capture_agent_initialized(
+            platform=limrun_config.platform.value,
+            device_id=self._limrun_instance_id,
+        )
+        return True
+
+    async def _cleanup_limrun_device(self) -> None:
+        """Cleanup Limrun device resources."""
+        from minitap.mobile_use.clients.limrun_factory import (
+            LimrunInstanceConfig,
+            delete_limrun_android_instance,
+            delete_limrun_ios_instance,
+        )
+
+        if not self._limrun_instance_id or not self._config.limrun_config:
+            return
+
+        logger.info(f"Cleaning up Limrun device: {self._limrun_instance_id}")
+
+        if self._limrun_controller:
+            await self._limrun_controller.cleanup()
+            self._limrun_controller = None
+
+        limrun_config = self._config.limrun_config
+        instance_config = LimrunInstanceConfig(
+            api_key=limrun_config.api_key,
+            base_url=limrun_config.base_url,
+        )
+
+        try:
+            if limrun_config.platform == LimrunPlatform.ANDROID:
+                await delete_limrun_android_instance(instance_config, self._limrun_instance_id)
+            else:
+                await delete_limrun_ios_instance(instance_config, self._limrun_instance_id)
+        except Exception as e:
+            logger.warning(f"Failed to delete Limrun instance: {e}")
+
+        self._limrun_instance_id = None
 
     async def _prepare_app_lock(self, task: Task, context: MobileUseContext):
         """Prepare app lock by launching the locked app if specified."""

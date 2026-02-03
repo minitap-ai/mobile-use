@@ -8,7 +8,7 @@ from minitap.mobile_use.agents.planner.types import Subgoal
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.controller_factory import create_device_controller
 from minitap.mobile_use.controllers.platform_specific_commands_controller import (
-    get_current_foreground_package,
+    get_current_foreground_package_async,
     get_device_date,
 )
 from minitap.mobile_use.graph.state import State
@@ -32,7 +32,7 @@ class ContextorNode:
     async def __call__(self, state: State):
         device_controller = create_device_controller(self.ctx)
         device_data = await device_controller.get_screen_data()
-        current_app_package = get_current_foreground_package(self.ctx)
+        current_app_package = await get_current_foreground_package_async(self.ctx)
         device_date = get_device_date(self.ctx)
         agent_outcome: str | None = None
 

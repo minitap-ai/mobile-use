@@ -4,6 +4,8 @@ from minitap.mobile_use.sdk.types.agent import (
     AgentConfig,
     ApiBaseUrl,
     DevicePlatform,
+    LimrunConfig,
+    LimrunPlatform,
     ServerConfig,
 )
 from minitap.mobile_use.sdk.types.exceptions import (
@@ -31,6 +33,8 @@ __all__ = [
     "ApiBaseUrl",
     "AgentConfig",
     "DevicePlatform",
+    "LimrunConfig",
+    "LimrunPlatform",
     "AgentProfile",
     "ServerConfig",
     "TaskRequest",
