@@ -1,19 +1,19 @@
 """
 Limrun device controller implementation.
 
-Supports both Android (via ADB forwarding with lim CLI) and iOS (via WebSocket).
+Supports both Android (via ADB forwarding with SDK-based WebSocket tunnel) and iOS (via WebSocket).
 """
 
 import asyncio
 import base64
 import re
-import subprocess
 from io import BytesIO
 
 from adbutils import AdbClient
 from PIL import Image
 
 from minitap.mobile_use.clients.idb_client import IOSAppInfo
+from minitap.mobile_use.clients.adb_tunnel import AdbTunnel
 from minitap.mobile_use.clients.limrun_client import LimrunIosClient
 from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
 from minitap.mobile_use.controllers.device_controller import (
@@ -29,10 +29,10 @@ logger = get_logger(__name__)
 
 class LimrunAndroidController(MobileDeviceController):
     """
-    Limrun Android controller using ADB forwarding via lim CLI.
+    Limrun Android controller using ADB forwarding via SDK-based WebSocket tunnel.
 
-    Uses the lim CLI to establish ADB tunnel, then uses standard ADB/UIAutomator2
-    for device interaction.
+    Uses the Python SDK's AdbTunnel to establish ADB tunnel, then uses standard
+    ADB/UIAutomator2 for device interaction.
     """
 
     def __init__(
@@ -53,52 +53,81 @@ class LimrunAndroidController(MobileDeviceController):
 
         self._adb_client: AdbClient | None = None
         self._ui_client: UIAutomatorClient | None = None
-        self._tunnel_process: subprocess.Popen | None = None
+        self._tunnel: AdbTunnel | None = None
         self._adb_serial: str | None = None
 
     async def connect(self) -> None:
-        """Establish ADB tunnel using lim CLI and connect."""
+        """Establish ADB tunnel using SDK and connect."""
         logger.info(f"Connecting to Limrun Android instance {self.instance_id}")
 
         try:
-            cmd = [
-                "lim",
-                "connect",
-                "android",
-                self.instance_id,
-            ]
-
-            self._tunnel_process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                stdin=subprocess.DEVNULL,
+            self._tunnel = AdbTunnel(
+                remote_url=self.adb_ws_url,
+                token=self.token,
             )
 
-            await asyncio.sleep(2)
+            tunnel_addr = await self._tunnel.start()
+            logger.info(f"ADB tunnel started on {tunnel_addr}")
 
-            if self._tunnel_process.poll() is not None:
-                stderr = self._tunnel_process.stderr.read() if self._tunnel_process.stderr else ""
-                raise RuntimeError(f"lim connect android failed: {stderr}")
+            # Give the tunnel thread a moment to be fully ready
+            await asyncio.sleep(0.5)
 
+            # Kill any existing ADB server to ensure clean state
+            proc = await asyncio.create_subprocess_exec(
+                "adb",
+                "kill-server",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            await proc.communicate()
+            await asyncio.sleep(0.5)
+
+            # Start the ADB server explicitly
+            proc = await asyncio.create_subprocess_exec(
+                "adb",
+                "start-server",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await proc.communicate()
+            logger.info(f"ADB start-server: {stderr.decode().strip()}")
+            await asyncio.sleep(1.0)
+
+            # Now connect to the tunnel
+            logger.info(f"Running: adb connect {tunnel_addr}")
+            proc = await asyncio.create_subprocess_exec(
+                "adb",
+                "connect",
+                tunnel_addr,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await proc.communicate()
+            stdout_str = stdout.decode().strip()
+            stderr_str = stderr.decode().strip()
+            logger.info(f"ADB connect stdout: {stdout_str}")
+            if stderr_str:
+                logger.info(f"ADB connect stderr: {stderr_str}")
+
+            # Wait a moment for the connection to establish
+            await asyncio.sleep(2.0)
+
+            # Now create the adbutils client
             self._adb_client = AdbClient(host="127.0.0.1", port=5037)
 
             max_retries = 15
             for attempt in range(max_retries):
-                devices = self._adb_client.device_list()
-                if devices:
-                    self._adb_serial = devices[0].serial
+                devices = await asyncio.to_thread(self._adb_client.device_list)
+                tunnel_device = next(
+                    (d for d in devices if d.serial and tunnel_addr in d.serial),
+                    None,
+                )
+                if tunnel_device:
+                    self._adb_serial = tunnel_device.serial
                     logger.info(f"Connected to Limrun Android device: {self._adb_serial}")
                     break
 
-                if self._tunnel_process.poll() is not None:
-                    stderr = ""
-                    if self._tunnel_process.stderr:
-                        stderr = self._tunnel_process.stderr.read()
-                    raise RuntimeError(f"lim tunnel exited unexpectedly: {stderr}")
-
-                logger.debug(f"Waiting for ADB device (attempt {attempt + 1}/{max_retries})...")
+                logger.info(f"Waiting for ADB device (attempt {attempt + 1}/{max_retries})...")
                 await asyncio.sleep(2)
             else:
                 raise RuntimeError(
@@ -360,13 +389,9 @@ class LimrunAndroidController(MobileDeviceController):
 
     async def cleanup(self) -> None:
         """Cleanup resources."""
-        if self._tunnel_process:
-            self._tunnel_process.terminate()
-            try:
-                self._tunnel_process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self._tunnel_process.kill()
-            self._tunnel_process = None
+        if self._tunnel:
+            await self._tunnel.stop()
+            self._tunnel = None
 
         self._adb_client = None
         self._ui_client = None
