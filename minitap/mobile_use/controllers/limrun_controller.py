@@ -137,6 +137,9 @@ class LimrunAndroidController(MobileDeviceController):
 
             if self._adb_serial is not None:
                 self._ui_client = UIAutomatorClient(device_id=self._adb_serial)
+                # Enable fast input IME keyboard
+                device = await asyncio.to_thread(self._ui_client._ensure_connected)
+                await asyncio.to_thread(device.set_fastinput_ime, True)
 
         except Exception as e:
             logger.error(f"Failed to connect to Limrun Android: {e}")
@@ -245,7 +248,18 @@ class LimrunAndroidController(MobileDeviceController):
     async def launch_app(self, package_or_bundle_id: str) -> bool:
         """Launch an application."""
         try:
-            self.device.app_start(package_or_bundle_id)
+            self.device.shell(
+                [
+                    "monkey",
+                    "-p",
+                    package_or_bundle_id,
+                    "-c",
+                    "android.intent.category.LAUNCHER",
+                    "--pct-syskeys",  # Disable system key events not supported by Limrun mobiles
+                    "0",
+                    "1",
+                ]
+            )
             return True
         except Exception as e:
             logger.error(f"Failed to launch app {package_or_bundle_id}: {e}")
