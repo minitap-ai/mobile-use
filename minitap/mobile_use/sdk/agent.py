@@ -363,6 +363,184 @@ class Agent:
         )
         logger.success(f"APK '{apk_path.name}' installed successfully")
 
+    async def install_app(self, app_path: str | Path) -> str | None:
+        """
+        Install an app on the connected device.
+
+        For Android: Installs an APK file using ADB.
+        For iOS (Limrun): Uploads and installs a .app folder using diff-based
+                         patch syncing for fast updates.
+
+        Args:
+            app_path: Path to the app to install:
+                      - Android: Path to an APK file
+                      - iOS: Path to a .app folder (simulator build)
+
+        Returns:
+            The bundle ID of the installed app (iOS only), or None for Android.
+
+        Raises:
+            AgentNotInitializedError: If the agent is not initialized
+            AgentError: If installation fails or platform is unsupported
+            FileNotFoundError: If the app file/folder doesn't exist
+        """
+        try:
+            return await self._install_app_internal(app_path)
+        except Exception as e:
+            telemetry.capture_exception(e, {"phase": "install_app"})
+            raise
+
+    async def _install_app_internal(self, app_path: str | Path) -> str | None:
+        if isinstance(app_path, str):
+            app_path = Path(app_path)
+
+        if not app_path.exists():
+            raise FileNotFoundError(f"App not found: {app_path}")
+
+        if not self._initialized:
+            raise AgentNotInitializedError()
+
+        platform = self._device_context.mobile_platform
+
+        if platform == DevicePlatform.ANDROID:
+            # For Android, delegate to install_apk
+            await self._install_apk_internal(app_path)
+            return None
+
+        elif platform == DevicePlatform.IOS:
+            # For iOS (Limrun), use the iOS app installation flow
+            return await self._install_ios_app(app_path)
+
+        else:
+            raise AgentError(f"App installation not supported for platform: {platform}")
+
+    async def _install_ios_app(self, app_path: Path) -> str:
+        """
+        Install an iOS .app bundle on a Limrun iOS device.
+
+        Uses diff-based patch syncing for fast updates - only changed parts
+        of the app are uploaded.
+
+        Args:
+            app_path: Path to the .app folder (simulator build)
+
+        Returns:
+            The bundle ID of the installed app
+
+        Raises:
+            AgentError: If not connected to a Limrun iOS device
+            FileNotFoundError: If the .app folder doesn't exist
+        """
+        import hashlib
+        import shutil
+        import tempfile
+
+        import httpx
+        from limrun_api import AsyncLimrun
+
+        from minitap.mobile_use.config import settings
+        from minitap.mobile_use.controllers.limrun_controller import LimrunIosController
+
+        if not app_path.is_dir() or not app_path.suffix == ".app":
+            raise AgentError(
+                f"Expected a .app folder for iOS, got: {app_path}. "
+                "Please provide the path to your built .app folder "
+                "(e.g., build/Debug-iphonesimulator/MyApp.app)"
+            )
+
+        # Check if we have a Limrun iOS controller
+        if not isinstance(self._ios_client, LimrunIosController):
+            raise AgentError(
+                "iOS app installation is only supported for Limrun iOS devices. "
+                "For local simulators, use 'xcrun simctl install' directly."
+            )
+
+        limrun_controller: LimrunIosController = self._ios_client
+
+        # Get API key from settings or platform service
+        api_key_value: str | None = None
+        if settings.MINITAP_API_KEY:
+            api_key_raw = settings.MINITAP_API_KEY
+            api_key_value = (
+                api_key_raw.get_secret_value()
+                if hasattr(api_key_raw, "get_secret_value")
+                else str(api_key_raw)
+            )
+        if not api_key_value and self._platform_service:
+            api_key_value = self._platform_service._api_key
+        if not api_key_value:
+            raise AgentError(
+                "API key is required for iOS app installation. "
+                "Set MINITAP_API_KEY environment variable."
+            )
+
+        base_url = settings.MINITAP_BASE_URL or "https://platform.minitap.ai"
+
+        app_name = app_path.stem
+        asset_name = f"{app_name}.zip"
+
+        logger.info(f"Preparing iOS app for upload: {app_name}")
+
+        # Create a temporary zip file
+        with tempfile.TemporaryDirectory() as temp_dir:
+            zip_path = Path(temp_dir) / asset_name
+            zip_base = str(zip_path.with_suffix(""))
+            shutil.make_archive(zip_base, "zip", app_path.parent, app_path.name)
+
+            # Calculate MD5 hash
+            md5 = hashlib.md5()
+            with open(zip_path, "rb") as f:
+                for chunk in iter(lambda: f.read(8192), b""):
+                    md5.update(chunk)
+            md5_hash = md5.hexdigest()
+
+            logger.info(f"Created zip archive: {zip_path.name}, MD5: {md5_hash}")
+
+            # Upload to Limrun using assets API
+            client = AsyncLimrun(api_key=api_key_value, base_url=f"{base_url}/api/v1/limrun")
+            try:
+                logger.info("Getting upload URL from Limrun assets API...")
+                asset_response = await client.assets.get_or_create(name=asset_name)
+
+                # Check if we need to upload (MD5 mismatch or no existing file)
+                existing_md5 = asset_response.md5
+                if existing_md5 == md5_hash:
+                    logger.info("App already uploaded with matching MD5, skipping upload")
+                else:
+                    upload_url = asset_response.signed_upload_url
+                    if not upload_url:
+                        raise AgentError("No upload URL returned from Limrun assets API")
+
+                    logger.info("Uploading iOS app to Limrun storage...")
+                    async with httpx.AsyncClient(timeout=300.0) as http_client:
+                        with open(zip_path, "rb") as f:
+                            response = await http_client.put(
+                                upload_url,
+                                content=f.read(),
+                                headers={"Content-Type": "application/zip"},
+                            )
+                            response.raise_for_status()
+                    logger.info("iOS app uploaded successfully")
+
+                download_url = asset_response.signed_download_url
+                if not download_url:
+                    raise AgentError("No download URL returned from Limrun assets API")
+
+            finally:
+                await client.close()
+
+        # Install app via WebSocket
+        logger.info("Installing app on Limrun iOS device...")
+        install_result = await limrun_controller.client.install_app(url=download_url, md5=md5_hash)
+        bundle_id = install_result.get("bundleId", "")
+
+        if bundle_id:
+            logger.success(f"iOS app installed successfully: {bundle_id}")
+        else:
+            logger.success("iOS app installed successfully")
+
+        return bundle_id
+
     def new_task(self, goal: str):
         """
         Create a new task request builder.
@@ -394,6 +572,7 @@ class Agent:
         profile: str | AgentProfile | None = None,
         name: str | None = None,
         locked_app_package: str | None = None,
+        app_path: str | Path | None = None,
     ) -> TOutput | None: ...
 
     @overload
@@ -405,6 +584,7 @@ class Agent:
         profile: str | AgentProfile | None = None,
         name: str | None = None,
         locked_app_package: str | None = None,
+        app_path: str | Path | None = None,
     ) -> str | dict | None: ...
 
     @overload
@@ -416,6 +596,7 @@ class Agent:
         profile: str | AgentProfile | None = None,
         name: str | None = None,
         locked_app_package: str | None = None,
+        app_path: str | Path | None = None,
     ) -> str | None: ...
 
     @overload
@@ -424,6 +605,7 @@ class Agent:
         *,
         request: TaskRequest[None],
         locked_app_package: str | None = None,
+        app_path: str | Path | None = None,
     ) -> str | dict | None: ...
 
     @overload
@@ -432,6 +614,7 @@ class Agent:
         *,
         request: TaskRequest[TOutput],
         locked_app_package: str | None = None,
+        app_path: str | Path | None = None,
     ) -> TOutput | None: ...
 
     @overload
@@ -440,6 +623,7 @@ class Agent:
         *,
         request: PlatformTaskRequest[None],
         locked_app_package: str | None = None,
+        app_path: str | Path | None = None,
     ) -> str | dict | None: ...
 
     @overload
@@ -448,6 +632,7 @@ class Agent:
         *,
         request: PlatformTaskRequest[TOutput],
         locked_app_package: str | None = None,
+        app_path: str | Path | None = None,
     ) -> TOutput | None: ...
 
     async def run_task(
@@ -458,6 +643,7 @@ class Agent:
         profile: str | AgentProfile | None = None,
         locked_app_package: str | None = None,
         name: str | None = None,
+        app_path: str | Path | None = None,
         request: TaskRequest[TOutput] | PlatformTaskRequest[TOutput] | None = None,
     ) -> str | dict | TOutput | None:
         # Check if cloud mobile is configured
@@ -495,6 +681,14 @@ class Agent:
                         "Using the parameter value."
                     )
                 request.locked_app_package = locked_app_package
+            # Handle app_path parameter override
+            if app_path is not None:
+                if request.app_path:
+                    logger.warning(
+                        "App path specified both in the request and as a parameter. "
+                        "Using the parameter value."
+                    )
+                request.app_path = Path(app_path) if isinstance(app_path, str) else app_path
             return await self._run_task(
                 request=request, task_info=task_info, platform_service=self._platform_service
             )
@@ -512,6 +706,8 @@ class Agent:
             task_request.with_name(name=name)
         if locked_app_package is not None:
             task_request.with_locked_app_package(package_name=locked_app_package)
+        if app_path is not None:
+            task_request.with_app_path(app_path=app_path)
         return await self._run_task(task_request.build())
 
     async def _run_cloud_mobile_task(
@@ -698,6 +894,7 @@ class Agent:
         )
 
         self._prepare_tracing(task=task, context=context)
+        await self._prepare_app_installation(task=task)
         await self._prepare_app_lock(task=task, context=context)
         self._prepare_output_files(task=task)
 
@@ -1163,6 +1360,29 @@ class Agent:
             )
 
         self._limrun_instance_id = None
+
+    async def _prepare_app_installation(self, task: Task) -> str | None:
+        """Install app if app_path is specified in the task request.
+
+        Returns:
+            The bundle ID of the installed app (iOS only), or None.
+        """
+        if not task.request.app_path:
+            return None
+
+        task_name = task.get_name()
+        logger.info(f"[{task_name}] Installing app from: {task.request.app_path}")
+
+        bundle_id = await self.install_app(task.request.app_path)
+
+        if bundle_id:
+            logger.info(f"[{task_name}] App installed with bundle ID: {bundle_id}")
+            # If locked_app_package is not set, automatically lock to the installed app
+            if not task.request.locked_app_package:
+                logger.info(f"[{task_name}] Auto-locking to installed app: {bundle_id}")
+                task.request.locked_app_package = bundle_id
+
+        return bundle_id
 
     async def _prepare_app_lock(self, task: Task, context: MobileUseContext):
         """Prepare app lock by launching the locked app if specified."""

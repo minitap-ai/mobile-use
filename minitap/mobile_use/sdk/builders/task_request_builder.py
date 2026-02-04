@@ -28,6 +28,7 @@ class TaskRequestCommonBuilder(BaseModel):
         self._llm_output_path: Path | None = None
         self._thoughts_output_path: Path | None = None
         self._locked_app_package: str | None = None
+        self._app_path: Path | None = None
 
     def with_max_steps(self, max_steps: int) -> Self:
         """
@@ -88,6 +89,22 @@ class TaskRequestCommonBuilder(BaseModel):
         self._locked_app_package = package_name
         return self
 
+    def with_app_path(self, app_path: str | Path) -> Self:
+        """
+        Set the path to an app to install before running the task.
+
+        For Android: Path to an APK file.
+        For iOS (Limrun): Path to a .app folder (simulator build).
+
+        The app will be installed automatically before the task starts.
+        For iOS on Limrun, this uses diff-based patch syncing for fast updates.
+
+        Args:
+            app_path: Path to the app file/folder to install
+        """
+        self._app_path = Path(app_path) if isinstance(app_path, str) else app_path
+        return self
+
     def build(self) -> TaskRequestCommon:
         """
         Build the TaskRequestCommon object.
@@ -105,6 +122,7 @@ class TaskRequestCommonBuilder(BaseModel):
             llm_output_path=self._llm_output_path,
             thoughts_output_path=self._thoughts_output_path,
             locked_app_package=self._locked_app_package,
+            app_path=self._app_path,
         )
 
 
@@ -144,6 +162,7 @@ class TaskRequestBuilder[TIn](TaskRequestCommonBuilder):
         res._llm_output_path = common.llm_output_path
         res._thoughts_output_path = common.thoughts_output_path
         res._locked_app_package = common.locked_app_package
+        res._app_path = common.app_path
         return res
 
     def using_profile(self, profile: str | AgentProfile) -> "TaskRequestBuilder[TIn]":
@@ -232,5 +251,6 @@ class TaskRequestBuilder[TIn](TaskRequestCommonBuilder):
             llm_output_path=self._llm_output_path,
             thoughts_output_path=self._thoughts_output_path,
             locked_app_package=self._locked_app_package,
+            app_path=self._app_path,
         )
         return task_request
