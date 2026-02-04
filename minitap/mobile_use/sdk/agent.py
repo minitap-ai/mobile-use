@@ -898,10 +898,23 @@ class Agent:
             return screenshot
 
         elif self._device_context.mobile_platform == DevicePlatform.IOS:
-            # Use xcrun to capture screenshot
+            from io import BytesIO
+
+            from minitap.mobile_use.controllers.limrun_controller import LimrunIosController
+
+            # Check if using Limrun iOS controller
+            if isinstance(self._ios_client, LimrunIosController):
+                logger.info("Capturing screenshot from Limrun iOS device")
+                screenshot_bytes = await self._ios_client.screenshot()
+                if screenshot_bytes is None:
+                    raise Exception("Failed to capture screenshot from Limrun iOS device")
+                screenshot = Image.open(BytesIO(screenshot_bytes))
+                logger.info("Screenshot captured from Limrun iOS device")
+                return screenshot
+
+            # Use xcrun to capture screenshot for local simulators
             import functools
             import subprocess
-            from io import BytesIO
 
             logger.info("Capturing screenshot from local iOS device")
             try:
