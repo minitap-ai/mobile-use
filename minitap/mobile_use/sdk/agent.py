@@ -506,13 +506,22 @@ class Agent:
 
                     logger.info("Uploading iOS app to Limrun storage...")
                     async with httpx.AsyncClient(timeout=300.0) as http_client:
-                        with open(zip_path, "rb") as f:
-                            response = await http_client.put(
-                                upload_url,
-                                content=f.read(),
-                                headers={"Content-Type": "application/zip"},
-                            )
-                            response.raise_for_status()
+
+                        def file_chunk_generator():
+                            """Generator that yields file chunks for streaming upload."""
+                            with open(zip_path, "rb") as f:
+                                while True:
+                                    chunk = f.read(64 * 1024)  # 64KB chunks
+                                    if not chunk:
+                                        break
+                                    yield chunk
+
+                        response = await http_client.put(
+                            upload_url,
+                            content=file_chunk_generator(),
+                            headers={"Content-Type": "application/zip"},
+                        )
+                        response.raise_for_status()
                     logger.info("iOS app uploaded successfully")
 
                 download_url = asset_response.signed_download_url
