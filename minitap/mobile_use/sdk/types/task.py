@@ -80,6 +80,15 @@ class TaskRequestCommon(TaskRequestBase):
 
     max_steps: int = RECURSION_LIMIT
     locked_app_package: str | None = None
+    app_path: Path | None = None
+    """Path to an app to install before running the task.
+    
+    For Android: Path to an APK file.
+    For iOS (Limrun): Path to a .app folder (simulator build).
+    
+    The app will be installed automatically before the task starts.
+    For iOS on Limrun, this uses diff-based patch syncing for fast updates.
+    """
 
 
 class TaskRequest[TOutput](TaskRequestCommon):
