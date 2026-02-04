@@ -1,4 +1,6 @@
 import asyncio
+import hashlib
+import shutil
 import sys
 import tempfile
 import uuid
@@ -10,9 +12,11 @@ from shutil import which
 from types import NoneType
 from typing import Any, TypeVar, overload
 
+import httpx
 from adbutils import AdbClient
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage
+from limrun_api import AsyncLimrun
 from PIL import Image
 from pydantic import BaseModel
 
@@ -403,12 +407,10 @@ class Agent:
         platform = self._device_context.mobile_platform
 
         if platform == DevicePlatform.ANDROID:
-            # For Android, delegate to install_apk
             await self._install_apk_internal(app_path)
             return None
 
         elif platform == DevicePlatform.IOS:
-            # For iOS (Limrun), use the iOS app installation flow
             return await self._install_ios_app(app_path)
 
         else:
@@ -431,15 +433,6 @@ class Agent:
             AgentError: If not connected to a Limrun iOS device
             FileNotFoundError: If the .app folder doesn't exist
         """
-        import hashlib
-        import shutil
-        import tempfile
-
-        import httpx
-        from limrun_api import AsyncLimrun
-
-        from minitap.mobile_use.config import settings
-        from minitap.mobile_use.controllers.limrun_controller import LimrunIosController
 
         if not app_path.is_dir() or not app_path.suffix == ".app":
             raise AgentError(
