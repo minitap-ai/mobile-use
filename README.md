@@ -13,7 +13,9 @@
 
 <h3>
     <a href="https://platform.mobile-use.ai"><b>☁️ Cloud</b></a> •
-    <a href="https://docs.minitap.ai/v2/mcp-server/introduction"><b>📚 Documentation</b></a>
+    <a href="https://docs.minitap.ai/v2/mcp-server/introduction"><b>📚 Documentation</b></a> •
+    <a href="https://arxiv.org/abs/2602.07787"><b>📃 Paper</b></a>
+
 </h3>
 <p align="center">
     <a href="https://discord.gg/6nSqmQ9pQs"><b>Discord</b></a> •
@@ -50,6 +52,8 @@ We stand as the top performers and the first to have completed 100% of the Andro
 Get more info about how we reached this milestone here: [Minitap Benchmark](https://minitap.ai/benchmark).
 
 The official leaderboard is available [here](https://docs.google.com/spreadsheets/d/1cchzP9dlTZ3WXQTfYNhh3avxoLipqHN75v1Tb86uhHo/edit?pli=1&gid=0#gid=0).
+
+Check out our research paper [here](https://arxiv.org/abs/2602.07787).
 
 ## 🚀 Getting Started
 
@@ -274,4 +278,23 @@ If you use this code, or are inspired by the architecture used to reach our benc
 
 ### How to Cite
 If you use this work in research or a commercial product, please use the following:
-> Minitap, Inc. (2026). Mobile-Use: Achieving 100% on AndroidWorld. GitHub: https://github.com/minitap-ai/mobile-use
+> Pierre-Louis Favreau, Jean-Pierre Lo, Clement Guiguet, Charles Simon-Meunier,  
+Nicolas Dehandschoewercker, Allen G. Roush, Judah Goldfeder, Ravid Shwartz-Ziv.  
+*Do Multi-Agents Dream of Electric Screens? Achieving Perfect Accuracy on AndroidWorld Through Task Decomposition.*  
+arXiv preprint arXiv:2602.07787 (2026).  
+https://arxiv.org/abs/2602.07787
+
+#### Bibtex
+
+
+```bibtex
+@misc{favreau2026multiagentsdreamelectricscreens,
+  title        = {Do Multi-Agents Dream of Electric Screens? Achieving Perfect Accuracy on AndroidWorld Through Task Decomposition},
+  author       = {Pierre-Louis Favreau and Jean-Pierre Lo and Clement Guiguet and Charles Simon-Meunier and Nicolas Dehandschoewercker and Allen G. Roush and Judah Goldfeder and Ravid Shwartz-Ziv},
+  year         = {2026},
+  eprint       = {2602.07787},
+  archivePrefix= {arXiv},
+  primaryClass = {cs.AI},
+  url          = {https://arxiv.org/abs/2602.07787}
+}
+
