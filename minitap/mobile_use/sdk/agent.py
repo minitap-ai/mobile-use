@@ -62,7 +62,6 @@ from minitap.mobile_use.sdk.types.exceptions import (
 from minitap.mobile_use.sdk.types.platform import TaskRunPlanResponse, TaskRunStatus
 from minitap.mobile_use.sdk.types.task import (
     AgentProfile,
-    CloudDevicePlatformTaskRequest,
     PlatformTaskInfo,
     PlatformTaskRequest,
     Task,
@@ -662,9 +661,8 @@ class Agent:
                     locked_app_package=locked_app_package,
                     enable_video_tools=self._config.video_recording_enabled,
                 )
-                if isinstance(request, CloudDevicePlatformTaskRequest):
-                    request.task_run_id = task_info.task_run.id
-                    request.task_run_id_available_event.set()
+                request.task_run_id = task_info.task_run.id
+                request.task_run_id_available_event.set()
                 self._config.agent_profiles[task_info.llm_profile.name] = task_info.llm_profile
                 request = task_info.task_request
             elif locked_app_package is not None:
