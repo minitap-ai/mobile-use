@@ -150,13 +150,13 @@ class PlatformTaskRequest[TOutput](TaskRequestBase):
     execution_origin: str = "sdk"
     record_trace: bool = True
     trace_path: Path = Path(tempfile.gettempdir()) / "mobile-use-traces"
+    task_run_id_available_event: Event = Field(default_factory=Event)
+    task_run_id: str | None = None
 
 
 class CloudDevicePlatformTaskRequest[TOutput](PlatformTaskRequest[TOutput]):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    task_run_id_available_event: Event = Event()
-    task_run_id: str | None = None
     virtual_mobile_id: str | None = None
 
 
