@@ -285,7 +285,7 @@ def get_default_minitap_llm_config(validate: bool = True) -> LLMConfig | None:
         ),
         cortex=LLMWithFallback(
             provider="minitap",
-            model="google/gemini-2.5-pro",
+            model="google/gemini-3-pro-preview",
             fallback=LLM(provider="minitap", model="openai/gpt-5"),
         ),
         executor=LLMWithFallback(

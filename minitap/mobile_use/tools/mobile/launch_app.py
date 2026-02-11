@@ -13,6 +13,9 @@ from minitap.mobile_use.controllers.platform_specific_commands_controller import
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 from minitap.mobile_use.utils.app_launch_utils import launch_app_with_retries
+from minitap.mobile_use.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 async def find_package(ctx: MobileUseContext, app_name: str) -> str | None:
@@ -31,7 +34,7 @@ async def find_package(ctx: MobileUseContext, app_name: str) -> str | None:
             return None
         return hopper_output.output
     except Exception as e:
-        print(f"Failed to find package for '{app_name}': {e}")
+        logger.error(f"Failed to find package for '{app_name}': {e}")
         return None
 
 

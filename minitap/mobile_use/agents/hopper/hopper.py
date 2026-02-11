@@ -6,6 +6,9 @@ from pydantic import BaseModel, Field
 
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message, with_fallback
+from minitap.mobile_use.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class HopperOutput(BaseModel):
@@ -22,7 +25,7 @@ async def hopper(
     request: str,
     data: str,
 ) -> HopperOutput:
-    print("Starting Hopper Agent", flush=True)
+    logger.info("Starting Hopper Agent")
     system_message = Template(
         Path(__file__).parent.joinpath("hopper.md").read_text(encoding="utf-8")
     ).render()
