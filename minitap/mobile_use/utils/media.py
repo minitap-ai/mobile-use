@@ -6,6 +6,10 @@ from pathlib import Path
 
 from PIL import Image
 
+from minitap.mobile_use.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 USE_FFMPEG_GIF = os.environ.get("USE_FFMPEG_GIF", "").lower() in ("1", "true", "yes")
 
 
@@ -148,14 +152,14 @@ def create_gif_from_trace_folder(trace_folder_path: Path):
 
     image_files.sort(key=lambda f: int(f.stem))
 
-    print(f"Found {len(image_files)} images to compile")
+    logger.info(f"Found {len(image_files)} images to compile")
 
     if not image_files:
         return
 
     gif_path = trace_folder_path / "trace.gif"
     quantize_and_save_gif_from_paths(image_files, gif_path)
-    print(f"GIF created at {gif_path}")
+    logger.info(f"GIF created at {gif_path}")
 
 
 def remove_images_from_trace_folder(trace_folder_path: Path):
@@ -174,7 +178,7 @@ def create_steps_json_from_trace_folder(trace_folder_path: Path):
 
     steps.sort(key=lambda f: f["timestamp"])
 
-    print("Found " + str(len(steps)) + " steps to compile")
+    logger.info(f"Found {len(steps)} steps to compile")
 
     with open(trace_folder_path / "steps.json", "w", encoding="utf-8", errors="ignore") as f:
         f.write(json.dumps(steps))
