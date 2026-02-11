@@ -280,7 +280,7 @@ If you use this code, or are inspired by the architecture used to reach our benc
 If you use this work in research or a commercial product, please use the following:
 > Pierre-Louis Favreau, Jean-Pierre Lo, Clement Guiguet, Charles Simon-Meunier,  
 Nicolas Dehandschoewercker, Allen G. Roush, Judah Goldfeder, Ravid Shwartz-Ziv.  
-*Do Multi-Agents Dream of Electric Screens? Achieving Perfect Accuracy on AndroidWorld Through Task Decomposition.*  
+_Do Multi-Agents Dream of Electric Screens? Achieving Perfect Accuracy on AndroidWorld Through Task Decomposition._  
 arXiv preprint arXiv:2602.07787 (2026).  
 https://arxiv.org/abs/2602.07787
 
