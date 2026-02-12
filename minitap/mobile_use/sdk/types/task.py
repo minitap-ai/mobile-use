@@ -145,6 +145,8 @@ class PlatformTaskRequest[TOutput](TaskRequestBase):
         trace_path: Path to save traces (default: temp directory)
     """
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     task: str | ManualTaskConfig
     profile: str | None = None
     execution_origin: str = "sdk"
@@ -155,8 +157,6 @@ class PlatformTaskRequest[TOutput](TaskRequestBase):
 
 
 class CloudDevicePlatformTaskRequest[TOutput](PlatformTaskRequest[TOutput]):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
     virtual_mobile_id: str | None = None
 
 
