@@ -1,6 +1,6 @@
 // Override the LLM config here for the agents.
 
-// Supported providers: openai, google, openrouter, xai, vertexai
+// Supported providers: openai, google, openrouter, xai, vertexai, anthropic
 // You can use any model as long as it is supported by the provider.
 
 // Do not modify this file directly, instead copy it to llm.override.jsonc and modify it there.

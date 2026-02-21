@@ -84,6 +84,11 @@ Follow our [Platform quickstart](https://docs.minitap.ai/mobile-use-sdk/platform
     2. In your `llm-config.override.jsonc`, set `openai` as the provider for the agent nodes you want, and choose a model supported by your provider.
 
     > [!NOTE]
+    > If you want to use Anthropic Claude, set `ANTHROPIC_API_KEY` in your `.env`.
+    > Alternatively, if you have an OAuth token from `claude setup-token`, set `ANTHROPIC_AUTH_TOKEN` instead.
+    > If both are set, `ANTHROPIC_AUTH_TOKEN` takes priority.
+
+    > [!NOTE]
     > If you want to use Google Vertex AI, you must either:
     >
     > - Have credentials configured for your environment (gcloud, workload identity, etc…)
