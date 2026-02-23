@@ -23,6 +23,7 @@ dependencies = [
     "python-dotenv==1.1.1",
     "pydantic-settings==2.10.1",
     "langchain-mcp-adapters==0.1.7",
+    "langchain-anthropic>=0.3.0",
     "langchain-openai==0.3.27",
     "typer==0.16.0",
     "langchain-cerebras>=0.5.0",

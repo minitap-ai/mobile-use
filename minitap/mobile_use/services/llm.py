@@ -3,6 +3,7 @@ import logging
 from collections.abc import Awaitable, Callable, Coroutine
 from typing import Any, Literal, TypeVar, overload
 
+from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_google_vertexai import ChatVertexAI
@@ -119,6 +120,45 @@ def get_vertex_llm(
     return client
 
 
+class _ChatAnthropicOAuth(ChatAnthropic):
+    """ChatAnthropic subclass that uses OAuth Bearer token auth instead of API key.
+
+    The underlying anthropic SDK reads ANTHROPIC_AUTH_TOKEN from env and sends
+    an Authorization: Bearer header. We override _client_params to set api_key=None
+    so the SDK doesn't also send an X-Api-Key header (which would fail validation).
+    """
+
+    @property
+    def _client_params(self) -> dict[str, Any]:
+        params = super()._client_params
+        params["api_key"] = None
+        return params
+
+
+def get_anthropic_llm(
+    model_name: str = "claude-sonnet-4-20250514",
+    temperature: float = 1,
+) -> ChatAnthropic:
+    if settings.ANTHROPIC_AUTH_TOKEN:
+        # OAuth token (e.g. from `claude setup-token`)
+        client = _ChatAnthropicOAuth(
+            model=model_name,
+            anthropic_api_key=SecretStr("not-used"),
+            default_headers={"anthropic-beta": "oauth-2025-04-20"},
+            temperature=temperature,
+            max_retries=2,
+        )
+    else:
+        assert settings.ANTHROPIC_API_KEY is not None
+        client = ChatAnthropic(
+            model=model_name,
+            api_key=settings.ANTHROPIC_API_KEY,
+            temperature=temperature,
+            max_retries=2,
+        )
+    return client
+
+
 def get_openai_llm(
     model_name: str = "o3",
     temperature: float = 1,
@@ -203,7 +243,9 @@ def get_llm(
             llm = llm.fallback
         else:
             raise ValueError("LLM has no fallback!")
-    if llm.provider == "openai":
+    if llm.provider == "anthropic":
+        return get_anthropic_llm(llm.model, temperature)
+    elif llm.provider == "openai":
         return get_openai_llm(llm.model, temperature)
     elif llm.provider == "google":
         return get_google_llm(llm.model, temperature)
