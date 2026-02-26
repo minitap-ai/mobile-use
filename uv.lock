@@ -1464,7 +1464,7 @@ wheels = [
 
 [[package]]
 name = "minitap-mobile-use"
-version = "3.5.3"
+version = "3.5.4"
 source = { editable = "." }
 dependencies = [
     { name = "adbutils" },
@@ -1517,37 +1517,37 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "adbutils", specifier = "==2.9.3" },
+    { name = "adbutils", specifier = ">=2.9.3" },
     { name = "appium-python-client", specifier = ">=5.0.0" },
     { name = "colorama", specifier = ">=0.4.6" },
     { name = "facebook-wda", specifier = ">=1.5.4" },
-    { name = "fastapi", specifier = "==0.111.0" },
-    { name = "fb-idb", specifier = "==1.1.7" },
+    { name = "fastapi", specifier = ">=0.111.0" },
+    { name = "fb-idb", specifier = ">=1.1.7" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "inquirer", specifier = ">=3.4.0" },
-    { name = "jinja2", specifier = "==3.1.6" },
+    { name = "jinja2", specifier = ">=3.1.6" },
     { name = "langchain", specifier = ">=0.3.27" },
     { name = "langchain-cerebras", specifier = ">=0.5.0" },
     { name = "langchain-core", specifier = ">=0.3.75" },
     { name = "langchain-google-genai", specifier = ">=2.1.10" },
     { name = "langchain-google-vertexai", specifier = ">=2.0.28" },
-    { name = "langchain-mcp-adapters", specifier = "==0.1.7" },
-    { name = "langchain-openai", specifier = "==0.3.27" },
+    { name = "langchain-mcp-adapters", specifier = ">=0.1.7" },
+    { name = "langchain-openai", specifier = ">=0.3.27" },
     { name = "langgraph", specifier = ">=1.0.0" },
     { name = "limrun-api", specifier = ">=0.1.0" },
     { name = "posthog", specifier = ">=7.4.2" },
     { name = "psutil", specifier = ">=5.9.0" },
-    { name = "pydantic-settings", specifier = "==2.10.1" },
-    { name = "pyright", marker = "extra == 'dev'", specifier = "==1.1.405" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = "==8.4.1" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = "==5.0.0" },
-    { name = "python-dotenv", specifier = "==1.1.1" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = "==0.5.3" },
-    { name = "sseclient-py", specifier = "==1.8.0" },
-    { name = "typer", specifier = "==0.16.0" },
+    { name = "pydantic-settings", specifier = ">=2.10.1" },
+    { name = "pyright", marker = "extra == 'dev'", specifier = ">=1.1.405" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.4.1" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0.0" },
+    { name = "python-dotenv", specifier = ">=1.1.1" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.5.3" },
+    { name = "sseclient-py", specifier = ">=1.8.0" },
+    { name = "typer", specifier = ">=0.16.0" },
     { name = "uiautomator2", specifier = ">=3.5.0" },
     { name = "uuid-utils", specifier = ">=0.12.0" },
-    { name = "uvicorn", extras = ["standard"], specifier = "==0.30.1" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.30.1" },
     { name = "websockets", specifier = ">=12.0" },
 ]
 provides-extras = ["dev"]
