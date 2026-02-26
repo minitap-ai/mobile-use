@@ -270,8 +270,7 @@ async def compress_video_for_api(
 
         new_size = output_path.stat().st_size
         logger.info(
-            f"Compressed: {current_size / 1024 / 1024:.2f} MB -> "
-            f"{new_size / 1024 / 1024:.2f} MB"
+            f"Compressed: {current_size / 1024 / 1024:.2f} MB -> {new_size / 1024 / 1024:.2f} MB"
         )
 
         return output_path
