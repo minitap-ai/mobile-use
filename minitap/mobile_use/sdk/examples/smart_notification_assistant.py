@@ -19,7 +19,7 @@ Run:
 
 import asyncio
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
@@ -30,7 +30,7 @@ from minitap.mobile_use.sdk.types import AgentProfile
 from minitap.mobile_use.sdk.types.exceptions import AgentError
 
 
-class NotificationPriority(str, Enum):
+class NotificationPriority(StrEnum):
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"

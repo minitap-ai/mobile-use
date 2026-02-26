@@ -1,7 +1,7 @@
 import json
 import platform
 import re
-from enum import Enum
+from enum import StrEnum
 from typing import TypedDict
 
 from minitap.mobile_use.clients.browserstack_client import BrowserStackClientWrapper
@@ -25,7 +25,7 @@ IosClientWrapper = (
 )
 
 
-class DeviceType(str, Enum):
+class DeviceType(StrEnum):
     """Type of iOS device."""
 
     SIMULATOR = "SIMULATOR"

@@ -6,7 +6,7 @@ from collections.abc import Awaitable, Callable
 R = TypeVar("R")
 
 
-def wrap_with_callbacks_sync(
+def wrap_with_callbacks_sync[R](
     fn: Callable[..., R],
     *,
     before: Callable[..., None] | None = None,
@@ -33,7 +33,7 @@ def wrap_with_callbacks_sync(
     return wrapper
 
 
-def wrap_with_callbacks_async(
+def wrap_with_callbacks_async[R](
     fn: Callable[..., Awaitable[R]],
     *,
     before: Callable[..., None] | None = None,
@@ -61,7 +61,7 @@ def wrap_with_callbacks_async(
 
 
 @overload
-def wrap_with_callbacks(
+def wrap_with_callbacks[R](
     fn: Callable[..., Awaitable[R]],
     *,
     before: Callable[[], None] | None = ...,
@@ -82,7 +82,7 @@ def wrap_with_callbacks(
 
 
 @overload
-def wrap_with_callbacks(
+def wrap_with_callbacks[R](
     fn: Callable[..., R],
     *,
     before: Callable[[], None] | None = ...,

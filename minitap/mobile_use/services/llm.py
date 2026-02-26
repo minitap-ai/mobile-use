@@ -231,7 +231,7 @@ def get_llm(
 T = TypeVar("T")
 
 
-async def with_fallback(
+async def with_fallback[T](
     main_call: Callable[[], Awaitable[T]],
     fallback_call: Callable[[], Awaitable[T]],
     none_should_fallback: bool = True,
