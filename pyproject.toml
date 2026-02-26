@@ -169,7 +169,7 @@ markers = [
 
 [dependency-groups]
 dev = [
-    "ruff>=0.5.3",
+    "ruff>=0.15.2",
     "pytest>=8.4.1",
     "pytest-asyncio>=1.2.0",
     "pytest-cov>=5.0.0",
