@@ -7,7 +7,7 @@ Android and iOS instances using the Limrun Python SDK.
 
 import asyncio
 import os
-from enum import Enum
+from enum import StrEnum
 
 from limrun_api import AsyncLimrun
 from limrun_api.types import AndroidInstance, IosInstance
@@ -22,7 +22,7 @@ from minitap.mobile_use.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
-class LimrunPlatform(str, Enum):
+class LimrunPlatform(StrEnum):
     """Limrun device platform."""
 
     ANDROID = "android"

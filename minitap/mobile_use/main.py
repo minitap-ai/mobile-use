@@ -1,6 +1,6 @@
 import asyncio
 import os
-from enum import Enum
+from enum import StrEnum
 from shutil import which
 from typing import Annotated
 
@@ -35,7 +35,7 @@ app = typer.Typer(add_completion=False, pretty_exceptions_enable=False)
 logger = get_logger(__name__)
 
 
-class DeviceType(str, Enum):
+class DeviceType(StrEnum):
     """Device type for mobile-use agent."""
 
     LOCAL = "local"

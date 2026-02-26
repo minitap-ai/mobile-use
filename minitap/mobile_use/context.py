@@ -5,7 +5,7 @@ Uses ContextVar to avoid prop drilling and maintain clean function signatures.
 """
 
 from collections.abc import Callable, Coroutine
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 
@@ -27,7 +27,7 @@ class AppLaunchResult(BaseModel):
     locked_app_initial_launch_error: str | None
 
 
-class DevicePlatform(str, Enum):
+class DevicePlatform(StrEnum):
     """Mobile device platform enumeration."""
 
     ANDROID = "android"

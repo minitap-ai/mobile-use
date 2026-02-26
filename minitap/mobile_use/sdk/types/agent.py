@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 from urllib.parse import urlparse
 
@@ -14,7 +14,7 @@ from minitap.mobile_use.controllers.limrun_controller import (
 from minitap.mobile_use.sdk.types.task import AgentProfile, TaskRequestCommon
 
 
-class LimrunPlatform(str, Enum):
+class LimrunPlatform(StrEnum):
     """Limrun device platform."""
 
     ANDROID = "android"

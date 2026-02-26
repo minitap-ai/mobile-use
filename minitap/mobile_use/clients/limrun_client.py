@@ -10,7 +10,7 @@ import base64
 import json
 import time
 from collections.abc import Callable
-from enum import Enum
+from enum import StrEnum
 
 import websockets
 from pydantic import BaseModel, Field
@@ -21,7 +21,7 @@ from minitap.mobile_use.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
-class ConnectionState(str, Enum):
+class ConnectionState(StrEnum):
     """Connection state of the instance client."""
 
     CONNECTING = "connecting"
