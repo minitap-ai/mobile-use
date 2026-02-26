@@ -126,7 +126,7 @@ def get_list_notes_tool(ctx: MobileUseContext) -> BaseTool:
 
 save_note_wrapper = ToolWrapper(
     tool_fn_getter=get_save_note_tool,
-    on_success_fn=lambda key: (f"Successfully saved note '{key}'."),
+    on_success_fn=lambda key: f"Successfully saved note '{key}'.",
     on_failure_fn=lambda key: f"Failed to save note '{key}'.",
 )
 

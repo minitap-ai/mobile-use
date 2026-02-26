@@ -164,6 +164,7 @@ long_press_on_wrapper = ToolWrapper(
     on_success_fn=lambda selector_info: (
         f"Long press on element with {selector_info} was successful."
     ),
-    on_failure_fn=lambda selector_info: "Failed to long press on element. "
-    + f"Last attempt was with {selector_info}.",
+    on_failure_fn=lambda selector_info: (
+        "Failed to long press on element. " + f"Last attempt was with {selector_info}."
+    ),
 )
