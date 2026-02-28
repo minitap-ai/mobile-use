@@ -5,7 +5,8 @@ from typing import Any, override
 from langchain_core.messages import AnyMessage, ToolCall, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.prebuilt import ToolNode
-from langgraph.store.base import BaseStore
+from langgraph.prebuilt.tool_node import ToolRuntime
+from langgraph.runtime import Runtime
 from langgraph.types import Command
 from pydantic import BaseModel
 
@@ -30,22 +31,37 @@ class ExecutorToolNode(ToolNode):
         self,
         input: list[AnyMessage] | dict[str, Any] | BaseModel,
         config: RunnableConfig,
-        *,
-        store: BaseStore | None,
+        runtime: Runtime,
     ):
-        return await self.__func(is_async=True, input=input, config=config, store=store)
+        return await self.__func(is_async=True, input=input, config=config, runtime=runtime)
 
     @override
     def _func(
         self,
         input: list[AnyMessage] | dict[str, Any] | BaseModel,
         config: RunnableConfig,
-        *,
-        store: BaseStore | None,
+        runtime: Runtime,
     ) -> Any:
         loop = asyncio.get_event_loop()
         return loop.run_until_complete(
-            self.__func(is_async=False, input=input, config=config, store=store)
+            self.__func(is_async=False, input=input, config=config, runtime=runtime)
+        )
+
+    def _build_tool_runtime(
+        self,
+        call: ToolCall,
+        input: list[AnyMessage] | dict[str, Any] | BaseModel,
+        config: RunnableConfig,
+        runtime: Runtime,
+    ) -> Any:
+        state = self._extract_state(input)
+        return ToolRuntime(
+            state=state,
+            tool_call_id=call["id"],
+            config=config,
+            context=runtime.context,
+            store=runtime.store,
+            stream_writer=runtime.stream_writer,
         )
 
     async def __func(
@@ -53,13 +69,13 @@ class ExecutorToolNode(ToolNode):
         is_async: bool,
         input: list[AnyMessage] | dict[str, Any] | BaseModel,
         config: RunnableConfig,
-        *,
-        store: BaseStore | None,
+        runtime: Runtime,
     ) -> Any:
-        tool_calls, input_type = self._parse_input(input, store)
+        tool_calls, input_type = self._parse_input(input)
         outputs: list[Command | ToolMessage] = []
         failed = False
         for call in tool_calls:
+            tool_runtime = self._build_tool_runtime(call, input, config, runtime)
             if failed:
                 output = self._get_erroneous_command(
                     call=call,
@@ -67,9 +83,9 @@ class ExecutorToolNode(ToolNode):
                 )
             else:
                 if is_async:
-                    output = await self._arun_one(call, input_type, config)
+                    output = await self._arun_one(call, input_type, tool_runtime)
                 else:
-                    output = self._run_one(call, input_type, config)
+                    output = self._run_one(call, input_type, tool_runtime)
                 failed = self._has_tool_call_failed(call, output)
                 if failed is None:
                     output = self._get_erroneous_command(
@@ -133,11 +149,11 @@ class ExecutorToolNode(ToolNode):
         tool_message = ToolMessage(
             name=call["name"], tool_call_id=call["id"], content=message, status="error"
         )
-        return Command(update={self.messages_key: [tool_message]})
+        return Command(update={self._messages_key: [tool_message]})
 
     def _get_tool_message(self, cmd: Command) -> ToolMessage:
         if isinstance(cmd.update, dict):
-            msg = cmd.update.get(self.messages_key)
+            msg = cmd.update.get(self._messages_key)
             if isinstance(msg, list):
                 if len(msg) == 0:
                     raise ValueError("No messages found in command update")
@@ -147,6 +163,6 @@ class ExecutorToolNode(ToolNode):
             elif isinstance(msg, ToolMessage):
                 return msg
             elif msg is None:
-                raise ValueError(f"Missing '{self.messages_key}' in command update")
+                raise ValueError(f"Missing '{self._messages_key}' in command update")
             raise ValueError(f"Unexpected message type in command update: {type(msg)}")
         raise ValueError("Command update is not a dict")
