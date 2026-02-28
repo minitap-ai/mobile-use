@@ -1,6 +1,6 @@
 [project]
 name = "minitap-mobile-use"
-version = "3.5.7"
+version = "3.6.0"
 description = "AI-powered multi-agent system that automates real Android and iOS devices through low-level control using LangGraph."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -14,25 +14,25 @@ authors = [
 requires-python = ">=3.12"
 
 dependencies = [
-    "langgraph>=1.0.0",
-    "adbutils>=2.9.3",
-    "langchain-google-genai>=2.1.10",
-    "langchain>=0.3.27",
-    "langchain-core>=0.3.75",
-    "jinja2>=3.1.6",
-    "python-dotenv>=1.1.1",
-    "pydantic-settings>=2.10.1",
-    "langchain-mcp-adapters>=0.1.7",
-    "langchain-openai>=0.3.27",
-    "typer>=0.16.0",
-    "langchain-cerebras>=0.5.0",
+    "langgraph>=1.0.2,<2.0.0",
+    "adbutils==2.9.3",
+    "langchain-google-genai>=4.0.0",
+    "langchain>=1.0.0",
+    "langchain-core>=1.0.0",
+    "jinja2==3.1.6",
+    "python-dotenv==1.1.1",
+    "pydantic-settings==2.10.1",
+    "langchain-mcp-adapters>=0.2.0",
+    "langchain-openai>=1.0.0",
+    "typer==0.16.0",
+    "langchain-cerebras>=0.8.0",
     "inquirer>=3.4.0",
     "sseclient-py>=1.8.0",
     "fastapi>=0.111.0",
     "uvicorn[standard]>=0.30.1",
     "colorama>=0.4.6",
     "psutil>=5.9.0",
-    "langchain-google-vertexai>=2.0.28",
+    "langchain-google-vertexai>=3.0.0",
     "httpx>=0.28.1",
     "uiautomator2>=3.5.0",
     "fb-idb>=1.1.7",

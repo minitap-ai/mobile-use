@@ -6,7 +6,7 @@ from typing import Annotated
 
 import typer
 from adbutils import AdbClient
-from langchain.callbacks.base import Callbacks
+from langchain_core.callbacks.base import Callbacks
 from rich.console import Console
 
 from minitap.mobile_use.clients.ios_client_config import (
