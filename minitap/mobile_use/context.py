@@ -17,6 +17,7 @@ from minitap.mobile_use.agents.planner.types import Subgoal
 from minitap.mobile_use.clients.ios_client import IosClientWrapper
 from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
 from minitap.mobile_use.config import AgentNode, LLMConfig
+from minitap.mobile_use.controllers.limrun_controller import LimrunAndroidController
 
 
 class AppLaunchResult(BaseModel):
@@ -83,6 +84,7 @@ class MobileUseContext(BaseModel):
     adb_client: AdbClient | None = None
     ui_adb_client: UIAutomatorClient | None = None
     ios_client: IosClientWrapper | None = None
+    limrun_android_controller: LimrunAndroidController | None = None
     execution_setup: ExecutionSetup | None = None
     on_agent_thought: Callable[[AgentNode, str], Coroutine] | None = None
     on_plan_changes: Callable[[list[Subgoal], IsReplan], Coroutine] | None = None

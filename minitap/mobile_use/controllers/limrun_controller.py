@@ -230,19 +230,27 @@ class LimrunAndroidController(MobileDeviceController):
             return False
 
     async def launch_app(self, package_or_bundle_id: str) -> bool:
-        """Launch an application."""
+        """Launch an application using am start (more reliable than monkey on Limrun)."""
         try:
+            # First, try to get the launcher activity from the package
+            result = self.device.shell(
+                f"cmd package resolve-activity --brief {package_or_bundle_id} | tail -n 1"
+            )
+            if isinstance(result, bytes):
+                result = result.decode("utf-8")
+            if isinstance(result, str):
+                result = result.strip()
+
+                if result and "/" in result:
+                    # Got component name like "com.android.settings/.Settings"
+                    logger.info(f"Launching app with component: {result}")
+                    self.device.shell(f"am start -n {result}")
+                    return True
+
+            # Fallback: use monkey command which resolves the launcher activity
+            logger.info(f"Falling back to monkey for: {package_or_bundle_id}")
             self.device.shell(
-                [
-                    "monkey",
-                    "-p",
-                    package_or_bundle_id,
-                    "-c",
-                    "android.intent.category.LAUNCHER",
-                    "--pct-syskeys",  # Disable system key events not supported by Limrun mobiles
-                    "0",
-                    "1",
-                ]
+                f"monkey -p {package_or_bundle_id} -c android.intent.category.LAUNCHER 1"
             )
             return True
         except Exception as e:

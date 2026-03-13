@@ -868,12 +868,21 @@ class Agent:
         if platform_service:
             api_key = platform_service._api_key
 
+        # Get limrun controller if available
+        limrun_android_ctrl = None
+        if hasattr(self, "_limrun_controller") and self._limrun_controller is not None:
+            from minitap.mobile_use.controllers.limrun_controller import LimrunAndroidController
+
+            if isinstance(self._limrun_controller, LimrunAndroidController):
+                limrun_android_ctrl = self._limrun_controller
+
         context = MobileUseContext(
             trace_id=task.id,
             device=self._device_context,
             adb_client=self._adb_client,
             ui_adb_client=self._ui_adb_client,
             ios_client=self._ios_client,
+            limrun_android_controller=limrun_android_ctrl,
             llm_config=agent_profile.llm_config,
             on_agent_thought=on_agent_thought,
             on_plan_changes=on_plan_changes,

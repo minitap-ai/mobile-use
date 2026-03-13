@@ -45,6 +45,9 @@ def mock_context():
     mock_response.json.return_value = {"elements": []}
     ctx.ui_adb_client.get_screen_data = Mock(return_value=mock_response)
 
+    # Limrun controller (None for local device tests)
+    ctx.limrun_android_controller = None
+
     return ctx
 
 
