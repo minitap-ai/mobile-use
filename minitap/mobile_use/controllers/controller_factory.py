@@ -11,6 +11,11 @@ def create_device_controller(ctx: MobileUseContext) -> MobileDeviceController:
     platform = ctx.device.mobile_platform
 
     if platform == DevicePlatform.ANDROID:
+        # Use Limrun controller if available (for cloud devices)
+        if ctx.limrun_android_controller is not None:
+            logger.info(f"Using LimrunAndroidController for device {ctx.device.device_id}")
+            return ctx.limrun_android_controller
+
         if ctx.adb_client is None:
             raise ValueError("ADB client not initialized for Android device")
 
