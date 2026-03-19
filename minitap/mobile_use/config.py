@@ -33,6 +33,8 @@ class Settings(BaseSettings):
 
     MOBILE_USE_TELEMETRY_ENABLED: bool | None = None
 
+    PROJECT_NAME: str | None = None
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 
