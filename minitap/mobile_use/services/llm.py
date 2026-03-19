@@ -55,6 +55,16 @@ async def invoke_llm_with_timeout_message[T](
         return await llm_task
 
 
+def _build_custom_headers(agent_name: str | None = None) -> dict[str, str]:
+    """Build custom headers for LLM API calls."""
+    headers: dict[str, str] = {}
+    if agent_name:
+        headers["X-Agent-Name"] = agent_name
+    if settings.PROJECT_NAME:
+        headers["X-Project-Name"] = settings.PROJECT_NAME
+    return headers
+
+
 def get_minitap_llm(
     trace_id: str,
     remote_tracing: bool = False,
@@ -62,6 +72,7 @@ def get_minitap_llm(
     temperature: float | None = None,
     max_retries: int | None = None,
     api_key: str | None = None,
+    agent_name: str | None = None,
 ) -> ChatOpenAI:
     if api_key:
         effective_api_key = SecretStr(api_key)
@@ -77,6 +88,9 @@ def get_minitap_llm(
 
     if max_retries is None and model.startswith("google/"):
         max_retries = 2
+
+    custom_headers = _build_custom_headers(agent_name)
+
     client = ChatOpenAI(
         model=model,
         temperature=temperature,
@@ -87,6 +101,7 @@ def get_minitap_llm(
             "sessionId": trace_id,
             "traceOnlyUsage": remote_tracing,
         },
+        default_headers=custom_headers or None,
     )
     return client
 
@@ -223,6 +238,7 @@ def get_llm(
             model=llm.model,
             temperature=temperature,
             api_key=ctx.minitap_api_key,
+            agent_name=name,
         )
     else:
         raise ValueError(f"Unsupported provider: {llm.provider}")
