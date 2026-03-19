@@ -93,6 +93,9 @@ class LimrunIosClient:
     This is a Python port of the TypeScript SDK's iOS client functionality.
     """
 
+    MAX_RECONNECT_ATTEMPTS = 3
+    RECONNECT_DELAY_SECONDS = 1.0
+
     def __init__(
         self,
         api_url: str,
@@ -110,6 +113,8 @@ class LimrunIosClient:
         self._ping_task: asyncio.Task | None = None
         self._receive_task: asyncio.Task | None = None
         self._request_counter = 0
+        self._reconnect_lock = asyncio.Lock()
+        self._reconnect_attempts = 0
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -268,26 +273,133 @@ class LimrunIosClient:
         params: dict | None = None,
         timeout: float | None = None,
     ) -> dict:
-        """Send a request and wait for response."""
-        if not self._ws:
-            raise RuntimeError("WebSocket is not connected")
+        """Send a request and wait for response, with auto-reconnect on connection loss.
 
+        The same request ID is reused across retry attempts to prevent duplicate
+        side effects for mutating operations.
+        """
+        last_error: Exception | None = None
+
+        # Generate request ID and build request ONCE, outside the retry loop
+        # This prevents duplicate side effects when retrying mutating operations
         request_id = self._generate_id()
         request = {"type": msg_type, "id": request_id, **(params or {})}
 
-        future: asyncio.Future = asyncio.get_event_loop().create_future()
-        self._pending_requests[request_id] = future
+        for attempt in range(self.MAX_RECONNECT_ATTEMPTS + 1):
+            # Check connection and reconnect if needed
+            if not self._ws or self._connection_state == ConnectionState.DISCONNECTED:
+                # On first attempt when disconnected, try to reconnect instead of failing
+                try:
+                    await self._reconnect()
+                except Exception as e:
+                    last_error = e
+                    continue
 
-        try:
-            await self._ws.send(json.dumps(request))
-            result = await asyncio.wait_for(future, timeout=timeout or 30.0)
-            return result
-        except TimeoutError:
-            self._pending_requests.pop(request_id, None)
-            raise RuntimeError(f"Request {msg_type} timed out")
-        except Exception:
-            self._pending_requests.pop(request_id, None)
-            raise
+            future: asyncio.Future = asyncio.get_event_loop().create_future()
+            self._pending_requests[request_id] = future
+
+            try:
+                await self._ws.send(json.dumps(request))  # type: ignore[union-attr]
+                result = await asyncio.wait_for(future, timeout=timeout or 30.0)
+                return result
+            except TimeoutError:
+                self._pending_requests.pop(request_id, None)
+                raise RuntimeError(f"Request {msg_type} timed out")
+            except websockets.ConnectionClosed as e:
+                self._pending_requests.pop(request_id, None)
+                last_error = e
+                logger.warning(
+                    f"Connection closed during {msg_type} (attempt {attempt + 1}), reconnecting..."
+                )
+                self._update_connection_state(ConnectionState.DISCONNECTED)
+                # Loop will attempt reconnect on next iteration
+                continue
+            except RuntimeError as e:
+                # Handle "Connection closed" from _fail_pending_requests
+                self._pending_requests.pop(request_id, None)
+                if "Connection closed" in str(e):
+                    last_error = e
+                    logger.warning(
+                        f"Connection closed during {msg_type} (attempt {attempt + 1}), "
+                        "reconnecting..."
+                    )
+                    self._update_connection_state(ConnectionState.DISCONNECTED)
+                    continue
+                raise
+            except Exception:
+                self._pending_requests.pop(request_id, None)
+                raise
+
+        # All retries exhausted
+        raise RuntimeError(
+            f"Failed to send {msg_type} after {self.MAX_RECONNECT_ATTEMPTS} reconnect attempts: "
+            f"{last_error}"
+        )
+
+    async def _reconnect(self) -> None:
+        """Attempt to reconnect to the WebSocket server."""
+        async with self._reconnect_lock:
+            # Double-check we still need to reconnect
+            if self._connection_state == ConnectionState.CONNECTED and self._ws:
+                return
+
+            if self._intentional_disconnect:
+                raise RuntimeError("Cannot reconnect after intentional disconnect")
+
+            self._update_connection_state(ConnectionState.RECONNECTING)
+            logger.info("Attempting to reconnect to Limrun iOS instance...")
+
+            # Cleanup old connection resources
+            if self._ping_task:
+                self._ping_task.cancel()
+                try:
+                    await self._ping_task
+                except asyncio.CancelledError:
+                    pass
+                self._ping_task = None
+
+            if self._receive_task:
+                self._receive_task.cancel()
+                try:
+                    await self._receive_task
+                except asyncio.CancelledError:
+                    pass
+                self._receive_task = None
+
+            if self._ws:
+                try:
+                    await self._ws.close()
+                except Exception:
+                    pass
+                self._ws = None
+
+            # Attempt reconnection
+            await asyncio.sleep(self.RECONNECT_DELAY_SECONDS)
+
+            # Re-check after sleep in case disconnect() was called
+            if self._intentional_disconnect:
+                raise RuntimeError("Cannot reconnect after intentional disconnect")
+
+            ws_url = self._get_ws_url()
+            try:
+                new_ws = await websockets.connect(ws_url)
+
+                # Re-check after connect in case disconnect() was called during connect
+                if self._intentional_disconnect:
+                    await new_ws.close()
+                    raise RuntimeError("Cannot reconnect after intentional disconnect")
+
+                self._ws = new_ws
+                self._update_connection_state(ConnectionState.CONNECTED)
+
+                self._receive_task = asyncio.create_task(self._receive_loop())
+                self._ping_task = asyncio.create_task(self._ping_loop())
+
+                logger.info("Successfully reconnected to Limrun iOS instance")
+            except Exception as e:
+                logger.error(f"Reconnection failed: {e}")
+                self._update_connection_state(ConnectionState.DISCONNECTED)
+                raise
 
     async def _fetch_device_info(self) -> DeviceInfo:
         """Fetch device info from the instance."""
