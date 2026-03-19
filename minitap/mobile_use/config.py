@@ -24,9 +24,11 @@ class Settings(BaseSettings):
     XAI_API_KEY: SecretStr | None = None
     OPEN_ROUTER_API_KEY: SecretStr | None = None
     ANTHROPIC_API_KEY: SecretStr | None = None
+    AZURE_API_KEY: SecretStr | None = None
     MINITAP_API_KEY: SecretStr | None = None
 
     OPENAI_BASE_URL: str | None = None
+    AZURE_BASE_URL: str | None = None
     MINITAP_BASE_URL: str = "https://platform.minitap.ai"
 
     ADB_HOST: str | None = None
@@ -95,7 +97,9 @@ def record_events(output_path: Path | None, events: list[str] | BaseModel | Any)
 
 ### LLM Configuration
 
-LLMProvider = Literal["openai", "google", "openrouter", "xai", "vertexai", "minitap", "anthropic"]
+LLMProvider = Literal[
+    "openai", "google", "openrouter", "xai", "vertexai", "minitap", "anthropic", "azure"
+]
 LLMUtilsNode = Literal["outputter", "hopper", "video_analyzer"]
 LLMUtilsNodeWithFallback = LLMUtilsNode
 AgentNode = Literal[
@@ -129,6 +133,9 @@ class LLM(BaseModel):
 
     def validate_provider(self, name: str):
         match self.provider:
+            case "azure":
+                if not settings.AZURE_BASE_URL:
+                    raise Exception(f"{name} requires AZURE_BASE_URL in .env")
             case "openai":
                 if not settings.OPENAI_API_KEY:
                     raise Exception(f"{name} requires OPENAI_API_KEY in .env")

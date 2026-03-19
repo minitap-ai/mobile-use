@@ -10,6 +10,8 @@ sys.modules["langchain_google_vertexai"] = Mock()
 sys.modules["langchain_google_genai"] = Mock()
 sys.modules["langchain_openai"] = Mock()
 sys.modules["langchain_cerebras"] = Mock()
+sys.modules["langchain_azure_ai"] = Mock()
+sys.modules["langchain_azure_ai.chat_models"] = Mock()
 
 from minitap.mobile_use.agents.outputter.outputter import outputter  # noqa: E402
 from minitap.mobile_use.config import LLM, OutputConfig  # noqa: E402
