@@ -37,7 +37,7 @@ Mobile-use is a powerful, open-source AI agent that controls your Android or IOS
 - 🗣️ **Natural Language Control**: Interact with your phone using your native language.
 - 📱 **UI-Aware Automation**: Intelligently navigates through app interfaces (note: currently has limited effectiveness with games as they don't provide accessibility tree data).
 - 📊 **Data Scraping**: Extract information from any app and structure it into your desired format (e.g., JSON) using a natural language description.
-- 🔧 **Extensible & Customizable**: Easily configure different LLMs to power the agents that power mobile-use.
+- 🔧 **Extensible & Customizable**: Easily configure different LLMs to power the agents that power mobile-use. Supports OpenAI, Google, xAI, OpenRouter, MiniMax, and more.
 
 ## Benchmarks
 
@@ -86,6 +86,15 @@ Follow our [Platform quickstart](https://docs.minitap.ai/mobile-use-sdk/platform
 
     1. Set `OPENAI_BASE_URL` and `OPENAI_API_KEY` in your `.env`
     2. In your `llm-config.override.jsonc`, set `openai` as the provider for the agent nodes you want, and choose a model supported by your provider.
+
+    **Using MiniMax:**
+
+    [MiniMax](https://www.minimaxi.com/) provides high-performance LLMs with up to 1M context window. To use MiniMax as your provider:
+
+    1. Set `MINIMAX_API_KEY` in your `.env`
+    2. Copy the `minimax` preset from `llm-config.defaults.jsonc` into your `llm-config.override.jsonc`, or set `"provider": "minimax"` on individual agent nodes.
+
+    Available models: `MiniMax-M2.7` (1M context, recommended), `MiniMax-M2.7-highspeed` (fast inference).
 
     > [!NOTE]
     > If you want to use Google Vertex AI, you must either:

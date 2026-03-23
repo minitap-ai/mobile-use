@@ -1,7 +1,8 @@
 // Override the LLM config here for the agents.
 
-// Supported providers: openai, google, openrouter, xai, vertexai
+// Supported providers: openai, google, openrouter, xai, vertexai, minimax
 // You can use any model as long as it is supported by the provider.
+// MiniMax models: MiniMax-M2.7 (1M context), MiniMax-M2.7-highspeed
 
 // Do not modify this file directly, instead copy it to llm.override.jsonc and modify it there.
 {
