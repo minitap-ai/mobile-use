@@ -167,6 +167,7 @@ addopts = [
 markers = [
     "ios_simulator: tests requiring iOS simulator (run on macOS with IDB)",
     "android: tests requiring Android device or emulator",
+    "integration: tests making real external API calls (require provider credentials)",
 ]
 
 [dependency-groups]

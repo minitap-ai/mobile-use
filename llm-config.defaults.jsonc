@@ -71,6 +71,69 @@
       // }
     }
   },
+  // MiniMax preset – uses MiniMax M2.7 and M2.7-highspeed (200k context).
+  // To use it, copy the contents of this object into llm-config.override.jsonc.
+  "minimax": {
+    "planner": {
+      "provider": "minimax",
+      "model": "MiniMax-M2.7",
+      "fallback": {
+        "provider": "minimax",
+        "model": "MiniMax-M2.7-highspeed"
+      }
+    },
+    "orchestrator": {
+      "provider": "minimax",
+      "model": "MiniMax-M2.7",
+      "fallback": {
+        "provider": "minimax",
+        "model": "MiniMax-M2.7-highspeed"
+      }
+    },
+    "cortex": {
+      "provider": "minimax",
+      "model": "MiniMax-M2.7",
+      "fallback": {
+        "provider": "minimax",
+        "model": "MiniMax-M2.7-highspeed"
+      }
+    },
+    "executor": {
+      "provider": "minimax",
+      "model": "MiniMax-M2.7-highspeed",
+      "fallback": {
+        "provider": "minimax",
+        "model": "MiniMax-M2.7"
+      }
+    },
+    "contextor": {
+      "provider": "minimax",
+      "model": "MiniMax-M2.7-highspeed",
+      "fallback": {
+        "provider": "minimax",
+        "model": "MiniMax-M2.7"
+      }
+    },
+    "utils": {
+      "hopper": {
+        // Ideally needs a 256k context window; MiniMax-M2.7 caps at 200k.
+        "provider": "minimax",
+        "model": "MiniMax-M2.7",
+        "fallback": {
+          "provider": "minimax",
+          "model": "MiniMax-M2.7-highspeed"
+        }
+      },
+      "outputter": {
+        "provider": "minimax",
+        "model": "MiniMax-M2.7-highspeed",
+        "fallback": {
+          "provider": "minimax",
+          "model": "MiniMax-M2.7"
+        }
+      }
+    }
+  },
   // This is the config we recommend.
   // To use it, copy it to llm-config.override.jsonc, following llm-config.override.template.jsonc.
   "recommended": {

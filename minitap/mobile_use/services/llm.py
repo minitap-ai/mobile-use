@@ -214,6 +214,18 @@ def get_azure_llm(model_name: str, temperature: float = 1) -> AzureAIOpenAIApiCh
     return client
 
 
+def get_minimax_llm(model_name: str = "MiniMax-M2.7", temperature: float = 1) -> ChatOpenAI:
+    assert settings.MINIMAX_API_KEY is not None
+    clamped_temperature = max(0.0, min(1.0, temperature))
+    client = ChatOpenAI(
+        model=model_name,
+        api_key=settings.MINIMAX_API_KEY,
+        temperature=clamped_temperature,
+        base_url="https://api.minimax.io/v1",
+    )
+    return client
+
+
 @overload
 def get_llm(
     ctx: MobileUseContext,
@@ -276,6 +288,8 @@ def get_llm(
         return get_grok_llm(llm.model, temperature)
     elif llm.provider == "azure":
         return get_azure_llm(llm.model, temperature)
+    elif llm.provider == "minimax":
+        return get_minimax_llm(llm.model, temperature)
     elif llm.provider == "minitap":
         remote_tracing = False
         if ctx.execution_setup:
