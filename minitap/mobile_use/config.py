@@ -3,9 +3,7 @@ import os
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-import google.auth
 from dotenv import load_dotenv
-from google.auth.exceptions import DefaultCredentialsError
 from pydantic import BaseModel, Field, SecretStr, ValidationError, model_validator
 from pydantic_settings import BaseSettings
 
@@ -112,6 +110,15 @@ OVERRIDE_LLM_CONFIG_FILENAME = "llm-config.override.jsonc"
 
 
 def validate_vertex_ai_credentials():
+    try:
+        import google.auth  # type: ignore[import-not-found]
+        from google.auth.exceptions import DefaultCredentialsError  # type: ignore[import-not-found]
+    except ImportError:
+        raise Exception(
+            "VertexAI requires the 'google-auth' package. "
+            "Install it with: uv add google-auth, or install mobile-use with the agent extra: "
+            "uv add 'minitap-mobile-use[agent]'"
+        )
     try:
         _, project = google.auth.default()
         if not project:

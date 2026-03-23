@@ -4,19 +4,17 @@ Context variables for global state management.
 Uses ContextVar to avoid prop drilling and maintain clean function signatures.
 """
 
-from collections.abc import Callable, Coroutine
+from __future__ import annotations
+
 from enum import StrEnum
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from adbutils import AdbClient
-from openai import BaseModel
-from pydantic import ConfigDict
+from pydantic import BaseModel, ConfigDict
 
-from minitap.mobile_use.agents.planner.types import Subgoal
 from minitap.mobile_use.clients.ios_client import IosClientWrapper
 from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
-from minitap.mobile_use.config import AgentNode, LLMConfig
 from minitap.mobile_use.controllers.limrun_controller import LimrunAndroidController
 
 
@@ -74,20 +72,26 @@ class ExecutionSetup(BaseModel):
 
 IsReplan = bool
 
+# Agent-only callback type aliases (for documentation).
+# At runtime these are Any since the agent types may not be installed.
+# When running with [agent] extras, callers pass typed callables.
+AgentThoughtCallback = Any  # Callable[[AgentNode, str], Coroutine]
+PlanChangesCallback = Any  # Callable[[list[Subgoal], IsReplan], Coroutine]
+
 
 class MobileUseContext(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     trace_id: str
     device: DeviceContext
-    llm_config: LLMConfig
+    llm_config: Any = None  # LLMConfig (from config.py) — only set when running the agent
     adb_client: AdbClient | None = None
     ui_adb_client: UIAutomatorClient | None = None
     ios_client: IosClientWrapper | None = None
     limrun_android_controller: LimrunAndroidController | None = None
     execution_setup: ExecutionSetup | None = None
-    on_agent_thought: Callable[[AgentNode, str], Coroutine] | None = None
-    on_plan_changes: Callable[[list[Subgoal], IsReplan], Coroutine] | None = None
+    on_agent_thought: AgentThoughtCallback = None
+    on_plan_changes: PlanChangesCallback = None
     minitap_api_key: str | None = None
     video_recording_enabled: bool = False
 
