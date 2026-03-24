@@ -4,6 +4,7 @@ from collections.abc import Awaitable, Callable, Coroutine
 from typing import Any, Literal, TypeVar, overload
 
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_azure_ai.chat_models import AzureAIOpenAIApiChatModel
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_google_vertexai import ChatVertexAI
 from langchain_openai import ChatOpenAI
@@ -169,6 +170,31 @@ def get_grok_llm(model_name: str, temperature: float = 1) -> ChatOpenAI:
     )
     return client
 
+def get_azure_llm(model_name: str, temperature: float = 1) -> AzureAIOpenAIApiChatModel:
+    assert settings.AZURE_BASE_URL is not None
+
+    api_key: str | None = None
+    if settings.AZURE_API_KEY:
+        api_key = settings.AZURE_API_KEY.get_secret_value()
+
+    if api_key:
+        client = AzureAIOpenAIApiChatModel(
+            model=model_name,
+            endpoint=settings.AZURE_BASE_URL,
+            credential=api_key,
+            temperature=temperature,
+        )
+    else:
+        from azure.identity import DefaultAzureCredential
+
+        client = AzureAIOpenAIApiChatModel(
+            model=model_name,
+            project_endpoint=settings.AZURE_BASE_URL,
+            credential=DefaultAzureCredential(),
+            temperature=temperature,
+        )
+    return client
+
 
 @overload
 def get_llm(
@@ -228,6 +254,8 @@ def get_llm(
         return get_openrouter_llm(llm.model, temperature)
     elif llm.provider == "xai":
         return get_grok_llm(llm.model, temperature)
+    elif llm.provider == "azure":
+        return get_azure_llm(llm.model, temperature)
     elif llm.provider == "minitap":
         remote_tracing = False
         if ctx.execution_setup:
