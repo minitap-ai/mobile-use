@@ -256,6 +256,14 @@ _This diagram is automatically updated from the codebase. This is our current ag
 
 </div>
 
+## 🔌 Community controllers
+
+mobile-use ships with first-party controllers for Android (adb / UIAutomator), iOS (idb / WDA), and Limrun. Out-of-tree controllers implement the same `MobileDeviceController` Protocol and ship as separate PyPI packages:
+
+- **EClawbot** (`pip install eclaw-mobile-use-driver`) — drives any device that has the [EClaw](https://eclawbot.com) app installed, over HTTPS, with no adb/idb access required on the caller machine. Useful for real-device + global reach. Source: [HankHuang0516/EClaw / eclaw-mobile-use-driver](https://github.com/HankHuang0516/EClaw/tree/main/eclaw-mobile-use-driver). Spec: [mobile-use-integration.md](https://github.com/HankHuang0516/EClaw/blob/main/docs/specs/mobile-use-integration.md). Import shim — `from minitap.mobile_use.controllers.eclaw_controller import EclawController`.
+
+PRs adding new entries to this list are welcome — keep the driver package out-of-tree (so upstream stays slim and release coordination stays decoupled) and contribute only the documentation pointer + optional one-file import shim under `minitap/mobile_use/controllers/`.
+
 ## ❤️ Contributing
 
 We love contributions! Whether you're fixing a bug, adding a feature, or improving documentation, your help is welcome. Please read our **[Contributing Guidelines](CONTRIBUTING.md)** to get started.
