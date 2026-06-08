@@ -3,6 +3,7 @@ import logging
 from collections.abc import Awaitable, Callable, Coroutine
 from typing import Any, Literal, TypeVar, overload
 
+from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_google_vertexai import ChatVertexAI
@@ -134,6 +135,22 @@ def get_vertex_llm(
     return client
 
 
+def get_anthropic_llm(
+    model_name: str = "claude-sonnet-4-6",
+    temperature: float = 1,
+) -> ChatAnthropic:
+    assert settings.ANTHROPIC_API_KEY is not None
+    client = ChatAnthropic(
+        model_name=model_name,
+        api_key=settings.ANTHROPIC_API_KEY,
+        temperature=temperature,
+        max_retries=2,
+        timeout=None,
+        stop=None,
+    )
+    return client
+
+
 def get_openai_llm(
     model_name: str = "o3",
     temperature: float = 1,
@@ -218,7 +235,9 @@ def get_llm(
             llm = llm.fallback
         else:
             raise ValueError("LLM has no fallback!")
-    if llm.provider == "openai":
+    if llm.provider == "anthropic":
+        return get_anthropic_llm(llm.model, temperature)
+    elif llm.provider == "openai":
         return get_openai_llm(llm.model, temperature)
     elif llm.provider == "google":
         return get_google_llm(llm.model, temperature)

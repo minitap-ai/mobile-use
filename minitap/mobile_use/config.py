@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     GOOGLE_API_KEY: SecretStr | None = None
     XAI_API_KEY: SecretStr | None = None
     OPEN_ROUTER_API_KEY: SecretStr | None = None
+    ANTHROPIC_API_KEY: SecretStr | None = None
     MINITAP_API_KEY: SecretStr | None = None
 
     OPENAI_BASE_URL: str | None = None
@@ -94,7 +95,7 @@ def record_events(output_path: Path | None, events: list[str] | BaseModel | Any)
 
 ### LLM Configuration
 
-LLMProvider = Literal["openai", "google", "openrouter", "xai", "vertexai", "minitap"]
+LLMProvider = Literal["openai", "google", "openrouter", "xai", "vertexai", "minitap", "anthropic"]
 LLMUtilsNode = Literal["outputter", "hopper", "video_analyzer"]
 LLMUtilsNodeWithFallback = LLMUtilsNode
 AgentNode = Literal[
@@ -145,6 +146,9 @@ class LLM(BaseModel):
             case "minitap":
                 if not settings.MINITAP_API_KEY:
                     raise Exception(f"{name} requires MINITAP_API_KEY in .env")
+            case "anthropic":
+                if not settings.ANTHROPIC_API_KEY:
+                    raise Exception(f"{name} requires ANTHROPIC_API_KEY in .env")
 
     def __str__(self):
         return f"{self.provider}/{self.model}"
