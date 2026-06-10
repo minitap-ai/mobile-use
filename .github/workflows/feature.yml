@@ -46,8 +46,11 @@ jobs:
       - name: Install dependencies
         run: uv sync --dev
 
-      - name: Run tests
-        run: uv run pytest -m "not ios_simulator"
+      - name: Run affected tests
+        uses: minitap-ai/devops-common/.github/actions/affected-pytest@v5
+        with:
+          impacted-module: minitap
+          pytest-args: -m "not ios_simulator"
 
   build:
     runs-on: ubuntu-latest

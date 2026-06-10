@@ -178,4 +178,5 @@ dev = [
     "pytest-cov>=5.0.0",
     "pyright>=1.1.389",
     "pre-commit>=3.5.0",
+    "pytest-impacted",
 ]
