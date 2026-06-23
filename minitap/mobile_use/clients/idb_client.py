@@ -385,9 +385,12 @@ class IdbClientWrapper:
                     current_bundle_id = bundle_match.group(1)
                     continue
 
-                # Match display name keys including localized variants so non-English simulator locales resolve to the correct bundle ID.
+                # Match display name keys including localized variants so
+                # non-English simulator locales resolve to the correct bundle ID.
                 if current_bundle_id:
-                    name_match = re.match(r"CFBundle(?:Display|Localized)?Name\s*=\s*([^;]+);", line)
+                    name_match = re.match(
+                        r"CFBundle(?:Display|Localized)?Name\s*=\s*([^;]+);", line
+                    )
                     if name_match:
                         display_name = name_match.group(1).strip()
                         if display_name == app_name:
