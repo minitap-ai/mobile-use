@@ -4,7 +4,11 @@
 // You can use any model as long as it is supported by the provider.
 // MiniMax models: MiniMax-M2.7 (200k context), MiniMax-M2.7-highspeed
 
-// Do not modify this file directly, instead copy it to llm.override.jsonc and modify it there.
+// Do not modify this file directly, instead copy it to llm-config.override.jsonc and modify it there.
+
+// Any node may optionally define a "fallback" with a non-empty provider + model
+// (see the commented example on "cortex" below). Leave it out if you don't need one
+// an empty fallback like { "provider": "", "model": "" } is invalid and will be rejected.
 {
   "planner": {
     "provider": "",
@@ -16,11 +20,12 @@
   },
   "cortex": {
     "provider": "",
-    "model": "",
-    "fallback": {
-      "provider": "",
-      "model": ""
-    }
+    "model": ""
+    // Optional fallback, used if the primary call fails:
+    // "fallback": {
+    //   "provider": "openai",
+    //   "model": "gpt-5-mini"
+    // }
   },
   "executor": {
     "provider": "",
@@ -42,11 +47,7 @@
     },
     "video_analyzer": {
       "provider": "",
-      "model": "",
-      "fallback": {
-        "provider": "",
-        "model": ""
-      }
+      "model": ""
     }
   }
 }
