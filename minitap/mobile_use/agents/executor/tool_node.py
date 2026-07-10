@@ -54,7 +54,7 @@ class ExecutorToolNode(ToolNode):
         config: RunnableConfig,
         runtime: Runtime,
     ) -> Any:
-        state = self._extract_state(input)
+        state = self._extract_state(input, config)
         return ToolRuntime(
             state=state,
             tool_call_id=call["id"],
