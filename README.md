@@ -275,8 +275,8 @@ We love contributions! Whether you're fixing a bug, adding a feature, or improvi
 ## ⭐ Star History
 
 <p align="center">
-  <a href="https://star-history.com/#minitap-ai/mobile-use&Date">
-    <img src="https://api.star-history.com/svg?repos=minitap-ai/mobile-use&type=Date" alt="Star History Chart" />
+  <a href="https://star-history.dera.page/#minitap-ai/mobile-use&Date">
+    <img src="https://star-history.dera.page/svg?repos=minitap-ai/mobile-use&type=Date" alt="Star History Chart" />
   </a>
 </p>
 
