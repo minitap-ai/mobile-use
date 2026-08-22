@@ -145,6 +145,7 @@ def get_anthropic_llm(
         model_name=model_name,
         api_key=settings.ANTHROPIC_API_KEY,
         temperature=temperature,
+        max_tokens=8192,  # type: ignore[call-arg]  # field aliased to max_tokens_to_sample
         max_retries=2,
         timeout=None,
         stop=None,

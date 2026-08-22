@@ -71,6 +71,68 @@
       // }
     }
   },
+  // Anthropic preset – uses Claude Sonnet 4.6 (capable, 200k context) with Haiku 4.5 as a
+  // fast/cheap fallback. To use it, copy the contents of this object into llm-config.override.jsonc.
+  "anthropic": {
+    "planner": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "fallback": {
+        "provider": "anthropic",
+        "model": "claude-haiku-4-5-20251001"
+      }
+    },
+    "orchestrator": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "fallback": {
+        "provider": "anthropic",
+        "model": "claude-haiku-4-5-20251001"
+      }
+    },
+    "cortex": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "fallback": {
+        "provider": "anthropic",
+        "model": "claude-haiku-4-5-20251001"
+      }
+    },
+    "executor": {
+      "provider": "anthropic",
+      "model": "claude-haiku-4-5-20251001",
+      "fallback": {
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6"
+      }
+    },
+    "contextor": {
+      "provider": "anthropic",
+      "model": "claude-haiku-4-5-20251001",
+      "fallback": {
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6"
+      }
+    },
+    "utils": {
+      "hopper": {
+        "provider": "anthropic",
+        "model": "claude-sonnet-4-6",
+        "fallback": {
+          "provider": "anthropic",
+          "model": "claude-haiku-4-5-20251001"
+        }
+      },
+      "outputter": {
+        "provider": "anthropic",
+        "model": "claude-haiku-4-5-20251001",
+        "fallback": {
+          "provider": "anthropic",
+          "model": "claude-sonnet-4-6"
+        }
+      }
+    }
+  },
   // MiniMax preset – uses MiniMax M2.7 and M2.7-highspeed (200k context).
   // To use it, copy the contents of this object into llm-config.override.jsonc.
   "minimax": {

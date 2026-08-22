@@ -96,9 +96,15 @@ Follow our [Platform quickstart](https://docs.minitap.ai/mobile-use-sdk/platform
 
     Available models: `MiniMax-M2.7` (200K context, recommended), `MiniMax-M2.7-highspeed` (200K context, faster inference).
 
-    > [!NOTE]
-    > If you want to use Anthropic Claude, set `ANTHROPIC_API_KEY` in your `.env`.
-    >
+    **Using Anthropic Claude:**
+
+    [Anthropic](https://www.anthropic.com/) provides Claude — a capable, safety-focused model family. To use it:
+
+    1. Set `ANTHROPIC_API_KEY` in your `.env`
+    2. Copy the contents of the `anthropic` preset object from `llm-config.defaults.jsonc` into your `llm-config.override.jsonc`, or set `"provider": "anthropic"` on individual agent nodes.
+
+    Available models: `claude-sonnet-4-6` (200K context, recommended), `claude-haiku-4-5-20251001` (200K context, faster/cheaper).
+
     > [!NOTE]
     > If you want to use Google Vertex AI, you must either:
     >
