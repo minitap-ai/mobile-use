@@ -77,7 +77,7 @@ def get_device_date(ctx: MobileUseContext) -> str:
 
 
 def list_packages(ctx: MobileUseContext) -> str:
-    """List installed packages. For Limrun iOS, use list_packages_async instead."""
+    """List installed packages. For cloud iOS, use list_packages_async instead."""
     if ctx.device.mobile_platform == DevicePlatform.IOS:
         udid = ctx.device.device_id
         device_type = get_device_type(udid)
@@ -138,17 +138,18 @@ def list_packages(ctx: MobileUseContext) -> str:
 
 async def list_packages_async(ctx: MobileUseContext) -> str:
     """
-    Async version of list_packages. Use this for Limrun iOS devices.
+    Async version of list_packages. Use this for cloud iOS devices.
     """
     if ctx.device.mobile_platform == DevicePlatform.IOS:
-        # Try to use ios_client.list_apps() for Limrun/cloud devices
         if ctx.ios_client:
             try:
                 # Import here to avoid circular imports
                 from minitap.mobile_use.clients.idb_client import IdbClientWrapper
-                from minitap.mobile_use.controllers.limrun_controller import LimrunIosController
+                from minitap.mobile_use.controllers.cloud_device_controller import (
+                    CloudIosController,
+                )
 
-                if isinstance(ctx.ios_client, LimrunIosController):
+                if isinstance(ctx.ios_client, CloudIosController):
                     apps = await ctx.ios_client.client.list_apps()
                     packages = [f"{app.bundle_id} ({app.name})" for app in apps]
                     return "\n".join(sorted(packages))
@@ -174,7 +175,7 @@ def get_current_foreground_package(ctx: MobileUseContext) -> str | None:
     Returns only the clean package/bundle name (e.g., 'com.whatsapp'),
     without any metadata or window information.
 
-    Note: For iOS with Limrun, prefer using get_current_foreground_package_async()
+    For cloud iOS, prefer get_current_foreground_package_async().
     to avoid event loop issues.
 
     Returns:
@@ -212,7 +213,7 @@ async def get_current_foreground_package_async(ctx: MobileUseContext) -> str | N
     """
     Async version of get_current_foreground_package.
 
-    Use this when calling from an async context, especially with Limrun iOS
+    Use this when calling from an async context, especially with cloud iOS.
     where the WebSocket connection is tied to the event loop.
 
     Returns:
@@ -249,7 +250,7 @@ async def get_current_foreground_package_async(ctx: MobileUseContext) -> str | N
 def _get_ios_foreground_package(ctx: MobileUseContext) -> str | None:
     """Get foreground package for iOS devices (simulator or physical).
 
-    Note: This sync version doesn't work well with Limrun iOS because the
+    This sync version does not work well with cloud iOS because the
     WebSocket is tied to the event loop. Use _get_ios_foreground_package_async instead.
     """
     ios_client = ctx.ios_client
@@ -261,12 +262,12 @@ def _get_ios_foreground_package(ctx: MobileUseContext) -> str | None:
         # Check if we're in an async context
         try:
             asyncio.get_running_loop()
-            # Already in async context - this won't work well with Limrun
+            # Already in async context; use the async API for cloud devices.
             # because the WebSocket is tied to the original event loop.
             # Return None and let the caller use the async version.
             logger.debug(
                 "_get_ios_foreground_package called from async context. "
-                "Use get_current_foreground_package_async() for Limrun iOS."
+                "Use get_current_foreground_package_async() for cloud iOS."
             )
             return None
         except RuntimeError:
@@ -280,7 +281,7 @@ def _get_ios_foreground_package(ctx: MobileUseContext) -> str | None:
 
 
 async def _get_ios_foreground_package_async(ctx: MobileUseContext) -> str | None:
-    """Async version - properly handles Limrun iOS WebSocket in the same event loop."""
+    """Async version that keeps cloud iOS WebSocket work in the same event loop."""
     ios_client = ctx.ios_client
 
     if not ios_client:

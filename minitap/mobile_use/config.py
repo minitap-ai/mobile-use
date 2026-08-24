@@ -30,7 +30,7 @@ class Settings(BaseSettings):
 
     OPENAI_BASE_URL: str | None = None
     AZURE_BASE_URL: str | None = None
-    MINITAP_BASE_URL: str = "https://platform.minitap.ai"
+    MINITAP_API_BASE_URL: str = "https://platform.minitap.ai/api/v1"
 
     ADB_HOST: str | None = None
     ADB_PORT: int | None = None

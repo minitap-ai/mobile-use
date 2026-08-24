@@ -1,8 +1,7 @@
 """
-Factory functions for creating Limrun instances and controllers.
+Factory functions for creating cloud device instances and controllers.
 
-This module provides high-level functions to create and manage Limrun
-Android and iOS instances using the Limrun Python SDK.
+This module adapts the cloud provider SDK to mobile-use controllers.
 """
 
 import asyncio
@@ -13,24 +12,24 @@ from limrun_api import AsyncLimrun
 from limrun_api.types import AndroidInstance, IosInstance
 
 from minitap.mobile_use.controllers.ios_controller import iOSDeviceController
-from minitap.mobile_use.controllers.limrun_controller import (
-    LimrunAndroidController,
-    LimrunIosController,
+from minitap.mobile_use.controllers.cloud_device_controller import (
+    CloudAndroidController,
+    CloudIosController,
 )
 from minitap.mobile_use.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
-class LimrunPlatform(StrEnum):
-    """Limrun device platform."""
+class ProviderPlatform(StrEnum):
+    """Cloud provider device platform."""
 
     ANDROID = "android"
     IOS = "ios"
 
 
-class LimrunInstanceConfig:
-    """Configuration for creating a Limrun instance."""
+class CloudDeviceInstanceConfig:
+    """Internal configuration for creating a cloud device instance."""
 
     def __init__(
         self,
@@ -41,49 +40,44 @@ class LimrunInstanceConfig:
         display_name: str | None = None,
         labels: dict[str, str] | None = None,
     ):
-        self.api_key = api_key or os.environ.get("MINITAP_API_KEY") or os.environ.get("LIM_API_KEY")
+        self.api_key = api_key or os.environ.get("MINITAP_API_KEY")
         if not self.api_key:
             raise ValueError(
-                "API key is required. Set MINITAP_API_KEY or LIM_API_KEY environment variable "
-                "or pass api_key parameter."
+                "API key is required. Set MINITAP_API_KEY or pass the api_key parameter."
             )
-        self.base_url = base_url or os.environ.get(
-            "MINITAP_BASE_URL", "https://platform.minitap.ai"
-        )
+        if base_url:
+            self.base_url = f"{base_url.rstrip('/')}/api/v1"
+        else:
+            self.base_url = os.environ.get(
+                "MINITAP_API_BASE_URL", "https://platform.minitap.ai/api/v1"
+            ).rstrip("/")
         self.inactivity_timeout = inactivity_timeout
         self.hard_timeout = hard_timeout
         self.display_name = display_name
         self.labels = labels or {}
 
 
-async def create_limrun_android_instance(
-    config: LimrunInstanceConfig,
-) -> tuple[AndroidInstance, LimrunAndroidController]:
+def _build_cloud_client(config: CloudDeviceInstanceConfig) -> AsyncLimrun:
+    return AsyncLimrun(api_key=config.api_key, base_url=f"{config.base_url}/limrun")
+
+
+async def create_cloud_android_instance(
+    config: CloudDeviceInstanceConfig,
+) -> tuple[AndroidInstance, CloudAndroidController]:
     """
-    Create a Limrun Android instance and return the controller.
+    Create a cloud Android instance and return the controller.
 
     Args:
-        config: Configuration for the Limrun instance.
+        config: Cloud device configuration.
 
     Returns:
-        Tuple of (AndroidInstance, LimrunAndroidController)
-
-    Example:
-        config = LimrunInstanceConfig(api_key="your-api-key")
-        instance, controller = await create_limrun_android_instance(config)
-
-        try:
-            await controller.connect()
-            screenshot = await controller.screenshot()
-        finally:
-            await controller.cleanup()
-            await delete_limrun_android_instance(config, instance.metadata.id)
+        Tuple of the provider instance and mobile-use controller.
     """
-    client = AsyncLimrun(api_key=config.api_key, base_url=f"{config.base_url}/api/v1/limrun")
+    client = _build_cloud_client(config)
     instance: AndroidInstance | IosInstance | None = None
 
     try:
-        logger.info("Creating Limrun Android instance...")
+        logger.info("Creating cloud Android instance...")
 
         spec: dict = {
             "inactivityTimeout": config.inactivity_timeout,
@@ -106,7 +100,7 @@ async def create_limrun_android_instance(
         logger.info(f"Created Android instance: {instance.metadata.id}")
 
         instance = await _wait_for_instance_ready(
-            client, instance.metadata.id, platform=LimrunPlatform.ANDROID
+            client, instance.metadata.id, platform=ProviderPlatform.ANDROID
         )
 
         if not isinstance(instance, AndroidInstance):
@@ -117,7 +111,7 @@ async def create_limrun_android_instance(
         if instance.status.endpoint_web_socket_url is None:
             raise RuntimeError("Android instance missing endpoint_web_socket_url")
 
-        controller = LimrunAndroidController(
+        controller = CloudAndroidController(
             instance_id=instance.metadata.id,
             adb_ws_url=instance.status.adb_web_socket_url,
             endpoint_ws_url=instance.status.endpoint_web_socket_url,
@@ -139,34 +133,23 @@ async def create_limrun_android_instance(
         await client.close()
 
 
-async def create_limrun_ios_instance(
-    config: LimrunInstanceConfig,
-) -> tuple[IosInstance, iOSDeviceController, LimrunIosController]:
+async def create_cloud_ios_instance(
+    config: CloudDeviceInstanceConfig,
+) -> tuple[IosInstance, iOSDeviceController, CloudIosController]:
     """
-    Create a Limrun iOS instance and return the controller.
+    Create a cloud iOS instance and return the controller.
 
     Args:
-        config: Configuration for the Limrun instance.
+        config: Cloud device configuration.
 
     Returns:
-        Tuple of (IosInstance, iOSDeviceController, LimrunIosController)
-
-    Example:
-        config = LimrunInstanceConfig(api_key="your-api-key")
-        instance, controller = await create_limrun_ios_instance(config)
-
-        try:
-            await controller.connect()
-            screenshot = await controller.screenshot()
-        finally:
-            await controller.cleanup()
-            await delete_limrun_ios_instance(config, instance.metadata.id)
+        Tuple of the provider instance, unified controller, and provider controller.
     """
-    client = AsyncLimrun(api_key=config.api_key, base_url=f"{config.base_url}/api/v1/limrun")
+    client = _build_cloud_client(config)
     instance: AndroidInstance | IosInstance | None = None
 
     try:
-        logger.info("Creating Limrun iOS instance...")
+        logger.info("Creating cloud iOS instance...")
 
         spec: dict = {
             "inactivityTimeout": config.inactivity_timeout,
@@ -193,24 +176,24 @@ async def create_limrun_ios_instance(
         if instance.status.api_url is None:
             raise RuntimeError("iOS instance missing api_url")
 
-        limrun_controller = LimrunIosController(
+        cloud_controller = CloudIosController(
             instance_id=instance.metadata.id,
             api_url=instance.status.api_url,
             token=instance.status.token,
         )
 
         # Connect to get device dimensions
-        await limrun_controller.connect()
+        await cloud_controller.connect()
 
         # Wrap in iOSDeviceController for unified interface
         controller = iOSDeviceController(
-            ios_client=limrun_controller,
+            ios_client=cloud_controller,
             device_id=instance.metadata.id,
-            device_width=limrun_controller.device_width,
-            device_height=limrun_controller.device_height,
+            device_width=cloud_controller.device_width,
+            device_height=cloud_controller.device_height,
         )
 
-        return instance, controller, limrun_controller
+        return instance, controller, cloud_controller
 
     except Exception:
         if instance is not None:
@@ -228,22 +211,22 @@ async def create_limrun_ios_instance(
 async def _wait_for_instance_ready(
     client: AsyncLimrun,
     instance_id: str,
-    platform: LimrunPlatform,
+    platform: ProviderPlatform,
     timeout: float = 120.0,
     poll_interval: float = 2.0,
 ) -> AndroidInstance | IosInstance:
-    """Wait for a Limrun instance to be ready."""
+    """Wait for a cloud instance to be ready."""
     start_time = asyncio.get_event_loop().time()
 
     while True:
         elapsed = asyncio.get_event_loop().time() - start_time
         if elapsed > timeout:
             raise TimeoutError(
-                f"Limrun {platform.value} instance {instance_id} did not become ready "
+                f"Cloud {platform.value} instance {instance_id} did not become ready "
                 f"within {timeout}s"
             )
 
-        if platform == LimrunPlatform.ANDROID:
+        if platform == ProviderPlatform.ANDROID:
             instance = await client.android_instances.get(instance_id)
         else:
             instance = await client.ios_instances.get(instance_id)
@@ -251,13 +234,13 @@ async def _wait_for_instance_ready(
         state = instance.status.state
 
         if state == "ready":
-            logger.info(f"Limrun {platform.value} instance {instance_id} is ready")
+            logger.info(f"Cloud {platform.value} instance {instance_id} is ready")
             return instance
 
         if state == "terminated":
             error_msg = instance.status.error_message or "Unknown error"
             raise RuntimeError(
-                f"Limrun {platform.value} instance {instance_id} terminated: {error_msg}"
+                f"Cloud {platform.value} instance {instance_id} terminated: {error_msg}"
             )
 
         logger.debug(
@@ -267,12 +250,12 @@ async def _wait_for_instance_ready(
         await asyncio.sleep(poll_interval)
 
 
-async def delete_limrun_android_instance(
-    config: LimrunInstanceConfig,
+async def delete_cloud_android_instance(
+    config: CloudDeviceInstanceConfig,
     instance_id: str,
 ) -> None:
-    """Delete a Limrun Android instance."""
-    client = AsyncLimrun(api_key=config.api_key, base_url=f"{config.base_url}/api/v1/limrun")
+    """Delete a cloud Android instance."""
+    client = _build_cloud_client(config)
     try:
         await client.android_instances.delete(instance_id)
         logger.info(f"Deleted Android instance: {instance_id}")
@@ -280,12 +263,12 @@ async def delete_limrun_android_instance(
         await client.close()
 
 
-async def delete_limrun_ios_instance(
-    config: LimrunInstanceConfig,
+async def delete_cloud_ios_instance(
+    config: CloudDeviceInstanceConfig,
     instance_id: str,
 ) -> None:
-    """Delete a Limrun iOS instance."""
-    client = AsyncLimrun(api_key=config.api_key, base_url=f"{config.base_url}/api/v1/limrun")
+    """Delete a cloud iOS instance."""
+    client = _build_cloud_client(config)
     try:
         await client.ios_instances.delete(instance_id)
         logger.info(f"Deleted iOS instance: {instance_id}")
@@ -293,11 +276,11 @@ async def delete_limrun_ios_instance(
         await client.close()
 
 
-async def list_limrun_android_instances(
-    config: LimrunInstanceConfig,
+async def list_cloud_android_instances(
+    config: CloudDeviceInstanceConfig,
 ) -> list[AndroidInstance]:
-    """List all Limrun Android instances."""
-    client = AsyncLimrun(api_key=config.api_key, base_url=f"{config.base_url}/api/v1/limrun")
+    """List all cloud Android instances."""
+    client = _build_cloud_client(config)
     try:
         page = await client.android_instances.list()
         return page.items
@@ -305,11 +288,11 @@ async def list_limrun_android_instances(
         await client.close()
 
 
-async def list_limrun_ios_instances(
-    config: LimrunInstanceConfig,
+async def list_cloud_ios_instances(
+    config: CloudDeviceInstanceConfig,
 ) -> list[IosInstance]:
-    """List all Limrun iOS instances."""
-    client = AsyncLimrun(api_key=config.api_key, base_url=f"{config.base_url}/api/v1/limrun")
+    """List all cloud iOS instances."""
+    client = _build_cloud_client(config)
     try:
         page = await client.ios_instances.list()
         return page.items

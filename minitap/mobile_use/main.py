@@ -14,17 +14,10 @@ from minitap.mobile_use.clients.ios_client_config import (
     IosClientConfig,
     WdaClientConfig,
 )
-from minitap.mobile_use.clients.limrun_factory import (
-    LimrunInstanceConfig,
-    LimrunPlatform,
-    create_limrun_android_instance,
-    create_limrun_ios_instance,
-    delete_limrun_android_instance,
-    delete_limrun_ios_instance,
-)
 from minitap.mobile_use.config import initialize_llm_config, settings
 from minitap.mobile_use.sdk import Agent
 from minitap.mobile_use.sdk.builders import Builders
+from minitap.mobile_use.sdk.types.agent import CloudDevicePlatform
 from minitap.mobile_use.sdk.types.task import AgentProfile
 from minitap.mobile_use.services.telemetry import telemetry
 from minitap.mobile_use.utils.cli_helpers import display_device_status
@@ -39,7 +32,7 @@ class DeviceType(StrEnum):
     """Device type for mobile-use agent."""
 
     LOCAL = "local"
-    LIMRUN = "limrun"
+    CLOUD = "cloud"
 
 
 async def run_automation(
@@ -59,7 +52,7 @@ async def run_automation(
     idb_host: str | None = None,
     idb_port: int | None = None,
     device_type: DeviceType = DeviceType.LOCAL,
-    limrun_platform: LimrunPlatform | None = None,
+    cloud_platform: CloudDevicePlatform | None = None,
 ):
     llm_config = initialize_llm_config()
     agent_profile = AgentProfile(name="default", llm_config=llm_config)
@@ -67,30 +60,10 @@ async def run_automation(
     if video_recording_tools_enabled:
         config.with_video_recording_tools()
 
-    # Limrun device provisioning
-    limrun_instance_id: str | None = None
-    limrun_controller = None
-    limrun_config: LimrunInstanceConfig | None = None
-
-    if device_type == DeviceType.LIMRUN:
-        if limrun_platform is None:
-            raise ValueError("--limrun-platform is required when using --device-type limrun")
-
-        logger.info(f"Provisioning Limrun {limrun_platform.value} device...")
-        limrun_config = LimrunInstanceConfig()
-
-        if limrun_platform == LimrunPlatform.ANDROID:
-            instance, limrun_controller = await create_limrun_android_instance(limrun_config)
-            limrun_instance_id = instance.metadata.id
-            await limrun_controller.connect()
-            config.with_limrun_android_controller(limrun_controller)
-        else:
-            instance, _, limrun_controller = await create_limrun_ios_instance(limrun_config)
-            limrun_instance_id = instance.metadata.id
-            # Connection is done in the factory, no need to call connect()
-            config.with_limrun_ios_controller(limrun_controller)
-
-        logger.info(f"Limrun {limrun_platform.value} device ready: {limrun_instance_id}")
+    if device_type == DeviceType.CLOUD:
+        if cloud_platform is None:
+            raise ValueError("--cloud-platform is required when using --device-type cloud")
+        config.for_cloud_device(cloud_platform)
     else:
         # Build iOS client config from CLI options (local device)
         wda_config = WdaClientConfig.with_overrides(
@@ -137,16 +110,6 @@ async def run_automation(
     finally:
         if agent is not None:
             await agent.clean()
-
-        # Cleanup Limrun device
-        if limrun_instance_id and limrun_config:
-            logger.info(f"Cleaning up Limrun device: {limrun_instance_id}")
-            if limrun_controller:
-                await limrun_controller.cleanup()
-            if limrun_platform == LimrunPlatform.ANDROID:
-                await delete_limrun_android_instance(limrun_config, limrun_instance_id)
-            else:
-                await delete_limrun_ios_instance(limrun_config, limrun_instance_id)
 
 
 @app.command()
@@ -250,15 +213,14 @@ def main(
         typer.Option(
             "--device-type",
             "-d",
-            help="Device type: 'local' for connected devices, 'limrun' for cloud devices.",
+            help="Device type: 'local' for connected devices, 'cloud' for Minitap cloud devices.",
         ),
     ] = DeviceType.LOCAL,
-    limrun_platform: Annotated[
-        LimrunPlatform | None,
+    cloud_platform: Annotated[
+        CloudDevicePlatform | None,
         typer.Option(
-            "--limrun-platform",
-            help="Platform for Limrun cloud device: 'android' or 'ios'. "
-            "Required when --device-type is 'limrun'.",
+            "--cloud-platform",
+            help="Cloud device platform: 'android' or 'ios'. Required for cloud devices.",
         ),
     ] = None,
 ):
@@ -283,12 +245,12 @@ def main(
 
         display_device_status(console, adb_client=adb_client)
     else:
-        if limrun_platform is None:
+        if cloud_platform is None:
             console.print(
-                "[red]Error: --limrun-platform is required when using --device-type limrun[/red]"
+                "[red]Error: --cloud-platform is required when using --device-type cloud[/red]"
             )
             raise typer.Exit(1)
-        console.print(f"[cyan]Using Limrun cloud device ({limrun_platform.value})...[/cyan]")
+        console.print(f"[cyan]Using Minitap cloud device ({cloud_platform.value})...[/cyan]")
 
     # Start telemetry session with CLI context (only non-sensitive flags)
     session_id = telemetry.start_session(
@@ -317,7 +279,7 @@ def main(
                 idb_port=idb_port,
                 video_recording_tools_enabled=with_video_recording_tools,
                 device_type=device_type,
-                limrun_platform=limrun_platform,
+                cloud_platform=cloud_platform,
             )
         )
     except KeyboardInterrupt:

@@ -414,7 +414,13 @@ class IdbClientWrapper:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            stdout, stderr = await process.communicate()
+            try:
+                stdout, stderr = await process.communicate()
+            except asyncio.CancelledError:
+                if process.returncode is None:
+                    process.terminate()
+                    await process.wait()
+                raise
 
             if process.returncode != 0:
                 logger.error(f"idb describe-all failed: {stderr.decode()}")

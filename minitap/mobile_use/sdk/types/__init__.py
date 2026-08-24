@@ -3,9 +3,9 @@
 from minitap.mobile_use.sdk.types.agent import (
     AgentConfig,
     ApiBaseUrl,
+    CloudDeviceConfig,
+    CloudDevicePlatform,
     DevicePlatform,
-    LimrunConfig,
-    LimrunPlatform,
     ServerConfig,
 )
 from minitap.mobile_use.sdk.types.exceptions import (
@@ -21,8 +21,6 @@ from minitap.mobile_use.sdk.types.exceptions import (
 )
 from minitap.mobile_use.sdk.types.task import (
     AgentProfile,
-    ManualTaskConfig,
-    PlatformTaskRequest,
     Task,
     TaskRequest,
     TaskRequestCommon,
@@ -32,14 +30,12 @@ from minitap.mobile_use.sdk.types.task import (
 __all__ = [
     "ApiBaseUrl",
     "AgentConfig",
+    "CloudDeviceConfig",
+    "CloudDevicePlatform",
     "DevicePlatform",
-    "LimrunConfig",
-    "LimrunPlatform",
     "AgentProfile",
     "ServerConfig",
     "TaskRequest",
-    "ManualTaskConfig",
-    "PlatformTaskRequest",
     "TaskResult",
     "TaskRequestCommon",
     "Task",

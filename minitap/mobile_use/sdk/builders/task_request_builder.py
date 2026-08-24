@@ -94,10 +94,10 @@ class TaskRequestCommonBuilder(BaseModel):
         Set the path to an app to install before running the task.
 
         For Android: Path to an APK file.
-        For iOS (Limrun): Path to a .app folder (simulator build).
+        For cloud iOS: Path to a .app folder (simulator build).
 
         The app will be installed automatically before the task starts.
-        For iOS on Limrun, this uses diff-based patch syncing for fast updates.
+        Cloud iOS uses diff-based patch syncing for fast updates.
 
         Args:
             app_path: Path to the app file/folder to install

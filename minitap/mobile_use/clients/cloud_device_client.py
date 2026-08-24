@@ -1,8 +1,8 @@
 """
-Limrun client wrapper for iOS WebSocket communication.
+Cloud device client wrapper for iOS WebSocket communication.
 
 This module ports the TypeScript SDK's iOS client functionality to Python,
-providing WebSocket-based communication with Limrun iOS instances.
+providing WebSocket-based communication with cloud iOS instances.
 """
 
 import asyncio
@@ -86,9 +86,9 @@ class TapElementResult(BaseModel):
         populate_by_name = True
 
 
-class LimrunIosClient:
+class CloudIosClient:
     """
-    A client for interacting with a Limrun iOS instance via WebSocket.
+    A client for interacting with a cloud iOS instance via WebSocket.
 
     This is a Python port of the TypeScript SDK's iOS client functionality.
     """
@@ -150,7 +150,7 @@ class LimrunIosClient:
                     logger.error(f"Error in connection state callback: {e}")
 
     async def connect(self) -> None:
-        """Connect to the Limrun iOS instance."""
+        """Connect to the cloud iOS instance."""
         self._intentional_disconnect = False
         self._update_connection_state(ConnectionState.CONNECTING)
 
@@ -166,15 +166,18 @@ class LimrunIosClient:
             self._ping_task = asyncio.create_task(self._ping_loop())
 
             self._device_info = await self._fetch_device_info()
-            logger.info(f"Connected to Limrun iOS instance: {self._device_info.model}")
+            logger.info(f"Connected to cloud iOS instance: {self._device_info.model}")
 
         except Exception as e:
             logger.error(f"Failed to connect: {e}")
-            self._update_connection_state(ConnectionState.DISCONNECTED)
+            try:
+                await self.cleanup()
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to clean up connection: {cleanup_error}")
             raise
 
     async def disconnect(self) -> None:
-        """Disconnect from the Limrun iOS instance."""
+        """Disconnect from the cloud iOS instance."""
         self._intentional_disconnect = True
 
         if self._ping_task:
@@ -199,7 +202,7 @@ class LimrunIosClient:
 
         self._fail_pending_requests("Intentional disconnect")
         self._update_connection_state(ConnectionState.DISCONNECTED)
-        logger.debug("Disconnected from Limrun iOS instance")
+        logger.debug("Disconnected from cloud iOS instance")
 
     async def cleanup(self) -> None:
         """Cleanup resources."""
@@ -347,7 +350,7 @@ class LimrunIosClient:
                 raise RuntimeError("Cannot reconnect after intentional disconnect")
 
             self._update_connection_state(ConnectionState.RECONNECTING)
-            logger.info("Attempting to reconnect to Limrun iOS instance...")
+            logger.info("Attempting to reconnect to cloud iOS instance...")
 
             # Cleanup old connection resources
             if self._ping_task:
@@ -395,7 +398,7 @@ class LimrunIosClient:
                 self._receive_task = asyncio.create_task(self._receive_loop())
                 self._ping_task = asyncio.create_task(self._ping_loop())
 
-                logger.info("Successfully reconnected to Limrun iOS instance")
+                logger.info("Successfully reconnected to cloud iOS instance")
             except Exception as e:
                 logger.error(f"Reconnection failed: {e}")
                 self._update_connection_state(ConnectionState.DISCONNECTED)
@@ -535,7 +538,7 @@ class LimrunIosClient:
     ) -> str:
         """Calculate scroll direction from swipe coordinates.
 
-        Limrun uses scroll semantics: "down" scrolls content down (reveals content below).
+        The cloud device API uses scroll semantics: "down" reveals content below.
         A swipe from bottom to top (y_start > y_end) should scroll "down".
         """
         dx = x_end - x_start

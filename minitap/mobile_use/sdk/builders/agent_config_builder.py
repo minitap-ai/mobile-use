@@ -9,16 +9,16 @@ from langchain_core.callbacks.base import Callbacks
 from minitap.mobile_use.clients.ios_client_config import BrowserStackClientConfig, IosClientConfig
 from minitap.mobile_use.config import get_default_llm_config, get_default_minitap_llm_config
 from minitap.mobile_use.context import DevicePlatform
-from minitap.mobile_use.controllers.limrun_controller import (
-    LimrunAndroidController,
-    LimrunIosController,
+from minitap.mobile_use.controllers.cloud_device_controller import (
+    CloudAndroidController,
+    CloudIosController,
 )
 from minitap.mobile_use.sdk.constants import DEFAULT_PROFILE_NAME
 from minitap.mobile_use.sdk.types.agent import (
     AgentConfig,
     AgentProfile,
-    LimrunConfig,
-    LimrunPlatform,
+    CloudDeviceConfig,
+    CloudDevicePlatform,
     ServerConfig,
 )
 from minitap.mobile_use.sdk.types.task import TaskRequestCommon
@@ -52,13 +52,12 @@ class AgentConfigBuilder:
         self._device_platform: DevicePlatform | None = None
         self._servers: ServerConfig = get_default_servers()
         self._graph_config_callbacks: Callbacks = None
-        self._cloud_mobile_id_or_ref: str | None = None
         self._ios_client_config: IosClientConfig | None = None
         self._browserstack_config: BrowserStackClientConfig | None = None
         self._video_recording_enabled: bool = False
-        self._limrun_config: LimrunConfig | None = None
-        self._limrun_android_controller: LimrunAndroidController | None = None
-        self._limrun_ios_controller: LimrunIosController | None = None
+        self._cloud_device_config: CloudDeviceConfig | None = None
+        self._cloud_android_controller: CloudAndroidController | None = None
+        self._cloud_ios_controller: CloudIosController | None = None
 
     def add_profile(self, profile: AgentProfile, validate: bool = True) -> "AgentConfigBuilder":
         """
@@ -109,43 +108,22 @@ class AgentConfigBuilder:
             platform: The device platform (ANDROID or IOS)
             device_id: The unique identifier for the device
         """
-        if self._cloud_mobile_id_or_ref is not None:
-            raise ValueError(
-                "Device ID cannot be set when a cloud mobile is already configured.\n"
-                "> for_device() and for_cloud_mobile() are mutually exclusive"
-            )
         if self._browserstack_config is not None:
             raise ValueError(
                 "Device ID cannot be set when BrowserStack is already configured.\n"
                 "> for_device() and for_browserstack() are mutually exclusive"
             )
+        if (
+            self._cloud_device_config is not None
+            or self._cloud_android_controller is not None
+            or self._cloud_ios_controller is not None
+        ):
+            raise ValueError(
+                "Local device cannot be set when a cloud device is already configured.\n"
+                "> for_device() and cloud device configuration are mutually exclusive"
+            )
         self._device_id = device_id
         self._device_platform = platform
-        return self
-
-    def for_cloud_mobile(self, cloud_mobile_id_or_ref: str) -> "AgentConfigBuilder":
-        """
-        Configure the mobile-use agent to use a cloud mobile.
-
-        When using a cloud mobile, tasks are executed remotely via the Platform API,
-        and only PlatformTaskRequest can be used.
-
-        Args:
-            cloud_mobile_id_or_ref: The unique identifier or reference name for the cloud mobile.
-                Can be either a UUID (e.g., '550e8400-e29b-41d4-a716-446655440000')
-                or a reference name (e.g., 'my-test-device')
-        """
-        if self._device_id is not None:
-            raise ValueError(
-                "Cloud mobile device ID cannot be set when a device is already configured.\n"
-                "> for_device() and for_cloud_mobile() are mutually exclusive"
-            )
-        if self._browserstack_config is not None:
-            raise ValueError(
-                "Cloud mobile cannot be set when BrowserStack is already configured.\n"
-                "> for_cloud_mobile() and for_browserstack() are mutually exclusive"
-            )
-        self._cloud_mobile_id_or_ref = cloud_mobile_id_or_ref
         return self
 
     def for_browserstack(self, config: BrowserStackClientConfig) -> "AgentConfigBuilder":
@@ -154,7 +132,7 @@ class AgentConfigBuilder:
 
         When using BrowserStack, the agent connects to BrowserStack's cloud infrastructure
         for iOS device automation. This is mutually exclusive with for_device() and
-        for_cloud_mobile().
+        cloud device provisioning.
 
         Args:
             config: BrowserStack configuration with credentials and device settings
@@ -164,18 +142,22 @@ class AgentConfigBuilder:
                 "BrowserStack cannot be set when a device is already configured.\n"
                 "> for_device() and for_browserstack() are mutually exclusive"
             )
-        if self._cloud_mobile_id_or_ref is not None:
+        if (
+            self._cloud_device_config is not None
+            or self._cloud_android_controller is not None
+            or self._cloud_ios_controller is not None
+        ):
             raise ValueError(
-                "BrowserStack cannot be set when a cloud mobile is already configured.\n"
-                "> for_cloud_mobile() and for_browserstack() are mutually exclusive"
+                "BrowserStack cannot be set when a cloud device is already configured.\n"
+                "> for_cloud_device() and for_browserstack() are mutually exclusive"
             )
         self._browserstack_config = config
         self._device_platform = DevicePlatform.IOS
         return self
 
-    def for_limrun(
+    def for_cloud_device(
         self,
-        platform: LimrunPlatform,
+        platform: CloudDevicePlatform,
         *,
         api_key: str | None = None,
         base_url: str | None = None,
@@ -185,16 +167,15 @@ class AgentConfigBuilder:
         labels: dict[str, str] | None = None,
     ) -> "AgentConfigBuilder":
         """
-        Configure the agent to use a Limrun cloud device.
+        Configure the agent to use a Minitap cloud device.
 
         The SDK will automatically provision the device during agent initialization
         and clean it up when the agent is stopped.
 
         Args:
-            platform: The device platform (LimrunPlatform.ANDROID or LimrunPlatform.IOS).
-            api_key: API key for Limrun. If not provided, uses MINITAP_API_KEY
-                     or LIM_API_KEY environment variable.
-            base_url: Base URL for Limrun API. Defaults to https://platform.minitap.ai.
+            platform: The cloud device operating system.
+            api_key: Minitap API key. If omitted, uses MINITAP_API_KEY.
+            base_url: Optional cloud device API base URL.
             inactivity_timeout: Timeout for device inactivity (e.g., "10m").
             hard_timeout: Hard timeout for device lifetime.
             display_name: Optional display name for the device.
@@ -202,33 +183,28 @@ class AgentConfigBuilder:
 
         Example:
             >>> config = (Builders.AgentConfig
-            ...     .for_limrun(LimrunPlatform.ANDROID)
+            ...     .for_cloud_device(CloudDevicePlatform.ANDROID)
             ...     .build())
             >>> agent = Agent(config=config)
-            >>> await agent.init()  # Provisions Limrun device automatically
+            >>> await agent.init()
         """
         if self._device_id is not None:
             raise ValueError(
-                "Limrun cannot be set when a device is already configured.\n"
-                "> for_device() and for_limrun() are mutually exclusive"
+                "Cloud device cannot be set when a local device is already configured.\n"
+                "> for_device() and for_cloud_device() are mutually exclusive"
             )
         if self._browserstack_config is not None:
             raise ValueError(
-                "Limrun cannot be set when BrowserStack is already configured.\n"
-                "> for_browserstack() and for_limrun() are mutually exclusive"
+                "Cloud device cannot be set when BrowserStack is already configured.\n"
+                "> for_browserstack() and for_cloud_device() are mutually exclusive"
             )
-        if self._cloud_mobile_id_or_ref is not None:
+        if self._cloud_android_controller is not None or self._cloud_ios_controller is not None:
             raise ValueError(
-                "Limrun cannot be set when a cloud mobile is already configured.\n"
-                "> for_cloud_mobile() and for_limrun() are mutually exclusive"
-            )
-        if self._limrun_android_controller is not None or self._limrun_ios_controller is not None:
-            raise ValueError(
-                "Limrun config cannot be set when a Limrun controller is already configured.\n"
-                "> for_limrun() and with_limrun_*_controller() are mutually exclusive"
+                "Cloud device config cannot be set when a controller is already configured.\n"
+                "> for_cloud_device() and with_cloud_*_controller() are mutually exclusive"
             )
 
-        self._limrun_config = LimrunConfig(
+        self._cloud_device_config = CloudDeviceConfig(
             platform=platform,
             api_key=api_key,
             base_url=base_url,
@@ -238,7 +214,9 @@ class AgentConfigBuilder:
             labels=labels,
         )
         self._device_platform = (
-            DevicePlatform.ANDROID if platform == LimrunPlatform.ANDROID else DevicePlatform.IOS
+            DevicePlatform.ANDROID
+            if platform == CloudDevicePlatform.ANDROID
+            else DevicePlatform.IOS
         )
         return self
 
@@ -289,67 +267,61 @@ class AgentConfigBuilder:
         self._ios_client_config = copy.deepcopy(config)
         return self
 
-    def with_limrun_android_controller(
-        self, controller: "LimrunAndroidController"
+    def with_cloud_android_controller(
+        self, controller: "CloudAndroidController"
     ) -> "AgentConfigBuilder":
         """
-        Configure the agent to use a pre-provisioned Limrun Android controller.
+        Configure the agent to use a pre-provisioned cloud Android controller.
 
         Args:
-            controller: A connected LimrunAndroidController instance
+            controller: A connected cloud Android controller
         """
         if self._device_id is not None:
             raise ValueError(
-                "Limrun controller cannot be set when a device is already configured.\n"
-                "> for_device() and with_limrun_android_controller() are mutually exclusive"
+                "Cloud controller cannot be set when a local device is already configured.\n"
+                "> for_device() and with_cloud_android_controller() are mutually exclusive"
             )
         if self._browserstack_config is not None:
             raise ValueError(
-                "Limrun controller cannot be set when BrowserStack is already configured.\n"
-                "> for_browserstack() and with_limrun_android_controller() are mutually exclusive"
+                "Cloud controller cannot be set when BrowserStack is already configured.\n"
+                "> for_browserstack() and with_cloud_android_controller() are mutually exclusive"
             )
-        if self._cloud_mobile_id_or_ref is not None:
+        if self._cloud_device_config is not None:
             raise ValueError(
-                "Limrun controller cannot be set when a cloud mobile is already configured.\n"
-                "> for_cloud_mobile() and with_limrun_android_controller() are mutually exclusive"
+                "Cloud controller cannot be set when cloud config is already configured.\n"
+                "> for_cloud_device() and with_cloud_android_controller() are mutually exclusive"
             )
-        if self._limrun_config is not None:
-            raise ValueError(
-                "Limrun controller cannot be set when Limrun config is already configured.\n"
-                "> for_limrun() and with_limrun_android_controller() are mutually exclusive"
-            )
-        self._limrun_android_controller = controller
+        if self._cloud_ios_controller is not None:
+            raise ValueError("Only one cloud device controller can be configured")
+        self._cloud_android_controller = controller
         self._device_platform = DevicePlatform.ANDROID
         return self
 
-    def with_limrun_ios_controller(self, controller: "LimrunIosController") -> "AgentConfigBuilder":
+    def with_cloud_ios_controller(self, controller: "CloudIosController") -> "AgentConfigBuilder":
         """
-        Configure the agent to use a pre-provisioned Limrun iOS controller.
+        Configure the agent to use a pre-provisioned cloud iOS controller.
 
         Args:
-            controller: A connected LimrunIosController instance
+            controller: A connected cloud iOS controller
         """
         if self._device_id is not None:
             raise ValueError(
-                "Limrun controller cannot be set when a device is already configured.\n"
-                "> for_device() and with_limrun_ios_controller() are mutually exclusive"
+                "Cloud controller cannot be set when a local device is already configured.\n"
+                "> for_device() and with_cloud_ios_controller() are mutually exclusive"
             )
         if self._browserstack_config is not None:
             raise ValueError(
-                "Limrun controller cannot be set when BrowserStack is already configured.\n"
-                "> for_browserstack() and with_limrun_ios_controller() are mutually exclusive"
+                "Cloud controller cannot be set when BrowserStack is already configured.\n"
+                "> for_browserstack() and with_cloud_ios_controller() are mutually exclusive"
             )
-        if self._cloud_mobile_id_or_ref is not None:
+        if self._cloud_device_config is not None:
             raise ValueError(
-                "Limrun controller cannot be set when a cloud mobile is already configured.\n"
-                "> for_cloud_mobile() and with_limrun_ios_controller() are mutually exclusive"
+                "Cloud controller cannot be set when cloud config is already configured.\n"
+                "> for_cloud_device() and with_cloud_ios_controller() are mutually exclusive"
             )
-        if self._limrun_config is not None:
-            raise ValueError(
-                "Limrun controller cannot be set when Limrun config is already configured.\n"
-                "> for_limrun() and with_limrun_ios_controller() are mutually exclusive"
-            )
-        self._limrun_ios_controller = controller
+        if self._cloud_android_controller is not None:
+            raise ValueError("Only one cloud device controller can be configured")
+        self._cloud_ios_controller = controller
         self._device_platform = DevicePlatform.IOS
         return self
 
@@ -435,13 +407,12 @@ class AgentConfigBuilder:
             device_platform=self._device_platform,
             servers=self._servers,
             graph_config_callbacks=self._graph_config_callbacks,
-            cloud_mobile_id_or_ref=self._cloud_mobile_id_or_ref,
             ios_client_config=self._ios_client_config,
             browserstack_config=self._browserstack_config,
             video_recording_enabled=self._video_recording_enabled,
-            limrun_config=self._limrun_config,
-            limrun_android_controller=self._limrun_android_controller,
-            limrun_ios_controller=self._limrun_ios_controller,
+            cloud_device_config=self._cloud_device_config,
+            cloud_android_controller=self._cloud_android_controller,
+            cloud_ios_controller=self._cloud_ios_controller,
         )
 
 

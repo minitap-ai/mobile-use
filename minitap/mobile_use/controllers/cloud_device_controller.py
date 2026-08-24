@@ -1,5 +1,5 @@
 """
-Limrun device controller implementation.
+Cloud device controller implementation.
 
 Supports both Android (via ADB forwarding with SDK-based WebSocket tunnel) and iOS (via WebSocket).
 """
@@ -16,7 +16,7 @@ from PIL import Image
 
 from minitap.mobile_use.clients.adb_tunnel import AdbTunnel
 from minitap.mobile_use.clients.idb_client import IOSAppInfo
-from minitap.mobile_use.clients.limrun_client import LimrunIosClient
+from minitap.mobile_use.clients.cloud_device_client import CloudIosClient
 from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
 from minitap.mobile_use.controllers.device_controller import (
     MobileDeviceController,
@@ -29,9 +29,9 @@ from minitap.mobile_use.utils.video import DEFAULT_MAX_DURATION_SECONDS, VideoRe
 logger = get_logger(__name__)
 
 
-class LimrunAndroidController(MobileDeviceController):
+class CloudAndroidController(MobileDeviceController):
     """
-    Limrun Android controller using ADB forwarding via SDK-based WebSocket tunnel.
+    Cloud Android controller using ADB forwarding via an SDK-based WebSocket tunnel.
 
     Uses the Python SDK's AdbTunnel to establish ADB tunnel, then uses standard
     ADB/UIAutomator2 for device interaction.
@@ -58,7 +58,7 @@ class LimrunAndroidController(MobileDeviceController):
 
     async def connect(self) -> None:
         """Establish ADB tunnel using SDK and connect."""
-        logger.info(f"Connecting to Limrun Android instance {self.instance_id}")
+        logger.info(f"Connecting to cloud Android instance {self.instance_id}")
 
         try:
             self._tunnel = AdbTunnel(
@@ -103,7 +103,7 @@ class LimrunAndroidController(MobileDeviceController):
                 )
                 if tunnel_device:
                     self._adb_serial = tunnel_device.serial
-                    logger.info(f"Connected to Limrun Android device: {self._adb_serial}")
+                    logger.info(f"Connected to cloud Android device: {self._adb_serial}")
                     break
 
                 logger.info(f"Waiting for ADB device (attempt {attempt + 1}/{max_retries})...")
@@ -125,11 +125,11 @@ class LimrunAndroidController(MobileDeviceController):
                 self.device_width = screen_data.width
                 self.device_height = screen_data.height
                 logger.info(
-                    f"Limrun Android screen dimensions: {self.device_width}x{self.device_height}"
+                    f"Cloud Android screen dimensions: {self.device_width}x{self.device_height}"
                 )
 
         except Exception as e:
-            logger.error(f"Failed to connect to Limrun Android: {e}")
+            logger.error(f"Failed to connect to cloud Android device: {e}")
             await self.cleanup()
             raise
 
@@ -158,7 +158,7 @@ class LimrunAndroidController(MobileDeviceController):
             self.device.shell(cmd)
             return TapOutput(error=None)
         except Exception as e:
-            return TapOutput(error=f"Limrun Android tap failed: {str(e)}")
+            return TapOutput(error=f"Cloud Android tap failed: {str(e)}")
 
     async def swipe(
         self,
@@ -172,7 +172,7 @@ class LimrunAndroidController(MobileDeviceController):
             self.device.shell(cmd)
             return None
         except Exception as e:
-            return f"Limrun Android swipe failed: {str(e)}"
+            return f"Cloud Android swipe failed: {str(e)}"
 
     async def get_screen_data(self) -> ScreenDataResponse:
         """Get screen data using UIAutomator2."""
@@ -230,7 +230,7 @@ class LimrunAndroidController(MobileDeviceController):
             return False
 
     async def launch_app(self, package_or_bundle_id: str) -> bool:
-        """Launch an application using am start (more reliable than monkey on Limrun)."""
+        """Launch an application using am start, with monkey as a fallback."""
         try:
             # First, try to get the launcher activity from the package
             result = self.device.shell(
@@ -402,7 +402,7 @@ class LimrunAndroidController(MobileDeviceController):
         self._adb_client = None
         self._ui_client = None
         self._adb_serial = None
-        logger.debug("Limrun Android controller cleanup complete")
+        logger.debug("Cloud Android controller cleanup complete")
 
     def get_compressed_b64_screenshot(self, image_base64: str, quality: int = 50) -> str:
         """Compress a base64 image."""
@@ -424,20 +424,20 @@ class LimrunAndroidController(MobileDeviceController):
         """Start screen recording."""
         return VideoRecordingResult(
             success=False,
-            message="Video recording not yet supported for Limrun Android",
+            message="Video recording is not yet supported for cloud Android devices",
         )
 
     async def stop_video_recording(self) -> VideoRecordingResult:
         """Stop screen recording."""
         return VideoRecordingResult(
             success=False,
-            message="Video recording not yet supported for Limrun Android",
+            message="Video recording is not yet supported for cloud Android devices",
         )
 
 
-class LimrunIosController:
+class CloudIosController:
     """
-    Limrun iOS controller using WebSocket communication.
+    Cloud iOS controller using WebSocket communication.
 
     Implements IosClientWrapper interface for use with iOSDeviceController.
     """
@@ -454,13 +454,13 @@ class LimrunIosController:
         self.device_width: int = 0
         self.device_height: int = 0
 
-        self._client: LimrunIosClient | None = None
+        self._client: CloudIosClient | None = None
 
     async def connect(self) -> None:
-        """Connect to the Limrun iOS instance."""
-        logger.info(f"Connecting to Limrun iOS instance {self.instance_id}")
+        """Connect to the cloud iOS instance."""
+        logger.info(f"Connecting to cloud iOS instance {self.instance_id}")
 
-        self._client = LimrunIosClient(
+        self._client = CloudIosClient(
             api_url=self.api_url,
             token=self.token,
         )
@@ -471,15 +471,15 @@ class LimrunIosController:
         self.device_height = int(device_info.screen_height)
 
         logger.info(
-            f"Connected to Limrun iOS: {device_info.model} "
+            f"Connected to cloud iOS device: {device_info.model} "
             f"({self.device_width}x{self.device_height})"
         )
 
     @property
-    def client(self) -> LimrunIosClient:
-        """Get the Limrun iOS client."""
+    def client(self) -> CloudIosClient:
+        """Get the cloud iOS client."""
         if self._client is None:
-            raise RuntimeError("Not connected to Limrun iOS instance")
+            raise RuntimeError("Not connected to a cloud iOS instance")
         return self._client
 
     async def cleanup(self) -> None:
@@ -487,7 +487,7 @@ class LimrunIosController:
         if self._client:
             await self._client.cleanup()
             self._client = None
-        logger.debug("Limrun iOS controller cleanup complete")
+        logger.debug("Cloud iOS controller cleanup complete")
 
     # IosClientWrapper interface methods (matching IdbClientWrapper)
 
@@ -497,7 +497,7 @@ class LimrunIosController:
             await self.client.tap(x=x, y=y, duration=duration)
             return True
         except Exception as e:
-            logger.error(f"Limrun iOS tap failed: {e}")
+            logger.error(f"Cloud iOS tap failed: {e}")
             return False
 
     async def swipe(
@@ -519,7 +519,7 @@ class LimrunIosController:
             )
             return True
         except Exception as e:
-            logger.error(f"Limrun iOS swipe failed: {e}")
+            logger.error(f"Cloud iOS swipe failed: {e}")
             return False
 
     async def screenshot(self, output_path: str | None = None) -> bytes | None:

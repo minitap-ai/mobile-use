@@ -17,7 +17,7 @@ from minitap.mobile_use.agents.planner.types import Subgoal
 from minitap.mobile_use.clients.ios_client import IosClientWrapper
 from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
 from minitap.mobile_use.config import AgentNode, LLMConfig
-from minitap.mobile_use.controllers.limrun_controller import LimrunAndroidController
+from minitap.mobile_use.controllers.cloud_device_controller import CloudAndroidController
 
 
 class AppLaunchResult(BaseModel):
@@ -57,7 +57,6 @@ class ExecutionSetup(BaseModel):
 
     traces_path: Path | None = None
     trace_name: str | None = None
-    enable_remote_tracing: bool = False
     app_lock_status: AppLaunchResult | None = None
 
     def get_locked_app_package(self) -> str | None:
@@ -84,11 +83,10 @@ class MobileUseContext(BaseModel):
     adb_client: AdbClient | None = None
     ui_adb_client: UIAutomatorClient | None = None
     ios_client: IosClientWrapper | None = None
-    limrun_android_controller: LimrunAndroidController | None = None
+    cloud_android_controller: CloudAndroidController | None = None
     execution_setup: ExecutionSetup | None = None
     on_agent_thought: Callable[[AgentNode, str], Coroutine] | None = None
     on_plan_changes: Callable[[list[Subgoal], IsReplan], Coroutine] | None = None
-    minitap_api_key: str | None = None
     video_recording_enabled: bool = False
 
     def get_adb_client(self) -> AdbClient:

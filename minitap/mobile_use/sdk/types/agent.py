@@ -7,39 +7,38 @@ from pydantic import BaseModel
 
 from minitap.mobile_use.clients.ios_client_config import BrowserStackClientConfig, IosClientConfig
 from minitap.mobile_use.context import DevicePlatform
-from minitap.mobile_use.controllers.limrun_controller import (
-    LimrunAndroidController,
-    LimrunIosController,
+from minitap.mobile_use.controllers.cloud_device_controller import (
+    CloudAndroidController,
+    CloudIosController,
 )
 from minitap.mobile_use.sdk.types.task import AgentProfile, TaskRequestCommon
 
 
-class LimrunPlatform(StrEnum):
-    """Limrun device platform."""
+class CloudDevicePlatform(StrEnum):
+    """Cloud device operating system."""
 
     ANDROID = "android"
     IOS = "ios"
 
 
-class LimrunConfig(BaseModel):
+class CloudDeviceConfig(BaseModel):
     """
-    Configuration for Limrun cloud device provisioning.
+    Configuration for cloud device provisioning.
 
-    When set, the SDK will automatically provision a Limrun device
+    When set, the SDK will automatically provision a cloud device
     during agent initialization and clean it up when the agent is stopped.
 
     Attributes:
         platform: The device platform (android or ios).
-        api_key: API key for Limrun. If not provided, uses MINITAP_API_KEY
-                 or LIM_API_KEY environment variable.
-        base_url: Base URL for Limrun API. Defaults to https://platform.minitap.ai.
+        api_key: API key for the cloud device API. If omitted, uses MINITAP_API_KEY.
+        base_url: Optional cloud device API base URL.
         inactivity_timeout: Timeout for device inactivity (e.g., "10m").
         hard_timeout: Hard timeout for device lifetime.
         display_name: Optional display name for the device.
         labels: Optional labels for the device.
     """
 
-    platform: LimrunPlatform
+    platform: CloudDevicePlatform
     api_key: str | None = None
     base_url: str | None = None
     inactivity_timeout: str = "10m"
@@ -103,13 +102,10 @@ class AgentConfig(BaseModel):
         device_id: Specific device to target (if None, first available is used).
         device_platform: Platform of the device to target.
         servers: Custom server configurations.
-        cloud_mobile_id_or_ref: ID or reference name of cloud mobile (virtual mobile)
-                                to use for remote execution.
         video_recording_enabled: Whether video recording tools are enabled.
-        limrun_config: Configuration for Limrun cloud device provisioning.
-            When set, the SDK will automatically provision a Limrun device.
-        limrun_android_controller: Pre-configured Limrun Android controller.
-        limrun_ios_controller: Pre-configured Limrun iOS controller.
+        cloud_device_config: Configuration for cloud device provisioning.
+        cloud_android_controller: Pre-configured cloud Android controller.
+        cloud_ios_controller: Pre-configured cloud iOS controller.
     """
 
     agent_profiles: dict[str, AgentProfile]
@@ -119,12 +115,11 @@ class AgentConfig(BaseModel):
     device_platform: DevicePlatform | None = None
     servers: ServerConfig
     graph_config_callbacks: Callbacks = None
-    cloud_mobile_id_or_ref: str | None = None
     ios_client_config: IosClientConfig | None = None
     browserstack_config: BrowserStackClientConfig | None = None
     video_recording_enabled: bool = False
-    limrun_config: LimrunConfig | None = None
-    limrun_android_controller: LimrunAndroidController | None = None
-    limrun_ios_controller: LimrunIosController | None = None
+    cloud_device_config: CloudDeviceConfig | None = None
+    cloud_android_controller: CloudAndroidController | None = None
+    cloud_ios_controller: CloudIosController | None = None
 
     model_config = {"arbitrary_types_allowed": True}

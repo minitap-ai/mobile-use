@@ -2,20 +2,19 @@
 Task-related type definitions for the Mobile-use SDK.
 """
 
-import tempfile
-from asyncio import Event
 from collections.abc import Callable, Coroutine
 from datetime import datetime
 from pathlib import Path
-from typing import Any, TypeVar, overload
+from typing import Any, Literal, TypeVar, overload
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 from minitap.mobile_use.config import LLMConfig, get_default_llm_config
 from minitap.mobile_use.constants import RECURSION_LIMIT
 from minitap.mobile_use.context import DeviceContext
-from minitap.mobile_use.sdk.types.platform import TaskRunResponse, TaskRunStatus
 from minitap.mobile_use.sdk.utils import load_llm_config_override
+
+TaskRunStatus = Literal["pending", "running", "completed", "failed", "cancelled"]
 
 
 class AgentProfile(BaseModel):
@@ -84,10 +83,10 @@ class TaskRequestCommon(TaskRequestBase):
     """Path to an app to install before running the task.
     
     For Android: Path to an APK file.
-    For iOS (Limrun): Path to a .app folder (simulator build).
+    For cloud iOS: Path to a .app folder (simulator build).
     
     The app will be installed automatically before the task starts.
-    For iOS on Limrun, this uses diff-based patch syncing for fast updates.
+    Cloud iOS uses diff-based patch syncing for fast updates.
     """
 
 
@@ -114,50 +113,6 @@ class TaskRequest[TOutput](TaskRequestCommon):
     task_name: str | None = None
     output_description: str | None = None
     output_format: type[TOutput] | None = None
-    enable_remote_tracing: bool = False
-
-
-class ManualTaskConfig(BaseModel):
-    """
-    Configuration for manually creating a task without fetching from the platform.
-
-    Attributes:
-        goal: Natural language description of the goal to achieve
-        output_description: Optional natural language description of expected output format
-        task_name: Optional name for the task
-    """
-
-    goal: str
-    output_description: str | None = None
-    task_name: str | None = None
-
-
-class PlatformTaskRequest[TOutput](TaskRequestBase):
-    """
-    Minitap-specific task request for SDK usage via the gateway platform.
-
-    Attributes:
-        task: Either a task name to fetch from the platform, or a
-              ManualTaskConfig to create manually
-        profile: Optional profile name specified by the user on the platform
-        execution_origin: Origin of the task execution (default: "sdk")
-        record_trace: Whether to record traces (default: True for platform tasks)
-        trace_path: Path to save traces (default: temp directory)
-    """
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    task: str | ManualTaskConfig
-    profile: str | None = None
-    execution_origin: str = "sdk"
-    record_trace: bool = True
-    trace_path: Path = Path(tempfile.gettempdir()) / "mobile-use-traces"
-    task_run_id_available_event: Event = Field(default_factory=Event)
-    task_run_id: str | None = None
-
-
-class CloudDevicePlatformTaskRequest[TOutput](PlatformTaskRequest[TOutput]):
-    virtual_mobile_id: str | None = None
 
 
 class TaskResult(BaseModel):
@@ -252,12 +207,6 @@ class Task(BaseModel):
         )
 
     def get_name(self) -> str:
-        if isinstance(self.request, PlatformTaskRequest):
-            if isinstance(self.request.task, str):
-                return self.request.task
-            else:
-                # ManualTaskConfig - use first 50 chars of goal
-                return f"Manual: {self.request.task.goal[:50]}"
         return self.request.task_name or self.id
 
     async def set_status(
@@ -270,9 +219,3 @@ class Task(BaseModel):
         self.status_message = message
         if self.on_status_changed:
             await self.on_status_changed(status, message, output)
-
-
-class PlatformTaskInfo(BaseModel):
-    task_request: TaskRequest = Field(..., description="Task request")
-    llm_profile: AgentProfile = Field(..., description="LLM profile")
-    task_run: TaskRunResponse = Field(..., description="Task run instance on the platform")
