@@ -12,7 +12,6 @@
 [![GitHub stars](https://img.shields.io/github/stars/minitap-ai/mobile-use?style=for-the-badge&color=e0a8dd)](https://github.com/minitap-ai/mobile-use/stargazers)
 
 <h3>
-    <a href="https://platform.mobile-use.ai"><b>☁️ Cloud</b></a> •
     <a href="https://docs.minitap.ai/v2/mcp-server/introduction"><b>📚 Documentation</b></a> •
     <a href="https://arxiv.org/abs/2602.07787"><b>📃 Paper</b></a>
 
@@ -59,12 +58,9 @@ Check out our research paper [here](https://arxiv.org/abs/2602.07787).
 
 Ready to automate your mobile experience? Follow these steps to get mobile-use up and running.
 
-### 🌐 From our Platform
+### 🛠️ Run locally
 
-Easiest way to get started is to use our Platform.
-Follow our [Platform quickstart](https://docs.minitap.ai/mobile-use-sdk/platform-quickstart) to get started.
-
-### 🛠️ From source
+Mobile-use runs on your own Android or iOS device with your choice of supported LLM provider. Start with the [local quickstart](https://docs.minitap.ai/mobile-use-sdk/quickstart).
 
 1.  **Set up Environment Variables:**
     Copy the example `.env.example` file to `.env` and add your API keys.
@@ -309,4 +305,3 @@ https://arxiv.org/abs/2602.07787
   primaryClass = {cs.AI},
   url          = {https://arxiv.org/abs/2602.07787}
 }
-

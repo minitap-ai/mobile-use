@@ -15,9 +15,9 @@ npx add-skill minitap-ai/mobile-use
 Interactive setup wizard that guides users through:
 
 - Choosing target platforms (iOS, Android, or both)
-- Selecting LLM mode (Platform or Local)
+- Selecting a supported LLM provider for local execution, including the Minitap API
 - Installing dependencies
-- Configuring devices (physical, simulator, or cloud)
+- Configuring local devices, BrowserStack, or Minitap cloud devices
 - Creating their first automation project
 
 **Triggers:** "set up mobile automation", "configure mobile-use SDK", "connect iOS device", "connect Android device"
@@ -34,8 +34,7 @@ skills/
     │   └── verify-device.sh
     └── references/
         ├── ios-physical-device.md
-        ├── android-device.md
-        └── platform-vs-local.md
+        └── android-device.md
 ```
 
 ## Usage

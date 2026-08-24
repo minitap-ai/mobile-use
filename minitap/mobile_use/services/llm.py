@@ -69,7 +69,6 @@ def _build_custom_headers(agent_name: str | None = None) -> dict[str, str]:
 
 def get_minitap_llm(
     trace_id: str,
-    remote_tracing: bool = False,
     model: str = "google/gemini-2.5-pro",
     temperature: float | None = None,
     max_retries: int | None = None,
@@ -83,11 +82,6 @@ def get_minitap_llm(
     else:
         raise ValueError("MINITAP_API_KEY must be provided or set in environment")
 
-    if settings.MINITAP_BASE_URL is None:
-        raise ValueError("MINITAP_BASE_URL must be set in environment")
-
-    llm_base_url = f"{settings.MINITAP_BASE_URL}/api/v1"
-
     if max_retries is None and model.startswith("google/"):
         max_retries = 2
 
@@ -98,10 +92,9 @@ def get_minitap_llm(
         temperature=temperature,
         max_retries=max_retries,
         api_key=effective_api_key,
-        base_url=llm_base_url,
+        base_url=settings.MINITAP_API_BASE_URL,
         default_query={
             "sessionId": trace_id,
-            "traceOnlyUsage": remote_tracing,
         },
         default_headers=custom_headers or None,
     )
@@ -291,15 +284,10 @@ def get_llm(
     elif llm.provider == "minimax":
         return get_minimax_llm(llm.model, temperature)
     elif llm.provider == "minitap":
-        remote_tracing = False
-        if ctx.execution_setup:
-            remote_tracing = ctx.execution_setup.enable_remote_tracing
         return get_minitap_llm(
             trace_id=ctx.trace_id,
-            remote_tracing=remote_tracing,
             model=llm.model,
             temperature=temperature,
-            api_key=ctx.minitap_api_key,
             agent_name=name,
         )
     else:

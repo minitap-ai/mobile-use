@@ -4,13 +4,12 @@ import shutil
 import sys
 import tempfile
 import uuid
-from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime
 from io import BytesIO
 from pathlib import Path
 from shutil import which
 from types import NoneType
-from typing import Any, TypeVar, overload
+from typing import TypeVar, overload
 
 import httpx
 from adbutils import AdbClient
@@ -21,49 +20,39 @@ from PIL import Image
 from pydantic import BaseModel
 
 from minitap.mobile_use.agents.outputter.outputter import outputter
-from minitap.mobile_use.agents.planner.types import Subgoal
 from minitap.mobile_use.clients.browserstack_client import BrowserStackClientWrapper
 from minitap.mobile_use.clients.idb_client import IdbClientWrapper
 from minitap.mobile_use.clients.ios_client import DeviceType, IosClientWrapper, get_ios_client
 from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
 from minitap.mobile_use.clients.wda_client import WdaClientWrapper
-from minitap.mobile_use.config import AgentNode, OutputConfig, record_events, settings
+from minitap.mobile_use.config import OutputConfig, record_events, settings
 from minitap.mobile_use.context import (
     DeviceContext,
     DevicePlatform,
     ExecutionSetup,
-    IsReplan,
     MobileUseContext,
 )
-from minitap.mobile_use.controllers.limrun_controller import (
-    LimrunAndroidController,
-    LimrunIosController,
+from minitap.mobile_use.controllers.cloud_device_controller import (
+    CloudAndroidController,
+    CloudIosController,
 )
 from minitap.mobile_use.controllers.platform_specific_commands_controller import get_first_device
 from minitap.mobile_use.graph.graph import get_graph
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.sdk.builders.agent_config_builder import get_default_agent_config
 from minitap.mobile_use.sdk.builders.task_request_builder import TaskRequestBuilder
-from minitap.mobile_use.sdk.constants import DEFAULT_PROFILE_NAME
-from minitap.mobile_use.sdk.services.cloud_mobile import CloudMobileService
-from minitap.mobile_use.sdk.services.platform import PlatformService
-from minitap.mobile_use.sdk.types.agent import AgentConfig, LimrunPlatform
+from minitap.mobile_use.sdk.types.agent import AgentConfig, CloudDevicePlatform
 from minitap.mobile_use.sdk.types.exceptions import (
     AgentError,
     AgentNotInitializedError,
     AgentProfileNotFoundError,
     AgentTaskRequestError,
-    CloudMobileServiceUninitializedError,
     DeviceNotFoundError,
     ExecutableNotFoundError,
-    PlatformServiceUninitializedError,
     ServerStartupError,
 )
-from minitap.mobile_use.sdk.types.platform import TaskRunPlanResponse, TaskRunStatus
 from minitap.mobile_use.sdk.types.task import (
     AgentProfile,
-    PlatformTaskInfo,
-    PlatformTaskRequest,
     Task,
     TaskRequest,
 )
@@ -97,9 +86,8 @@ class Agent:
     _ios_device_type: DeviceType | None
     _current_task: asyncio.Task | None = None
     _task_lock: asyncio.Lock
-    _cloud_mobile_id: str | None = None
-    _limrun_instance_id: str | None = None
-    _limrun_controller: Any = None
+    _cloud_instance_id: str | None = None
+    _cloud_controller: CloudAndroidController | CloudIosController | None = None
 
     def __init__(self, *, config: AgentConfig | None = None):
         self._config = config or get_default_agent_config()
@@ -108,18 +96,8 @@ class Agent:
         self._initialized = False
         self._task_lock = asyncio.Lock()
 
-        # Initialize platform service if API key is available in environment
-        # Note: Can also be initialized later with API key at agent .init()
-        if settings.MINITAP_API_KEY:
-            self._platform_service = PlatformService()
-            self._cloud_mobile_service = CloudMobileService()
-        else:
-            self._platform_service = None
-            self._cloud_mobile_service = None
-
     async def init(
         self,
-        api_key: str | None = None,
         server_restart_attempts: int = 3,
         retry_count: int = 5,
         retry_wait_seconds: int = 5,
@@ -130,7 +108,6 @@ class Agent:
 
         try:
             return await self._init_internal(
-                api_key=api_key,
                 server_restart_attempts=server_restart_attempts,
                 retry_count=retry_count,
                 retry_wait_seconds=retry_wait_seconds,
@@ -145,26 +122,10 @@ class Agent:
 
     async def _init_internal(
         self,
-        api_key: str | None = None,
         server_restart_attempts: int = 3,
         retry_count: int = 5,
         retry_wait_seconds: int = 5,
     ):
-        if api_key:
-            self._platform_service = PlatformService(api_key=api_key)
-            self._cloud_mobile_service = CloudMobileService(api_key=api_key)
-
-        # Skip initialization for cloud devices - no local setup required
-        if self._config.cloud_mobile_id_or_ref:
-            if not self._cloud_mobile_service:
-                raise CloudMobileServiceUninitializedError()
-            self._cloud_mobile_id = await self._cloud_mobile_service.resolve_cloud_mobile_id(
-                cloud_mobile_id_or_ref=self._config.cloud_mobile_id_or_ref,
-            )
-            logger.info("Cloud device configured - skipping local initialization")
-            self._initialized = True
-            return True
-
         # Handle BrowserStack initialization
         if self._config.browserstack_config:
             logger.info("Initializing BrowserStack session...")
@@ -192,15 +153,13 @@ class Agent:
             )
             return True
 
-        # Handle Limrun cloud device initialization
-        # Check for pre-configured controllers first, then fall back to limrun_config
-        if self._config.limrun_android_controller or self._config.limrun_ios_controller:
-            return await self._init_limrun_device(
-                android_controller=self._config.limrun_android_controller,
-                ios_controller=self._config.limrun_ios_controller,
+        if self._config.cloud_android_controller or self._config.cloud_ios_controller:
+            return await self._init_cloud_device(
+                android_controller=self._config.cloud_android_controller,
+                ios_controller=self._config.cloud_ios_controller,
             )
-        if self._config.limrun_config:
-            return await self._init_limrun_device()
+        if self._config.cloud_device_config:
+            return await self._init_cloud_device()
 
         if not which("adb") and not which("xcrun"):
             raise ExecutableNotFoundError("cli_tools")
@@ -288,8 +247,6 @@ class Agent:
     async def install_apk(self, apk_path: str | Path) -> None:
         """
         Install an APK on the connected device.
-        For cloud mobiles, the APK must be x86_64 compatible.
-
         Args:
             apk_path: Path to the local APK file to install
 
@@ -297,7 +254,6 @@ class Agent:
             AgentNotInitializedError: If the agent is not initialized
             AgentError: If attempting to install on non-Android device or ADB operations fail
             FileNotFoundError: If the APK file doesn't exist
-            CloudMobileServiceUninitializedError: If cloud service is unavailable
         """
         try:
             await self._install_apk_internal(apk_path)
@@ -312,66 +268,30 @@ class Agent:
         if not apk_path.exists():
             raise FileNotFoundError(f"APK file not found: {apk_path}")
 
-        if self._config.cloud_mobile_id_or_ref:
-            await self._install_apk_on_cloud_mobile(apk_path)
-        else:
-            if not self._initialized:
-                raise AgentNotInitializedError()
+        if not self._initialized:
+            raise AgentNotInitializedError()
 
-            if self._device_context.mobile_platform != DevicePlatform.ANDROID:
-                raise AgentError(
-                    "APK can only be installed on Android devices but got "
-                    f"'{self._device_context.mobile_platform.value}'"
-                )
-
-            device_id = self._device_context.device_id
-            logger.info(f"Installing APK on Android device '{device_id}'")
-            if not self._adb_client:
-                raise AgentError("ADB client not initialized")
-
-            device = self._adb_client.device(serial=device_id)
-            await asyncio.to_thread(device.install, apk_path)
-            logger.info(f"APK installed successfully on Android device '{device_id}'")
-
-    async def _install_apk_on_cloud_mobile(self, apk_path: Path) -> None:
-        """
-        Install an APK on a cloud mobile device.
-
-        This method starts the cloud mobile if needed, then uploads and installs the APK.
-        """
-        if not self._cloud_mobile_id:
-            raise AgentTaskRequestError("Cloud mobile ID is not configured")
-
-        if not self._cloud_mobile_service:
-            raise CloudMobileServiceUninitializedError()
-
-        # Check platform before starting - fail early if not Android
-        vm_info = await self._cloud_mobile_service._get_virtual_mobile_status(self._cloud_mobile_id)
-        if vm_info.platform and vm_info.platform != "android":
+        if self._device_context.mobile_platform != DevicePlatform.ANDROID:
             raise AgentError(
-                f"APK can only be installed on Android cloud mobiles but got '{vm_info.platform}'"
+                "APK can only be installed on Android devices but got "
+                f"'{self._device_context.mobile_platform.value}'"
             )
 
-        # Start cloud mobile if not already started
-        logger.info(f"Starting cloud mobile '{self._cloud_mobile_id}' for APK installation...")
-        await self._cloud_mobile_service.start_and_wait_for_ready(
-            cloud_mobile_id=self._cloud_mobile_id,
-        )
+        device_id = self._device_context.device_id
+        logger.info(f"Installing APK on Android device '{device_id}'")
+        if not self._adb_client:
+            raise AgentError("ADB client not initialized")
 
-        # Install APK
-        logger.info(f"Installing APK '{apk_path.name}' on cloud mobile '{self._cloud_mobile_id}'")
-        await self._cloud_mobile_service.install_apk(
-            cloud_mobile_id=self._cloud_mobile_id,
-            apk_path=apk_path,
-        )
-        logger.success(f"APK '{apk_path.name}' installed successfully")
+        device = self._adb_client.device(serial=device_id)
+        await asyncio.to_thread(device.install, apk_path)
+        logger.info(f"APK installed successfully on Android device '{device_id}'")
 
     async def install_app(self, app_path: str | Path) -> str | None:
         """
         Install an app on the connected device.
 
         For Android: Installs an APK file using ADB.
-        For iOS (Limrun): Uploads and installs a .app folder using diff-based
+        For cloud iOS: Uploads and installs a .app folder using diff-based
                          patch syncing for fast updates.
 
         Args:
@@ -417,7 +337,7 @@ class Agent:
 
     async def _install_ios_app(self, app_path: Path) -> str:
         """
-        Install an iOS .app bundle on a Limrun iOS device.
+        Install an iOS .app bundle on a cloud iOS device.
 
         Uses diff-based patch syncing for fast updates - only changed parts
         of the app are uploaded.
@@ -429,7 +349,7 @@ class Agent:
             The bundle ID of the installed app
 
         Raises:
-            AgentError: If not connected to a Limrun iOS device
+            AgentError: If not connected to a supported cloud iOS device
             FileNotFoundError: If the .app folder doesn't exist
         """
 
@@ -440,33 +360,34 @@ class Agent:
                 "(e.g., build/Debug-iphonesimulator/MyApp.app)"
             )
 
-        # Check if we have a Limrun iOS controller
-        if not isinstance(self._ios_client, LimrunIosController):
+        if not isinstance(self._ios_client, CloudIosController):
             raise AgentError(
-                "iOS app installation is only supported for Limrun iOS devices. "
+                "iOS app installation is only supported for cloud iOS devices. "
                 "For local simulators, use 'xcrun simctl install' directly."
             )
 
-        limrun_controller: LimrunIosController = self._ios_client
+        cloud_controller: CloudIosController = self._ios_client
 
-        # Get API key from settings or platform service
         api_key_value: str | None = None
-        if settings.MINITAP_API_KEY:
+        cloud_config = self._config.cloud_device_config
+        if cloud_config and cloud_config.api_key:
+            api_key_value = cloud_config.api_key
+        elif settings.MINITAP_API_KEY:
             api_key_raw = settings.MINITAP_API_KEY
             api_key_value = (
                 api_key_raw.get_secret_value()
                 if hasattr(api_key_raw, "get_secret_value")
                 else str(api_key_raw)
             )
-        if not api_key_value and self._platform_service:
-            api_key_value = self._platform_service._api_key
         if not api_key_value:
             raise AgentError(
                 "API key is required for iOS app installation. "
                 "Set MINITAP_API_KEY environment variable."
             )
 
-        base_url = settings.MINITAP_BASE_URL or "https://platform.minitap.ai"
+        base_url = settings.MINITAP_API_BASE_URL.rstrip("/")
+        if cloud_config and cloud_config.base_url:
+            base_url = f"{cloud_config.base_url.rstrip('/')}/api/v1"
 
         app_name = app_path.stem
         asset_name = f"{app_name}.zip"
@@ -488,10 +409,9 @@ class Agent:
 
             logger.info(f"Created zip archive: {zip_path.name}, MD5: {md5_hash}")
 
-            # Upload to Limrun using assets API
-            client = AsyncLimrun(api_key=api_key_value, base_url=f"{base_url}/api/v1/limrun")
+            client = AsyncLimrun(api_key=api_key_value, base_url=f"{base_url}/limrun")
             try:
-                logger.info("Getting upload URL from Limrun assets API...")
+                logger.info("Getting cloud upload URL...")
                 asset_response = await client.assets.get_or_create(name=asset_name)
 
                 # Check if we need to upload (MD5 mismatch or no existing file)
@@ -501,9 +421,9 @@ class Agent:
                 else:
                     upload_url = asset_response.signed_upload_url
                     if not upload_url:
-                        raise AgentError("No upload URL returned from Limrun assets API")
+                        raise AgentError("No upload URL returned by the cloud device API")
 
-                    logger.info("Uploading iOS app to Limrun storage...")
+                    logger.info("Uploading iOS app to cloud storage...")
                     async with httpx.AsyncClient(timeout=300.0) as http_client:
                         file_content = zip_path.read_bytes()
                         response = await http_client.put(
@@ -516,14 +436,13 @@ class Agent:
 
                 download_url = asset_response.signed_download_url
                 if not download_url:
-                    raise AgentError("No download URL returned from Limrun assets API")
+                    raise AgentError("No download URL returned by the cloud device API")
 
             finally:
                 await client.close()
 
-        # Install app via WebSocket
-        logger.info("Installing app on Limrun iOS device...")
-        install_result = await limrun_controller.client.install_app(url=download_url, md5=md5_hash)
+        logger.info("Installing app on cloud iOS device...")
+        install_result = await cloud_controller.client.install_app(url=download_url, md5=md5_hash)
         bundle_id = install_result.get("bundleId", "")
 
         if bundle_id:
@@ -609,24 +528,6 @@ class Agent:
         app_path: str | Path | None = None,
     ) -> TOutput | None: ...
 
-    @overload
-    async def run_task(
-        self,
-        *,
-        request: PlatformTaskRequest[None],
-        locked_app_package: str | None = None,
-        app_path: str | Path | None = None,
-    ) -> str | dict | None: ...
-
-    @overload
-    async def run_task(
-        self,
-        *,
-        request: PlatformTaskRequest[TOutput],
-        locked_app_package: str | None = None,
-        app_path: str | Path | None = None,
-    ) -> TOutput | None: ...
-
     async def run_task(
         self,
         *,
@@ -636,43 +537,16 @@ class Agent:
         locked_app_package: str | None = None,
         name: str | None = None,
         app_path: str | Path | None = None,
-        request: TaskRequest[TOutput] | PlatformTaskRequest[TOutput] | None = None,
+        request: TaskRequest[TOutput] | None = None,
     ) -> str | dict | TOutput | None:
-        # Check if cloud mobile is configured
-        if self._config.cloud_mobile_id_or_ref:
-            if request is None or not isinstance(request, PlatformTaskRequest):
-                raise AgentTaskRequestError(
-                    "When using a cloud mobile, only PlatformTaskRequest is supported. "
-                    "Use AgentConfigBuilder.for_cloud_mobile() only with PlatformTaskRequest."
-                )
-            # Use cloud mobile execution path
-            return await self._run_cloud_mobile_task(
-                request=request, locked_app_package=locked_app_package
-            )
-
-        # Normal local execution path
         if request is not None:
-            task_info = None
-            if isinstance(request, PlatformTaskRequest):
-                if not self._platform_service:
-                    raise PlatformServiceUninitializedError()
-                task_info = await self._platform_service.create_task_run(
-                    request=request,
-                    locked_app_package=locked_app_package,
-                    enable_video_tools=self._config.video_recording_enabled,
-                )
-                request.task_run_id = task_info.task_run.id
-                request.task_run_id_available_event.set()
-                self._config.agent_profiles[task_info.llm_profile.name] = task_info.llm_profile
-                request = task_info.task_request
-            elif locked_app_package is not None:
+            if locked_app_package is not None:
                 if request.locked_app_package:
                     logger.warning(
                         "Locked app package specified both in the request and as a parameter. "
                         "Using the parameter value."
                     )
                 request.locked_app_package = locked_app_package
-            # Handle app_path parameter override
             if app_path is not None:
                 if request.app_path:
                     logger.warning(
@@ -680,9 +554,7 @@ class Agent:
                         "Using the parameter value."
                     )
                 request.app_path = Path(app_path) if isinstance(app_path, str) else app_path
-            return await self._run_task(
-                request=request, task_info=task_info, platform_service=self._platform_service
-            )
+            return await self._run_task(request=request)
         if goal is None:
             raise AgentTaskRequestError("Goal is required")
         task_request = self.new_task(goal=goal)
@@ -701,118 +573,9 @@ class Agent:
             task_request.with_app_path(app_path=app_path)
         return await self._run_task(task_request.build())
 
-    async def _run_cloud_mobile_task(
-        self,
-        request: PlatformTaskRequest[TOutput],
-        locked_app_package: str | None = None,
-    ) -> str | dict | TOutput | None:
-        """
-        Execute a task on a cloud mobile.
-
-        This method triggers the task execution on the Platform and polls
-        for completion without running any agentic logic locally.
-        """
-        if not self._cloud_mobile_id:
-            raise AgentTaskRequestError("Cloud mobile ID is not configured")
-
-        if not self._cloud_mobile_service:
-            raise CloudMobileServiceUninitializedError()
-
-        if not self._platform_service:
-            raise PlatformServiceUninitializedError()
-
-        if self._config.video_recording_enabled:
-            profile_name = request.profile or DEFAULT_PROFILE_NAME
-            _, profile = await self._platform_service.get_profile(profile_name)
-            if not profile.llm_config.utils.video_analyzer:
-                raise AgentTaskRequestError(
-                    f"video_recording_enabled: profile '{profile_name}' "
-                    "must have a video_analyzer agent configured"
-                )
-
-        # Start cloud mobile if not already started
-        logger.info(f"Starting cloud mobile '{self._cloud_mobile_id}'...")
-        await self._cloud_mobile_service.start_and_wait_for_ready(
-            cloud_mobile_id=self._cloud_mobile_id,
-        )
-        logger.info(
-            f"Starting cloud mobile task execution '{self._cloud_mobile_id}'",
-        )
-
-        def log_callback(message: str):
-            """Callback for logging timeline updates."""
-            logger.info(message)
-
-        def status_callback(
-            status: TaskRunStatus,
-            status_message: str | None,
-        ):
-            """Callback for status updates."""
-            logger.info(f"Task status update: [{status}] {status_message}")
-
-        async def _execute_cloud(cloud_mobile_service: CloudMobileService, cloud_mobile_id: str):
-            try:
-                # Execute task on cloud mobile and wait for completion
-                final_status, error, output = await cloud_mobile_service.run_task_on_cloud_mobile(
-                    cloud_mobile_id=cloud_mobile_id,
-                    request=request,
-                    on_status_update=status_callback,
-                    on_log=log_callback,
-                    locked_app_package=locked_app_package,
-                    enable_video_tools=self._config.video_recording_enabled,
-                )
-                if final_status == "completed":
-                    logger.success("Cloud mobile task completed successfully")
-                    return output
-                if final_status == "failed":
-                    logger.error(f"Cloud mobile task failed: {error}")
-                    raise AgentTaskRequestError(
-                        f"Task execution failed on cloud mobile: {error}",
-                    )
-                if final_status == "cancelled":
-                    logger.warning("Cloud mobile task was cancelled")
-                    raise AgentTaskRequestError("Task execution was cancelled")
-                logger.error(f"Unknown cloud mobile task status: {final_status}")
-                raise AgentTaskRequestError(f"Unknown task status: {final_status}")
-            except asyncio.CancelledError:
-                # Propagate cancellation to parent coroutine.
-                logger.info("Task cancelled during execution, re-raising CancelledError")
-                raise
-            except AgentTaskRequestError as e:
-                # Capture and re-raise known exceptions
-                telemetry.capture_exception(e, {"phase": "cloud_mobile_task"})
-                raise
-            except Exception as e:
-                logger.error(f"Unexpected error during cloud mobile task execution: {e}")
-                telemetry.capture_exception(e, {"phase": "cloud_mobile_task"})
-                raise AgentTaskRequestError(f"Unexpected error: {e}") from e
-
-        async with self._task_lock:
-            if self._current_task and not self._current_task.done():
-                logger.warning(
-                    "Another cloud task is running; cancelling it before starting new one.",
-                )
-                self.stop_current_task()
-                try:
-                    await self._current_task
-                except asyncio.CancelledError:
-                    pass
-            try:
-                self._current_task = asyncio.create_task(
-                    _execute_cloud(
-                        cloud_mobile_service=self._cloud_mobile_service,
-                        cloud_mobile_id=self._cloud_mobile_id,
-                    ),
-                )
-                return await self._current_task
-            finally:
-                self._current_task = None
-
     async def _run_task(
         self,
         request: TaskRequest[TOutput],
-        task_info: PlatformTaskInfo | None = None,
-        platform_service: PlatformService | None = None,
     ) -> str | dict | TOutput | None:
         if not self._initialized:
             raise AgentNotInitializedError()
@@ -836,21 +599,7 @@ class Agent:
 
         logger.info(str(agent_profile))
 
-        on_status_changed = None
-        on_agent_thought = None
-        on_plan_changes = None
         task_id = str(uuid.uuid4())
-        if task_info:
-            on_status_changed = self._get_task_status_change_callback(
-                task_info=task_info, platform_service=platform_service
-            )
-            on_agent_thought = self._get_new_agent_thought_callback(
-                task_info=task_info, platform_service=platform_service
-            )
-            on_plan_changes = self._get_plan_changes_callback(
-                task_info=task_info, platform_service=platform_service
-            )
-            task_id = task_info.task_run.id
 
         task = Task(
             id=task_id,
@@ -858,23 +607,15 @@ class Agent:
             status="pending",
             request=request,
             created_at=datetime.now(),
-            on_status_changed=on_status_changed,
         )
         self._tasks.append(task)
         task_name = task.get_name()
 
-        # Extract API key from platform service if available
-        api_key = None
-        if platform_service:
-            api_key = platform_service._api_key
-
-        # Get limrun controller if available
-        limrun_android_ctrl = None
-        if hasattr(self, "_limrun_controller") and self._limrun_controller is not None:
-            from minitap.mobile_use.controllers.limrun_controller import LimrunAndroidController
-
-            if isinstance(self._limrun_controller, LimrunAndroidController):
-                limrun_android_ctrl = self._limrun_controller
+        cloud_android_controller = (
+            self._cloud_controller
+            if isinstance(self._cloud_controller, CloudAndroidController)
+            else None
+        )
 
         context = MobileUseContext(
             trace_id=task.id,
@@ -882,11 +623,8 @@ class Agent:
             adb_client=self._adb_client,
             ui_adb_client=self._ui_adb_client,
             ios_client=self._ios_client,
-            limrun_android_controller=limrun_android_ctrl,
+            cloud_android_controller=cloud_android_controller,
             llm_config=agent_profile.llm_config,
-            on_agent_thought=on_agent_thought,
-            on_plan_changes=on_plan_changes,
-            minitap_api_key=api_key,
             video_recording_enabled=(
                 self._config.video_recording_enabled
                 and agent_profile.llm_config.utils.video_analyzer is not None
@@ -1059,27 +797,13 @@ class Agent:
         """
         Capture a screenshot from the mobile device.
 
-        For cloud mobiles, this method calls the mobile-manager endpoint.
-        For local mobiles, it uses ADB (Android) or xcrun (iOS) directly.
-
         Returns:
             Screenshot as PIL Image
 
         Raises:
             AgentNotInitializedError: If the agent is not initialized
-            PlatformServiceUninitializedError: If cloud mobile service is not available
             Exception: If screenshot capture fails
         """
-        # Check if cloud mobile is configured
-        if self._cloud_mobile_id:
-            if not self._cloud_mobile_service:
-                raise CloudMobileServiceUninitializedError()
-            screenshot = await self._cloud_mobile_service.get_screenshot(
-                cloud_mobile_id=self._cloud_mobile_id,
-            )
-            return screenshot
-
-        # Local device - use ADB or xcrun directly
         if not self._initialized:
             raise AgentNotInitializedError()
 
@@ -1097,16 +821,13 @@ class Agent:
         elif self._device_context.mobile_platform == DevicePlatform.IOS:
             from io import BytesIO
 
-            from minitap.mobile_use.controllers.limrun_controller import LimrunIosController
-
-            # Check if using Limrun iOS controller
-            if isinstance(self._ios_client, LimrunIosController):
-                logger.info("Capturing screenshot from Limrun iOS device")
+            if isinstance(self._ios_client, CloudIosController):
+                logger.info("Capturing screenshot from cloud iOS device")
                 screenshot_bytes = await self._ios_client.screenshot()
                 if screenshot_bytes is None:
-                    raise Exception("Failed to capture screenshot from Limrun iOS device")
+                    raise Exception("Failed to capture screenshot from cloud iOS device")
                 screenshot = Image.open(BytesIO(screenshot_bytes))
-                logger.info("Screenshot captured from Limrun iOS device")
+                logger.info("Screenshot captured from cloud iOS device")
                 return screenshot
 
             # Use xcrun to capture screenshot for local simulators
@@ -1144,19 +865,10 @@ class Agent:
             raise Exception(f"Unsupported platform: {self._device_context.mobile_platform}")
 
     async def clean(self, force: bool = False):
-        if self._cloud_mobile_id:
+        if self._cloud_instance_id:
+            await self._cleanup_cloud_device()
             self._initialized = False
-            logger.info("✅ Cloud-mode agent stopped.")
-            # End telemetry session if started by SDK (not CLI)
-            if telemetry._session_id and telemetry._session_context.get("source") == "sdk":
-                telemetry.end_session(success=True)
-            return
-
-        # Cleanup Limrun device if provisioned by SDK
-        if self._limrun_instance_id:
-            await self._cleanup_limrun_device()
-            self._initialized = False
-            logger.info("✅ Limrun agent stopped.")
+            logger.info("✅ Cloud device agent stopped.")
             if telemetry._session_id and telemetry._session_context.get("source") == "sdk":
                 telemetry.end_session(success=True)
             return
@@ -1175,28 +887,28 @@ class Agent:
         if telemetry._session_id and telemetry._session_context.get("source") == "sdk":
             telemetry.end_session(success=True)
 
-    async def _init_limrun_device(
+    async def _init_cloud_device(
         self,
-        android_controller: LimrunAndroidController | None = None,
-        ios_controller: LimrunIosController | None = None,
+        android_controller: CloudAndroidController | None = None,
+        ios_controller: CloudIosController | None = None,
     ) -> bool:
         """
-        Initialize a Limrun cloud device.
+        Initialize a cloud device.
 
         This method either uses pre-configured controllers or provisions a new
-        Limrun device based on limrun_config, connects to it, and sets up the
+        device based on cloud_device_config, connects to it, and sets up the
         appropriate clients for device interaction.
 
         Args:
-            android_controller: Pre-configured Limrun Android controller (optional).
-            ios_controller: Pre-configured Limrun iOS controller (optional).
+            android_controller: Pre-configured cloud Android controller.
+            ios_controller: Pre-configured cloud iOS controller.
         """
 
         # Use pre-configured Android controller
         if android_controller is not None:
-            logger.info("Using pre-configured Limrun Android controller")
-            self._limrun_controller = android_controller
-            self._limrun_instance_id = android_controller.instance_id
+            logger.info("Using pre-configured cloud Android controller")
+            self._cloud_controller = android_controller
+            self._cloud_instance_id = android_controller.instance_id
 
             self._adb_client = android_controller._adb_client
             self._ui_adb_client = android_controller._ui_client
@@ -1206,80 +918,79 @@ class Agent:
             self._device_context = DeviceContext(
                 host_platform="LINUX",
                 mobile_platform=DevicePlatform.ANDROID,
-                device_id=android_controller._adb_serial or self._limrun_instance_id,
+                device_id=android_controller._adb_serial or self._cloud_instance_id,
                 device_width=android_controller.device_width,
                 device_height=android_controller.device_height,
             )
 
-            logger.info(f"Limrun Android device ready: {self._limrun_instance_id}")
+            logger.info(f"Cloud Android device ready: {self._cloud_instance_id}")
             logger.info(self._device_context.to_str())
-            logger.info("✅ Mobile-use agent initialized with pre-configured Limrun Android.")
+            logger.info("✅ Mobile-use agent initialized with a cloud Android device.")
             self._initialized = True
             telemetry.capture_agent_initialized(
                 platform=DevicePlatform.ANDROID.value,
-                device_id=self._limrun_instance_id,
+                device_id=self._cloud_instance_id,
             )
             return True
 
         # Use pre-configured iOS controller
         if ios_controller is not None:
-            logger.info("Using pre-configured Limrun iOS controller")
-            self._limrun_controller = ios_controller
-            self._limrun_instance_id = ios_controller.instance_id
+            logger.info("Using pre-configured cloud iOS controller")
+            self._cloud_controller = ios_controller
+            self._cloud_instance_id = ios_controller.instance_id
 
             self._adb_client = None
             self._ui_adb_client = None
             self._ios_client = ios_controller
-            self._ios_device_type = DeviceType.LIMRUN
+            self._ios_device_type = DeviceType.CLOUD
 
             self._device_context = DeviceContext(
                 host_platform="LINUX",
                 mobile_platform=DevicePlatform.IOS,
-                device_id=self._limrun_instance_id,
+                device_id=self._cloud_instance_id,
                 device_width=ios_controller.device_width,
                 device_height=ios_controller.device_height,
             )
 
-            logger.info(f"Limrun iOS device ready: {self._limrun_instance_id}")
+            logger.info(f"Cloud iOS device ready: {self._cloud_instance_id}")
             logger.info(self._device_context.to_str())
-            logger.info("✅ Mobile-use agent initialized with pre-configured Limrun iOS.")
+            logger.info("✅ Mobile-use agent initialized with a cloud iOS device.")
             self._initialized = True
             telemetry.capture_agent_initialized(
                 platform=DevicePlatform.IOS.value,
-                device_id=self._limrun_instance_id,
+                device_id=self._cloud_instance_id,
             )
             return True
 
-        # Fall back to provisioning via limrun_config
-        from minitap.mobile_use.clients.limrun_factory import (
-            LimrunInstanceConfig,
-            create_limrun_android_instance,
-            create_limrun_ios_instance,
+        from minitap.mobile_use.clients.cloud_device_factory import (
+            CloudDeviceInstanceConfig,
+            create_cloud_android_instance,
+            create_cloud_ios_instance,
         )
 
-        limrun_config = self._config.limrun_config
-        if limrun_config is None:
-            raise ValueError("limrun_config is not set and no pre-configured controller provided")
+        cloud_config = self._config.cloud_device_config
+        if cloud_config is None:
+            raise ValueError("Cloud device config is not set and no controller was provided")
 
-        logger.info(f"Provisioning Limrun {limrun_config.platform.value} device...")
+        logger.info(f"Provisioning cloud {cloud_config.platform.value} device...")
 
-        instance_config = LimrunInstanceConfig(
-            api_key=limrun_config.api_key,
-            base_url=limrun_config.base_url,
-            inactivity_timeout=limrun_config.inactivity_timeout,
-            hard_timeout=limrun_config.hard_timeout,
-            display_name=limrun_config.display_name,
-            labels=limrun_config.labels,
+        instance_config = CloudDeviceInstanceConfig(
+            api_key=cloud_config.api_key,
+            base_url=cloud_config.base_url,
+            inactivity_timeout=cloud_config.inactivity_timeout,
+            hard_timeout=cloud_config.hard_timeout,
+            display_name=cloud_config.display_name,
+            labels=cloud_config.labels,
         )
 
-        if limrun_config.platform == LimrunPlatform.ANDROID:
-            instance, controller = await create_limrun_android_instance(instance_config)
-            self._limrun_instance_id = instance.metadata.id
-            self._limrun_controller = controller
+        if cloud_config.platform == CloudDevicePlatform.ANDROID:
+            instance, controller = await create_cloud_android_instance(instance_config)
+            self._cloud_instance_id = instance.metadata.id
+            self._cloud_controller = controller
             try:
                 await controller.connect()
             except Exception:
-                await self._cleanup_limrun_device()
+                await self._cleanup_cloud_device()
                 raise
 
             self._adb_client = controller._adb_client
@@ -1290,76 +1001,75 @@ class Agent:
             self._device_context = DeviceContext(
                 host_platform="LINUX",
                 mobile_platform=DevicePlatform.ANDROID,
-                device_id=controller._adb_serial or self._limrun_instance_id,
+                device_id=controller._adb_serial or self._cloud_instance_id,
                 device_width=controller.device_width,
                 device_height=controller.device_height,
             )
         else:
-            instance, controller, limrun_ctrl = await create_limrun_ios_instance(instance_config)
-            self._limrun_instance_id = instance.metadata.id
-            self._limrun_controller = limrun_ctrl  # Store underlying controller for cleanup
+            instance, controller, cloud_controller = await create_cloud_ios_instance(
+                instance_config
+            )
+            self._cloud_instance_id = instance.metadata.id
+            self._cloud_controller = cloud_controller
 
             self._adb_client = None
             self._ui_adb_client = None
-            self._ios_client = controller.ios_client  # Use the LimrunIosController as ios_client
-            self._ios_device_type = DeviceType.LIMRUN
+            self._ios_client = controller.ios_client
+            self._ios_device_type = DeviceType.CLOUD
 
             self._device_context = DeviceContext(
                 host_platform="LINUX",
                 mobile_platform=DevicePlatform.IOS,
-                device_id=self._limrun_instance_id,
+                device_id=self._cloud_instance_id,
                 device_width=controller.device_width,
                 device_height=controller.device_height,
             )
 
-        logger.info(
-            f"Limrun {limrun_config.platform.value} device ready: {self._limrun_instance_id}"
-        )
+        logger.info(f"Cloud {cloud_config.platform.value} device ready: {self._cloud_instance_id}")
         logger.info(self._device_context.to_str())
-        logger.info("✅ Mobile-use agent initialized with Limrun.")
+        logger.info("✅ Mobile-use agent initialized with a cloud device.")
         self._initialized = True
         telemetry.capture_agent_initialized(
-            platform=limrun_config.platform.value,
-            device_id=self._limrun_instance_id,
+            platform=cloud_config.platform.value,
+            device_id=self._cloud_instance_id,
         )
         return True
 
-    async def _cleanup_limrun_device(self) -> None:
-        """Cleanup Limrun device resources."""
-        from minitap.mobile_use.clients.limrun_factory import (
-            LimrunInstanceConfig,
-            delete_limrun_android_instance,
-            delete_limrun_ios_instance,
+    async def _cleanup_cloud_device(self) -> None:
+        """Clean up cloud device resources."""
+        from minitap.mobile_use.clients.cloud_device_factory import (
+            CloudDeviceInstanceConfig,
+            delete_cloud_android_instance,
+            delete_cloud_ios_instance,
         )
 
-        # Always cleanup controller if present
-        if self._limrun_controller:
-            logger.info("Cleaning up Limrun controller...")
-            await self._limrun_controller.cleanup()
-            self._limrun_controller = None
+        if self._cloud_controller:
+            logger.info("Cleaning up cloud device controller...")
+            await self._cloud_controller.cleanup()
+            self._cloud_controller = None
 
-        # Only attempt instance deletion if limrun_config is present
-        if self._config.limrun_config and self._limrun_instance_id:
-            logger.info(f"Deleting Limrun instance: {self._limrun_instance_id}")
-            limrun_config = self._config.limrun_config
-            instance_config = LimrunInstanceConfig(
-                api_key=limrun_config.api_key,
-                base_url=limrun_config.base_url,
+        if self._config.cloud_device_config and self._cloud_instance_id:
+            logger.info(f"Deleting cloud device instance: {self._cloud_instance_id}")
+            cloud_config = self._config.cloud_device_config
+            instance_config = CloudDeviceInstanceConfig(
+                api_key=cloud_config.api_key,
+                base_url=cloud_config.base_url,
             )
 
             try:
-                if limrun_config.platform == LimrunPlatform.ANDROID:
-                    await delete_limrun_android_instance(instance_config, self._limrun_instance_id)
+                if cloud_config.platform == CloudDevicePlatform.ANDROID:
+                    await delete_cloud_android_instance(instance_config, self._cloud_instance_id)
                 else:
-                    await delete_limrun_ios_instance(instance_config, self._limrun_instance_id)
+                    await delete_cloud_ios_instance(instance_config, self._cloud_instance_id)
             except Exception as e:
-                logger.warning(f"Failed to delete Limrun instance: {e}")
-        elif self._limrun_instance_id:
+                logger.warning(f"Failed to delete cloud device instance: {e}")
+        elif self._cloud_instance_id:
             logger.info(
-                f"Skipping Limrun instance deletion (no limrun_config): {self._limrun_instance_id}"
+                "Skipping cloud device deletion because no provisioning config is available: "
+                f"{self._cloud_instance_id}"
             )
 
-        self._limrun_instance_id = None
+        self._cloud_instance_id = None
 
     async def _prepare_app_installation(self, task: Task) -> str | None:
         """Install app if app_path is specified in the task request.
@@ -1421,7 +1131,6 @@ class Agent:
         context.execution_setup = ExecutionSetup(
             traces_path=self._tmp_traces_dir,
             trace_name=task_name,
-            enable_remote_tracing=task.request.enable_remote_tracing,
         )
 
     async def _finalize_tracing(self, task: Task, context: MobileUseContext):
@@ -1443,19 +1152,6 @@ class Agent:
         logger.info(f"[{task_name}] Compiling trace FROM FOLDER: " + str(temp_trace_path))
         create_gif_from_trace_folder(temp_trace_path)
         create_steps_json_from_trace_folder(temp_trace_path)
-
-        if exec_setup_ctx.enable_remote_tracing:
-            gif_path = temp_trace_path / "trace.gif"
-            if gif_path.exists() and self._platform_service:
-                try:
-                    task_run_id = await self._platform_service.upload_trace_gif(
-                        task_run_id=task.id, gif_path=gif_path
-                    )
-                    if task_run_id:
-                        platform_url = f"{settings.MINITAP_BASE_URL}/task-runs/{task_run_id}"
-                        logger.info(f"[{task_name}] 🌐 View on platform: {platform_url}")
-                except Exception as e:
-                    logger.warning(f"[{task_name}] Failed to upload trace GIF: {e}")
 
         logger.info(f"[{task_name}] Video created, removing dust...")
         remove_images_from_trace_folder(temp_trace_path)
@@ -1635,90 +1331,6 @@ class Agent:
             device_width=device_width,
             device_height=device_height,
         )
-
-    def _get_task_status_change_callback(
-        self,
-        task_info: PlatformTaskInfo,
-        platform_service: PlatformService | None = None,
-    ) -> Callable[[TaskRunStatus, str | None, Any | None], Coroutine]:
-        service = platform_service or self._platform_service
-
-        async def change_status(
-            status: TaskRunStatus,
-            message: str | None = None,
-            output: Any | None = None,
-        ):
-            if not service:
-                raise PlatformServiceUninitializedError()
-            try:
-                await service.update_task_run_status(
-                    task_run_id=task_info.task_run.id,
-                    status=status,
-                    message=message,
-                    output=output,
-                )
-            except Exception as e:
-                logger.error(f"Failed to update task run status: {e}")
-
-        return change_status
-
-    def _get_plan_changes_callback(
-        self,
-        task_info: PlatformTaskInfo,
-        platform_service: PlatformService | None = None,
-    ) -> Callable[[list[Subgoal], IsReplan], Coroutine]:
-        service = platform_service or self._platform_service
-        current_plan: TaskRunPlanResponse | None = None
-
-        async def update_plan(plan: list[Subgoal], is_replan: IsReplan):
-            nonlocal current_plan
-
-            if not service:
-                raise PlatformServiceUninitializedError()
-            try:
-                if is_replan and current_plan:
-                    # End previous plan
-                    await service.upsert_task_run_plan(
-                        task_run_id=task_info.task_run.id,
-                        started_at=current_plan.started_at,
-                        plan=plan,
-                        ended_at=datetime.now(UTC),
-                        plan_id=current_plan.id,
-                    )
-                    current_plan = None
-
-                current_plan = await service.upsert_task_run_plan(
-                    task_run_id=task_info.task_run.id,
-                    started_at=current_plan.started_at if current_plan else datetime.now(UTC),
-                    plan=plan,
-                    ended_at=current_plan.ended_at if current_plan else None,
-                    plan_id=current_plan.id if current_plan else None,
-                )
-            except Exception as e:
-                logger.error(f"Failed to update plan: {e}")
-
-        return update_plan
-
-    def _get_new_agent_thought_callback(
-        self,
-        task_info: PlatformTaskInfo,
-        platform_service: PlatformService | None = None,
-    ) -> Callable[[AgentNode, str], Coroutine]:
-        service = platform_service or self._platform_service
-
-        async def add_agent_thought(agent: AgentNode, thought: str):
-            if not service:
-                raise PlatformServiceUninitializedError()
-            try:
-                await service.add_agent_thought(
-                    task_run_id=task_info.task_run.id,
-                    agent=agent,
-                    thought=thought,
-                )
-            except Exception as e:
-                logger.error(f"Failed to add agent thought: {e}")
-
-        return add_agent_thought
 
 
 def _validate_and_prepare_file(file_path: Path):
