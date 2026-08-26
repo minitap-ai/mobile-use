@@ -22,7 +22,7 @@ jobs:
           echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> $GITHUB_ENV
 
       - name: Check tag version
-        uses: minitap-ai/devops-common/.github/actions/check-tag-version@v1
+        uses: minitap-ai/mobile-use-actions/.github/actions/check-tag-version@e498f98a7b0c1530088e5979e6896771bbb00a97 # v1.10.0
         with:
           expected-tag-version: ${{ env.PACKAGE_VERSION }}
   
@@ -38,7 +38,7 @@ jobs:
       - name: Clone the repository
         uses: actions/checkout@v5
 
-      - uses: minitap-ai/devops-common/.github/actions/dockerhub-build-push@v1
+      - uses: minitap-ai/mobile-use-actions/.github/actions/dockerhub-build-push@e498f98a7b0c1530088e5979e6896771bbb00a97 # v1.10.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -56,7 +56,7 @@ jobs:
       - name: Clone the repository
         uses: actions/checkout@v5
 
-      - uses: minitap-ai/devops-common/.github/actions/gcp-docker-build-push@v1
+      - uses: minitap-ai/mobile-use-actions/.github/actions/gcp-docker-build-push@e498f98a7b0c1530088e5979e6896771bbb00a97 # v1.10.0
         with:
           gcp-credentials: ${{ secrets.GCP_SA_KEY }}
           gcp-project-id: ${{ vars.GCP_PROJECT_ID }}
