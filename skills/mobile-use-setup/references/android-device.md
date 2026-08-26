@@ -99,11 +99,7 @@ In Python:
 from minitap.mobile_use.sdk import Agent
 from minitap.mobile_use.sdk.builders import Builders
 
-config = (
-    Builders.AgentConfig
-    .for_device(platform="android", device_id="SERIAL_NUMBER")
-    .build()
-)
+config = Builders.AgentConfig.for_device(platform="android", device_id="SERIAL_NUMBER").build()
 agent = Agent(config=config)
 ```
 

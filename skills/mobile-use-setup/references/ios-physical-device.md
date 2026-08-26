@@ -113,11 +113,9 @@ from minitap.mobile_use.sdk import Agent
 from minitap.mobile_use.sdk.builders import Builders
 
 # Get UDID with: idevice_id -l
-config = (
-    Builders.AgentConfig
-    .for_device(platform="ios", device_id="00008110-001A2C3E4F50001E")
-    .build()
-)
+config = Builders.AgentConfig.for_device(
+    platform="ios", device_id="00008110-001A2C3E4F50001E"
+).build()
 agent = Agent(config=config)
 ```
 

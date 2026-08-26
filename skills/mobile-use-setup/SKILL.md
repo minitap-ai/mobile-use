@@ -165,15 +165,15 @@ from minitap.mobile_use.sdk.types import PlatformTaskRequest
 
 load_dotenv()
 
+
 async def main() -> None:
     agent = Agent()
     await agent.init()
 
-    result = await agent.run_task(
-        request=PlatformTaskRequest(task="your-task-name")
-    )
+    result = await agent.run_task(request=PlatformTaskRequest(task="your-task-name"))
     print(result)
     await agent.clean()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -189,6 +189,7 @@ from minitap.mobile_use.sdk.builders import Builders
 
 load_dotenv()
 
+
 async def main() -> None:
     profile = AgentProfile(name="default", from_file="llm-config.override.jsonc")
     config = Builders.AgentConfig.with_default_profile(profile).build()
@@ -196,12 +197,10 @@ async def main() -> None:
     agent = Agent(config=config)
     await agent.init()
 
-    result = await agent.run_task(
-        goal="Your automation goal here",
-        name="task-name"
-    )
+    result = await agent.run_task(goal="Your automation goal here", name="task-name")
     print(result)
     await agent.clean()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

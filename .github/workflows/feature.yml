@@ -14,10 +14,12 @@ jobs:
       - name: Run ruff format check
         uses: astral-sh/ruff-action@v3
         with:
+          version: "0.16.4"
           args: "format --check"
       - name: Run ruff linter
         uses: astral-sh/ruff-action@v3
         with:
+          version: "0.16.4"
           args: "check"
   pyright:
     runs-on: ubuntu-latest

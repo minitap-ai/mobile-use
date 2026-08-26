@@ -69,9 +69,7 @@ You can restrict task execution to a specific app using the `with_locked_app_pac
 ```python
 # Lock execution to WhatsApp
 result = await agent.run_task(
-    request=agent.new_task("Send message to Bob")
-        .with_locked_app_package("com.whatsapp")
-        .build()
+    request=agent.new_task("Send message to Bob").with_locked_app_package("com.whatsapp").build()
 )
 ```
 

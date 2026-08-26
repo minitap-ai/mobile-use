@@ -48,9 +48,7 @@ from minitap.mobile_use.sdk.types import PlatformTaskRequest
 agent = Agent()
 await agent.init()  # Uses MINITAP_API_KEY
 
-result = await agent.run_task(
-    request=PlatformTaskRequest(task="my-task")
-)
+result = await agent.run_task(request=PlatformTaskRequest(task="my-task"))
 ```
 
 ## Local Mode
@@ -94,19 +92,13 @@ from minitap.mobile_use.sdk import Agent
 from minitap.mobile_use.sdk.types import AgentProfile
 from minitap.mobile_use.sdk.builders import Builders
 
-profile = AgentProfile(
-    name="default",
-    from_file="llm-config.override.jsonc"
-)
+profile = AgentProfile(name="default", from_file="llm-config.override.jsonc")
 config = Builders.AgentConfig.with_default_profile(profile).build()
 
 agent = Agent(config=config)
 await agent.init()
 
-result = await agent.run_task(
-    goal="Open calculator and compute 2+2",
-    name="calc-test"
-)
+result = await agent.run_task(goal="Open calculator and compute 2+2", name="calc-test")
 ```
 
 ## Supported Providers (Local Mode)

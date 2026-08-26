@@ -39,7 +39,10 @@ jobs:
       - name: Install Homebrew dependencies
         run: |
           brew tap facebook/fb
-          brew install idb-companion
+          # idb 1.5 requires macOS 15 and Xcode 26; macos-14 runners need v1.1.8.
+          git -C "$(brew --repository facebook/fb)" checkout --detach c0386793f59da10c619787f2aa18d938ef1d69c9
+          brew trust --tap facebook/fb
+          HOMEBREW_NO_AUTO_UPDATE=1 brew install idb-companion
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
