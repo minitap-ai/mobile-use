@@ -11,6 +11,7 @@ from enum import StrEnum
 from limrun_api import AsyncLimrun
 from limrun_api.types import AndroidInstance, IosInstance
 
+from minitap.mobile_use.config import settings
 from minitap.mobile_use.controllers.ios_controller import iOSDeviceController
 from minitap.mobile_use.controllers.cloud_device_controller import (
     CloudAndroidController,
@@ -48,9 +49,7 @@ class CloudDeviceInstanceConfig:
         if base_url:
             self.base_url = f"{base_url.rstrip('/')}/api/v1"
         else:
-            self.base_url = os.environ.get(
-                "MINITAP_API_BASE_URL", "https://platform.minitap.ai/api/v1"
-            ).rstrip("/")
+            self.base_url = settings.MINITAP_API_BASE_URL.rstrip("/")
         self.inactivity_timeout = inactivity_timeout
         self.hard_timeout = hard_timeout
         self.display_name = display_name
