@@ -9,6 +9,7 @@ import base64
 import re
 import shlex
 from io import BytesIO
+from pathlib import Path
 
 from adbutils import AdbClient
 from idb.common.types import HIDButtonType
@@ -17,6 +18,11 @@ from PIL import Image
 from minitap.mobile_use.clients.adb_tunnel import AdbTunnel
 from minitap.mobile_use.clients.idb_client import IOSAppInfo
 from minitap.mobile_use.clients.cloud_device_client import CloudIosClient
+from minitap.mobile_use.clients.split_apk_installer import (
+    InstalledPackageInfo,
+    install_split_apks,
+    verify_foreground_package,
+)
 from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
 from minitap.mobile_use.controllers.device_controller import (
     MobileDeviceController,
@@ -139,6 +145,31 @@ class CloudAndroidController(MobileDeviceController):
         if self._adb_client is None or self._adb_serial is None:
             raise RuntimeError("Not connected to device")
         return self._adb_client.device(serial=self._adb_serial)
+
+    async def install_split_apks(
+        self,
+        apks_path: Path,
+        *,
+        expected_package: str,
+        expected_version_code: int,
+    ) -> InstalledPackageInfo:
+        """Install a flat ``.apks`` archive via one PM install session.
+
+        Runs off the event loop because adbutils is synchronous. On failure
+        the underlying helper abandons the install session and wipes the
+        on-device tmp dir before re-raising, so the device is left clean.
+        """
+        return await asyncio.to_thread(
+            install_split_apks,
+            self.device,
+            apks_path,
+            expected_package=expected_package,
+            expected_version_code=expected_version_code,
+        )
+
+    async def verify_foreground_package(self, expected_package: str) -> None:
+        """Confirm ``expected_package`` owns the currently focused window."""
+        await asyncio.to_thread(verify_foreground_package, self.device, expected_package)
 
     async def tap(
         self,
