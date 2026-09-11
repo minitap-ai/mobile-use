@@ -88,6 +88,13 @@ class MobileUseLogger:
     def error(self, message: str, **kwargs):
         self.logger.error(message, extra={"log_level": LogLevel.ERROR}, **kwargs)
 
+    def exception(self, message: str, **kwargs):
+        """Log an ERROR-level message plus the current exception's traceback.
+
+        Call from inside an `except` block, matching stdlib `Logger.exception`.
+        """
+        self.logger.exception(message, extra={"log_level": LogLevel.ERROR}, **kwargs)
+
     def critical(self, message: str, **kwargs):
         self.logger.critical(message, extra={"log_level": LogLevel.CRITICAL}, **kwargs)
 
