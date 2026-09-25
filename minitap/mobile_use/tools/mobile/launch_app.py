@@ -12,7 +12,11 @@ from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.platform_specific_commands_controller import list_packages_async
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
-from minitap.mobile_use.utils.app_launch_utils import launch_app_with_retries
+from minitap.mobile_use.errors import AppLockViolationError
+from minitap.mobile_use.utils.app_launch_utils import (
+    assert_strict_app_launch_allowed,
+    launch_app_with_retries,
+)
 from minitap.mobile_use.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -58,15 +62,26 @@ def get_launch_app_tool(ctx: MobileUseContext):
                 status="error",
             )
         else:
-            success, error_msg = await launch_app_with_retries(ctx=ctx, app_package=package_name)
-            tool_message = ToolMessage(
-                tool_call_id=tool_call_id,
-                content=launch_app_wrapper.on_success_fn(app_name)
-                if success
-                else launch_app_wrapper.on_failure_fn(app_name, error_msg),
-                additional_kwargs={} if success else {"error": error_msg},
-                status="success" if success else "error",
-            )
+            try:
+                assert_strict_app_launch_allowed(ctx, package_name)
+                success, error_msg = await launch_app_with_retries(
+                    ctx=ctx, app_package=package_name
+                )
+                tool_message = ToolMessage(
+                    tool_call_id=tool_call_id,
+                    content=launch_app_wrapper.on_success_fn(app_name)
+                    if success
+                    else launch_app_wrapper.on_failure_fn(app_name, error_msg),
+                    additional_kwargs={} if success else {"error": error_msg},
+                    status="success" if success else "error",
+                )
+            except AppLockViolationError as error:
+                tool_message = ToolMessage(
+                    tool_call_id=tool_call_id,
+                    content=launch_app_wrapper.on_failure_fn(app_name, str(error)),
+                    additional_kwargs={"error": str(error)},
+                    status="error",
+                )
 
         return Command(
             update=await state.asanitize_update(

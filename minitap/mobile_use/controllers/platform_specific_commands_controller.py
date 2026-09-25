@@ -168,6 +168,48 @@ async def list_packages_async(ctx: MobileUseContext) -> str:
         return list_packages(ctx)
 
 
+_ANDROID_FOCUS_COMMAND = "dumpsys window | grep -E 'mCurrentFocus|mFocusedApp'"
+
+
+def _package_from_window_component(segment: str) -> str | None:
+    """Package from a focus value such as 'Window{ab u0 com.pkg/com.pkg.Main}'."""
+    if "/" not in segment:
+        return None
+    for token in segment.split():
+        if "." in token and not token.startswith("Window"):
+            package = token.split("/")[0].rstrip("}")
+            if package and "." in package:
+                return package
+    return None
+
+
+def _last_value(output: str, key: str) -> str | None:
+    lines = [line for line in output.splitlines() if key in line]
+    return lines[-1].split(key, 1)[1].strip() if lines else None
+
+
+def parse_android_foreground_package(output: str) -> str | None:
+    """Foreground package from `dumpsys window` focus lines, or None if unknown.
+
+    A popup or menu (for example Chrome's overflow menu) takes window focus as
+    "PopupWindow:<id>", which names no package. Popups are attached to the
+    focused activity's window, so they are reported as that activity's app.
+    Any other window without a package (e.g. the notification shade) stays
+    unknown, and "mCurrentFocus=null" stays None (still loading).
+    """
+    focus = _last_value(output, "mCurrentFocus=")
+    if focus is None:
+        return None
+    package = _package_from_window_component(focus)
+    if package:
+        return package
+    tokens = focus.split()
+    if tokens and tokens[-1].startswith("PopupWindow:"):
+        focused_app = _last_value(output, "mFocusedApp=")
+        return _package_from_window_component(focused_app) if focused_app else None
+    return None
+
+
 def get_current_foreground_package(ctx: MobileUseContext) -> str | None:
     """
     Get the package name of the currently focused/foreground app.
@@ -186,23 +228,7 @@ def get_current_foreground_package(ctx: MobileUseContext) -> str | None:
             return _get_ios_foreground_package(ctx)
 
         device = get_adb_device(ctx)
-        output = str(device.shell("dumpsys window | grep mCurrentFocus"))
-
-        if "mCurrentFocus=" not in output:
-            return None
-
-        segment = output.split("mCurrentFocus=")[-1]
-
-        if "/" in segment:
-            tokens = segment.split()
-            for token in tokens:
-                if "." in token and not token.startswith("Window"):
-                    package = token.split("/")[0]
-                    package = package.rstrip("}")
-                    if package and "." in package:
-                        return package
-
-        return None
+        return parse_android_foreground_package(str(device.shell(_ANDROID_FOCUS_COMMAND)))
 
     except Exception as e:
         logger.debug(f"Failed to get current foreground package: {e}")
@@ -224,23 +250,7 @@ async def get_current_foreground_package_async(ctx: MobileUseContext) -> str | N
             return await _get_ios_foreground_package_async(ctx)
 
         device = get_adb_device(ctx)
-        output = str(device.shell("dumpsys window | grep mCurrentFocus"))
-
-        if "mCurrentFocus=" not in output:
-            return None
-
-        segment = output.split("mCurrentFocus=")[-1]
-
-        if "/" in segment:
-            tokens = segment.split()
-            for token in tokens:
-                if "." in token and not token.startswith("Window"):
-                    package = token.split("/")[0]
-                    package = package.rstrip("}")
-                    if package and "." in package:
-                        return package
-
-        return None
+        return parse_android_foreground_package(str(device.shell(_ANDROID_FOCUS_COMMAND)))
 
     except Exception as e:
         logger.debug(f"Failed to get current foreground package: {e}")

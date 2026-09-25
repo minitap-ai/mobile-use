@@ -15,6 +15,7 @@ from minitap.mobile_use.clients.ios_client_config import (
     WdaClientConfig,
 )
 from minitap.mobile_use.config import initialize_llm_config, settings
+from minitap.mobile_use.context import AppLockPolicy
 from minitap.mobile_use.sdk import Agent
 from minitap.mobile_use.sdk.builders import Builders
 from minitap.mobile_use.sdk.types.agent import CloudDevicePlatform
@@ -38,6 +39,7 @@ class DeviceType(StrEnum):
 async def run_automation(
     goal: str,
     locked_app_package: str | None = None,
+    app_lock_policy: AppLockPolicy = "permissive",
     test_name: str | None = None,
     traces_output_path_str: str = "traces",
     output_description: str | None = None,
@@ -94,6 +96,8 @@ async def run_automation(
         task = agent.new_task(goal)
         if locked_app_package:
             task.with_locked_app_package(locked_app_package)
+        if app_lock_policy == "strict":
+            task.with_strict_app_lock()
         if test_name:
             task.with_name(test_name).with_trace_recording(path=traces_output_path_str)
         if output_description:
@@ -115,6 +119,23 @@ async def run_automation(
 @app.command()
 def main(
     goal: Annotated[str, typer.Argument(help="The main goal for the agent to achieve.")],
+    locked_app_package: Annotated[
+        str | None,
+        typer.Option(
+            "--locked-app-package",
+            help="Restrict the agent to an Android package or iOS bundle ID.",
+        ),
+    ] = None,
+    strict_app_lock: Annotated[
+        bool,
+        typer.Option(
+            "--strict-app-lock",
+            help=(
+                "Fail if the approved app cannot be launched or its foreground state "
+                "cannot be verified. Requires --locked-app-package."
+            ),
+        ),
+    ] = False,
     test_name: Annotated[
         str | None,
         typer.Option(
@@ -232,6 +253,10 @@ def main(
 
     console = Console()
 
+    if strict_app_lock and not locked_app_package:
+        console.print("[red]Error: --strict-app-lock requires --locked-app-package[/red]")
+        raise typer.Exit(2)
+
     if device_type == DeviceType.LOCAL:
         adb_client = None
         try:
@@ -266,6 +291,8 @@ def main(
         asyncio.run(
             run_automation(
                 goal=goal,
+                locked_app_package=locked_app_package,
+                app_lock_policy="strict" if strict_app_lock else "permissive",
                 test_name=test_name,
                 traces_output_path_str=traces_path,
                 output_description=output_description,

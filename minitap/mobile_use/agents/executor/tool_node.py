@@ -11,6 +11,8 @@ from langgraph.types import Command
 from pydantic import BaseModel
 
 from minitap.mobile_use.services.telemetry import telemetry
+from minitap.mobile_use.context import MobileUseContext
+from minitap.mobile_use.utils.app_launch_utils import enforce_strict_app_lock
 from minitap.mobile_use.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -22,9 +24,16 @@ class ExecutorToolNode(ToolNode):
     If one error occurs, the remaining tool calls are aborted!
     """
 
-    def __init__(self, tools, messages_key: str, trace_id: str | None = None):
+    def __init__(
+        self,
+        tools,
+        messages_key: str,
+        trace_id: str | None = None,
+        ctx: MobileUseContext | None = None,
+    ):
         super().__init__(tools=tools, messages_key=messages_key)
         self._trace_id = trace_id
+        self._ctx = ctx
 
     @override
     async def _afunc(
@@ -82,10 +91,19 @@ class ExecutorToolNode(ToolNode):
                     message="Aborted: a previous tool call failed!",
                 )
             else:
+                if self._ctx is not None:
+                    # Focus may have changed while the model was deciding its
+                    # next action. Verify before dispatch as well as afterward.
+                    await enforce_strict_app_lock(self._ctx)
                 if is_async:
                     output = await self._arun_one(call, input_type, tool_runtime)
                 else:
                     output = self._run_one(call, input_type, tool_runtime)
+                if self._ctx is not None:
+                    # A model can emit several tool calls in one executor turn.
+                    # Verify after each call to restore or abort on a detected
+                    # foreground change before proceeding through the batch.
+                    await enforce_strict_app_lock(self._ctx)
                 failed = self._has_tool_call_failed(call, output)
                 if failed is None:
                     output = self._get_erroneous_command(

@@ -8,6 +8,7 @@ from typing import Self, TypeVar, cast
 from pydantic import BaseModel
 
 from minitap.mobile_use.constants import RECURSION_LIMIT
+from minitap.mobile_use.context import AppLockPolicy
 from minitap.mobile_use.sdk.types.agent import AgentProfile
 from minitap.mobile_use.sdk.types.task import TaskRequest, TaskRequestCommon
 
@@ -28,6 +29,7 @@ class TaskRequestCommonBuilder(BaseModel):
         self._llm_output_path: Path | None = None
         self._thoughts_output_path: Path | None = None
         self._locked_app_package: str | None = None
+        self._app_lock_policy: AppLockPolicy = "permissive"
         self._app_path: Path | None = None
 
     def with_max_steps(self, max_steps: int) -> Self:
@@ -89,6 +91,24 @@ class TaskRequestCommonBuilder(BaseModel):
         self._locked_app_package = package_name
         return self
 
+    def with_app_lock_policy(self, policy: AppLockPolicy) -> Self:
+        """Set how strictly a locked app must be enforced.
+
+        ``permissive`` (the default) allows the agent to use an LLM to decide
+        whether a temporary app deviation is acceptable. ``strict`` fails the
+        task if the locked app cannot be launched or its foreground state
+        cannot be verified.
+
+        Args:
+            policy: Either ``"permissive"`` or ``"strict"``.
+        """
+        self._app_lock_policy = policy
+        return self
+
+    def with_strict_app_lock(self) -> Self:
+        """Require the locked app to be verified at every enforcement point."""
+        return self.with_app_lock_policy("strict")
+
     def with_app_path(self, app_path: str | Path) -> Self:
         """
         Set the path to an app to install before running the task.
@@ -122,6 +142,7 @@ class TaskRequestCommonBuilder(BaseModel):
             llm_output_path=self._llm_output_path,
             thoughts_output_path=self._thoughts_output_path,
             locked_app_package=self._locked_app_package,
+            app_lock_policy=self._app_lock_policy,
             app_path=self._app_path,
         )
 
@@ -162,6 +183,7 @@ class TaskRequestBuilder[TIn](TaskRequestCommonBuilder):
         res._llm_output_path = common.llm_output_path
         res._thoughts_output_path = common.thoughts_output_path
         res._locked_app_package = common.locked_app_package
+        res._app_lock_policy = common.app_lock_policy
         res._app_path = common.app_path
         return res
 
@@ -251,6 +273,7 @@ class TaskRequestBuilder[TIn](TaskRequestCommonBuilder):
             llm_output_path=self._llm_output_path,
             thoughts_output_path=self._thoughts_output_path,
             locked_app_package=self._locked_app_package,
+            app_lock_policy=self._app_lock_policy,
             app_path=self._app_path,
         )
         return task_request

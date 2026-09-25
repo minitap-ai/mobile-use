@@ -10,6 +10,7 @@ from minitap.mobile_use.sdk.types.agent import (
 )
 from minitap.mobile_use.sdk.types.exceptions import (
     AgentError,
+    AppLockViolationError,
     AgentNotInitializedError,
     AgentProfileNotFoundError,
     AgentTaskRequestError,
@@ -26,6 +27,7 @@ from minitap.mobile_use.sdk.types.task import (
     TaskRequestCommon,
     TaskResult,
 )
+from minitap.mobile_use.context import AppLockPolicy
 
 __all__ = [
     "ApiBaseUrl",
@@ -39,11 +41,13 @@ __all__ = [
     "TaskResult",
     "TaskRequestCommon",
     "Task",
+    "AppLockPolicy",
     "AgentProfileNotFoundError",
     "AgentTaskRequestError",
     "DeviceNotFoundError",
     "ServerStartupError",
     "AgentError",
+    "AppLockViolationError",
     "AgentNotInitializedError",
     "DeviceError",
     "MobileUseError",

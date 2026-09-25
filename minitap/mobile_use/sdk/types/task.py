@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 from minitap.mobile_use.config import LLMConfig, get_default_llm_config
 from minitap.mobile_use.constants import RECURSION_LIMIT
-from minitap.mobile_use.context import DeviceContext
+from minitap.mobile_use.context import AppLockPolicy, DeviceContext
 from minitap.mobile_use.sdk.utils import load_llm_config_override
 
 TaskRunStatus = Literal["pending", "running", "completed", "failed", "cancelled"]
@@ -79,6 +79,13 @@ class TaskRequestCommon(TaskRequestBase):
 
     max_steps: int = RECURSION_LIMIT
     locked_app_package: str | None = None
+    app_lock_policy: AppLockPolicy = "permissive"
+    """How strictly to enforce ``locked_app_package`` during execution.
+
+    ``permissive`` preserves the existing behavior, which permits an LLM to
+    approve temporary app deviations. ``strict`` fails closed whenever the
+    locked app cannot be launched or verified.
+    """
     app_path: Path | None = None
     """Path to an app to install before running the task.
     

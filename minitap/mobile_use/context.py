@@ -20,12 +20,16 @@ from minitap.mobile_use.config import AgentNode, LLMConfig
 from minitap.mobile_use.controllers.cloud_device_controller import CloudAndroidController
 
 
+AppLockPolicy = Literal["permissive", "strict"]
+
+
 class AppLaunchResult(BaseModel):
     """Result of initial app launch attempt."""
 
     locked_app_package: str
     locked_app_initial_launch_success: bool | None
     locked_app_initial_launch_error: str | None
+    app_lock_policy: AppLockPolicy = "permissive"
 
 
 class DevicePlatform(StrEnum):
