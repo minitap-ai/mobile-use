@@ -1,5 +1,6 @@
 """Type definitions for the mobile-use SDK."""
 
+from minitap.mobile_use.clients.poco_client import PocoConfig
 from minitap.mobile_use.sdk.types.agent import (
     AgentConfig,
     ApiBaseUrl,
@@ -35,6 +36,7 @@ __all__ = [
     "DevicePlatform",
     "AgentProfile",
     "ServerConfig",
+    "PocoConfig",
     "TaskRequest",
     "TaskResult",
     "TaskRequestCommon",

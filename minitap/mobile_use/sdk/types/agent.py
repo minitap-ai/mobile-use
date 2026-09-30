@@ -1,11 +1,12 @@
 from enum import StrEnum
-from typing import Literal
+from typing import Literal, Self
 from urllib.parse import urlparse
 
 from langchain_core.callbacks.base import Callbacks
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from minitap.mobile_use.clients.ios_client_config import BrowserStackClientConfig, IosClientConfig
+from minitap.mobile_use.clients.poco_client import PocoConfig
 from minitap.mobile_use.context import DevicePlatform
 from minitap.mobile_use.controllers.cloud_device_controller import (
     CloudAndroidController,
@@ -106,6 +107,7 @@ class AgentConfig(BaseModel):
         cloud_device_config: Configuration for cloud device provisioning.
         cloud_android_controller: Pre-configured cloud Android controller.
         cloud_ios_controller: Pre-configured cloud iOS controller.
+        poco_config: Optional Poco-SDK hierarchy endpoint for a local Android game.
     """
 
     agent_profiles: dict[str, AgentProfile]
@@ -121,5 +123,19 @@ class AgentConfig(BaseModel):
     cloud_device_config: CloudDeviceConfig | None = None
     cloud_android_controller: CloudAndroidController | None = None
     cloud_ios_controller: CloudIosController | None = None
+    poco_config: PocoConfig | None = None
 
     model_config = {"arbitrary_types_allowed": True}
+
+    @model_validator(mode="after")
+    def validate_poco_device(self) -> Self:
+        if self.poco_config is not None and (
+            self.device_platform != DevicePlatform.ANDROID
+            or not self.device_id
+            or self.cloud_device_config is not None
+            or self.cloud_android_controller is not None
+            or self.cloud_ios_controller is not None
+            or self.browserstack_config is not None
+        ):
+            raise ValueError("Poco hierarchy requires an explicitly selected local Android device")
+        return self

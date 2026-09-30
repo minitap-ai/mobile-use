@@ -7,6 +7,7 @@ import copy
 from langchain_core.callbacks.base import Callbacks
 
 from minitap.mobile_use.clients.ios_client_config import BrowserStackClientConfig, IosClientConfig
+from minitap.mobile_use.clients.poco_client import PocoConfig
 from minitap.mobile_use.config import get_default_llm_config, get_default_minitap_llm_config
 from minitap.mobile_use.context import DevicePlatform
 from minitap.mobile_use.controllers.cloud_device_controller import (
@@ -58,6 +59,7 @@ class AgentConfigBuilder:
         self._cloud_device_config: CloudDeviceConfig | None = None
         self._cloud_android_controller: CloudAndroidController | None = None
         self._cloud_ios_controller: CloudIosController | None = None
+        self._poco_config: PocoConfig | None = None
 
     def add_profile(self, profile: AgentProfile, validate: bool = True) -> "AgentConfigBuilder":
         """
@@ -356,6 +358,11 @@ class AgentConfigBuilder:
         self._video_recording_enabled = True
         return self
 
+    def with_poco_hierarchy(self, config: PocoConfig) -> "AgentConfigBuilder":
+        """Use Poco-SDK element trees when the configured Android game is foreground."""
+        self._poco_config = config
+        return self
+
     def build(self, validate_profiles: bool = True) -> AgentConfig:
         """
         Build the mobile-use AgentConfig object.
@@ -413,6 +420,7 @@ class AgentConfigBuilder:
             cloud_device_config=self._cloud_device_config,
             cloud_android_controller=self._cloud_android_controller,
             cloud_ios_controller=self._cloud_ios_controller,
+            poco_config=self._poco_config,
         )
 
 

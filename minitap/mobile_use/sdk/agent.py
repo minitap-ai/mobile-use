@@ -23,6 +23,7 @@ from minitap.mobile_use.agents.outputter.outputter import outputter
 from minitap.mobile_use.clients.browserstack_client import BrowserStackClientWrapper
 from minitap.mobile_use.clients.idb_client import IdbClientWrapper
 from minitap.mobile_use.clients.ios_client import DeviceType, IosClientWrapper, get_ios_client
+from minitap.mobile_use.clients.poco_client import PocoClient
 from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
 from minitap.mobile_use.clients.wda_client import WdaClientWrapper
 from minitap.mobile_use.config import OutputConfig, record_events, settings
@@ -95,6 +96,9 @@ class Agent:
         self._tmp_traces_dir = Path(tempfile.gettempdir()) / "mobile-use-traces"
         self._initialized = False
         self._task_lock = asyncio.Lock()
+        self._poco_client = (
+            PocoClient(self._config.poco_config) if self._config.poco_config is not None else None
+        )
 
     async def init(
         self,
@@ -624,6 +628,7 @@ class Agent:
             ui_adb_client=self._ui_adb_client,
             ios_client=self._ios_client,
             cloud_android_controller=cloud_android_controller,
+            poco_client=self._poco_client,
             llm_config=agent_profile.llm_config,
             video_recording_enabled=(
                 self._config.video_recording_enabled
@@ -865,6 +870,9 @@ class Agent:
             raise Exception(f"Unsupported platform: {self._device_context.mobile_platform}")
 
     async def clean(self, force: bool = False):
+        if self._poco_client is not None:
+            await self._poco_client.close()
+
         if self._cloud_instance_id:
             await self._cleanup_cloud_device()
             self._initialized = False
