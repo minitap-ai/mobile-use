@@ -1,5 +1,7 @@
 from unittest.mock import patch
 
+import pytest
+
 from minitap.mobile_use.utils.ui_hierarchy import (
     ElementBounds,
     Point,
@@ -51,6 +53,38 @@ def test_find_element_by_resource_id():
 
     result = find_element_by_resource_id([], "com.example:id/button1")
     assert result is None
+
+
+@pytest.mark.parametrize("nested", [False, True])
+@pytest.mark.parametrize("index", [None, 0, 1, 2, 3, -1])
+def test_find_element_by_resource_id_index(index: int | None, nested: bool):
+    resource_id = "com.example:id/input"
+    matches = [{"resourceId": resource_id, "text": f"Field {i}"} for i in range(3)]
+    ui_hierarchy = (
+        [
+            {"children": [matches[0], {"children": [matches[1]]}]},
+            {"children": [matches[2]]},
+        ]
+        if nested
+        else matches
+    )
+
+    result = find_element_by_resource_id(ui_hierarchy, resource_id, index=index)
+
+    if index is None:
+        assert result is matches[0]
+    elif 0 <= index < len(matches):
+        assert result is matches[index]
+    else:
+        assert result is None
+
+
+def test_find_element_by_resource_id_index_in_matching_parent():
+    resource_id = "com.example:id/item"
+    child = {"resourceId": resource_id, "text": "Child"}
+    parent = {"resourceId": resource_id, "text": "Parent", "children": [child]}
+
+    assert find_element_by_resource_id([parent], resource_id, index=1) is child
 
 
 def test_find_element_by_resource_id_rich_hierarchy():

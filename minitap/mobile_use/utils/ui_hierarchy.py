@@ -59,15 +59,16 @@ def find_element_by_resource_id(
     if is_rich_hierarchy:
         return __find_element_by_ressource_id_in_rich_hierarchy(ui_hierarchy, resource_id)
 
+    idx = index or 0
+
     def search_recursive(elements: list[dict]) -> dict | None:
+        nonlocal idx
         for element in elements:
             if isinstance(element, dict):
                 if element.get("resourceId") == resource_id:
-                    idx = index or 0
                     if idx == 0:
                         return element
                     idx -= 1
-                    continue
 
                 children = element.get("children", [])
                 if children:
