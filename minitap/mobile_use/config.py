@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: SecretStr | None = None
     AZURE_API_KEY: SecretStr | None = None
     MINIMAX_API_KEY: SecretStr | None = None
+    CHEAPER_INFERENCE_API_KEY: SecretStr | None = None
     MINITAP_API_KEY: SecretStr | None = None
 
     OPENAI_BASE_URL: str | None = None
@@ -99,7 +100,16 @@ def record_events(output_path: Path | None, events: list[str] | BaseModel | Any)
 ### LLM Configuration
 
 LLMProvider = Literal[
-    "openai", "google", "openrouter", "xai", "vertexai", "minitap", "anthropic", "azure", "minimax"
+    "openai",
+    "google",
+    "openrouter",
+    "xai",
+    "vertexai",
+    "minitap",
+    "anthropic",
+    "azure",
+    "minimax",
+    "cheaperinference",
 ]
 LLMUtilsNode = Literal["outputter", "hopper", "video_analyzer"]
 LLMUtilsNodeWithFallback = LLMUtilsNode
@@ -160,6 +170,9 @@ class LLM(BaseModel):
             case "minimax":
                 if not settings.MINIMAX_API_KEY:
                     raise Exception(f"{name} requires MINIMAX_API_KEY in .env")
+            case "cheaperinference":
+                if not settings.CHEAPER_INFERENCE_API_KEY:
+                    raise Exception(f"{name} requires CHEAPER_INFERENCE_API_KEY in .env")
 
     def __str__(self):
         return f"{self.provider}/{self.model}"
