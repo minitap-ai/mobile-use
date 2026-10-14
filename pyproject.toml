@@ -14,7 +14,9 @@ authors = [
 requires-python = ">=3.12"
 
 dependencies = [
-    "langgraph>=1.0.2,<2.0.0",
+    # Capped to a minor: ExecutorToolNode subclasses langgraph-prebuilt's ToolNode private API,
+    # which changes in minor releases (see #213). Bump deliberately; tests/mobile_use/test_executor_tool_node.py guards it.
+    "langgraph>=1.2.0,<1.3.0",
     "adbutils==2.9.3",
     "langchain-google-genai>=4.0.0",
     "langchain>=1.0.0",

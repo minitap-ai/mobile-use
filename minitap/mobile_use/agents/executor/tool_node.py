@@ -20,6 +20,13 @@ class ExecutorToolNode(ToolNode):
     """
     ToolNode that runs tool calls one after the other - not simultaneously.
     If one error occurs, the remaining tool calls are aborted!
+
+    Upstream ToolNode has no public hook for sequential, abort-on-failure execution (it
+    runs calls in parallel), so this overrides `_func`/`_afunc` and relies on private
+    ToolNode methods (`_parse_input`, `_extract_state`, `_run_one`, `_arun_one`,
+    `_combine_tool_outputs`). Their signatures change across minor releases, hence the
+    minor-version cap on langgraph in pyproject.toml. When bumping it, diff upstream's
+    `ToolNode._func` and run tests/mobile_use/test_executor_tool_node.py.
     """
 
     def __init__(self, tools, messages_key: str, trace_id: str | None = None):
@@ -62,6 +69,9 @@ class ExecutorToolNode(ToolNode):
             context=runtime.context,
             store=runtime.store,
             stream_writer=runtime.stream_writer,
+            tools=list(self.tools_by_name.values()),
+            execution_info=runtime.execution_info,
+            server_info=runtime.server_info,
         )
 
     async def __func(
@@ -72,7 +82,7 @@ class ExecutorToolNode(ToolNode):
         runtime: Runtime,
     ) -> Any:
         tool_calls, input_type = self._parse_input(input)
-        outputs: list[Command | ToolMessage] = []
+        outputs: list[Command | ToolMessage | list[Command | ToolMessage]] = []
         failed = False
         for call in tool_calls:
             tool_runtime = self._build_tool_runtime(call, input, config, runtime)
@@ -103,8 +113,9 @@ class ExecutorToolNode(ToolNode):
                     if isinstance(output, ToolMessage):
                         error_msg = output.content
                     elif isinstance(output, Command):
-                        tool_msg = self._get_tool_message(output)
-                        error_msg = tool_msg.content
+                        error_msg = self._get_tool_message(output).content
+                    elif tool_message := self._find_tool_message(output):
+                        error_msg = tool_message.content
                 except Exception:
                     error_msg = "Could not extract error details"
 
@@ -136,13 +147,30 @@ class ExecutorToolNode(ToolNode):
     def _has_tool_call_failed(
         self,
         call: ToolCall,
-        output: ToolMessage | Command,
+        output: ToolMessage | Command | list[Command | ToolMessage],
     ) -> bool | None:
+        # langgraph-prebuilt >= 1.1 lets a tool return a list of ToolMessage/Command, with
+        # exactly one ToolMessage for the call (others are plain state updates): judge on it.
+        if isinstance(output, list):
+            tool_message = self._find_tool_message(output)
+            return None if tool_message is None else tool_message.status == "error"
         if isinstance(output, ToolMessage):
             return output.status == "error"
         if isinstance(output, Command):
             output_msg = self._get_tool_message(output)
             return output_msg.status == "error"
+        return None
+
+    def _find_tool_message(self, outputs: list[Command | ToolMessage]) -> ToolMessage | None:
+        for item in outputs:
+            if isinstance(item, ToolMessage):
+                return item
+            if isinstance(item, Command) and isinstance(item.update, dict):
+                msg = item.update.get(self._messages_key)
+                if isinstance(msg, ToolMessage):
+                    return msg
+                if isinstance(msg, list) and msg and isinstance(msg[-1], ToolMessage):
+                    return msg[-1]
         return None
 
     def _get_erroneous_command(self, call: ToolCall, message: str) -> Command:
