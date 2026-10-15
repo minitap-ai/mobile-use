@@ -26,10 +26,12 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: SecretStr | None = None
     AZURE_API_KEY: SecretStr | None = None
     MINIMAX_API_KEY: SecretStr | None = None
+    REQUESTY_API_KEY: SecretStr | None = None
     MINITAP_API_KEY: SecretStr | None = None
 
     OPENAI_BASE_URL: str | None = None
     AZURE_BASE_URL: str | None = None
+    REQUESTY_BASE_URL: str = "https://router.requesty.ai/v1"
     MINITAP_API_BASE_URL: str = "https://platform.minitap.ai/api/v1"
 
     ADB_HOST: str | None = None
@@ -99,7 +101,16 @@ def record_events(output_path: Path | None, events: list[str] | BaseModel | Any)
 ### LLM Configuration
 
 LLMProvider = Literal[
-    "openai", "google", "openrouter", "xai", "vertexai", "minitap", "anthropic", "azure", "minimax"
+    "openai",
+    "google",
+    "openrouter",
+    "xai",
+    "vertexai",
+    "minitap",
+    "anthropic",
+    "azure",
+    "minimax",
+    "requesty",
 ]
 LLMUtilsNode = Literal["outputter", "hopper", "video_analyzer"]
 LLMUtilsNodeWithFallback = LLMUtilsNode
@@ -160,6 +171,9 @@ class LLM(BaseModel):
             case "minimax":
                 if not settings.MINIMAX_API_KEY:
                     raise Exception(f"{name} requires MINIMAX_API_KEY in .env")
+            case "requesty":
+                if not settings.REQUESTY_API_KEY:
+                    raise Exception(f"{name} requires REQUESTY_API_KEY in .env")
 
     def __str__(self):
         return f"{self.provider}/{self.model}"
