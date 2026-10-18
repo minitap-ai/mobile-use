@@ -51,14 +51,14 @@ jobs:
     needs: verify-tag
     permissions:
       contents: read
+      id-token: write
     environment: GCP
     steps:
       - name: Clone the repository
         uses: actions/checkout@v5
 
-      - uses: minitap-ai/mobile-use-actions/.github/actions/gcp-docker-build-push@e498f98a7b0c1530088e5979e6896771bbb00a97 # v1.10.0
+      - uses: minitap-ai/mobile-use-actions/.github/actions/gcp-docker-build-push@4ddc3f615439741fefc3c3e01842c470418ea9c6 # v1.11.0
         with:
-          gcp-credentials: ${{ secrets.GCP_SA_KEY }}
           gcp-project-id: ${{ vars.GCP_PROJECT_ID }}
           gcp-region: ${{ vars.GCP_REGION }}
           gcp-artifact-repo: ${{ vars.GCP_ARTIFACT_REPO }}
