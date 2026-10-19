@@ -220,6 +220,17 @@ def get_minimax_llm(model_name: str = "MiniMax-M2.7", temperature: float = 1) ->
     return client
 
 
+def get_cheaperinference_llm(model_name: str, temperature: float = 1) -> ChatOpenAI:
+    assert settings.CHEAPER_INFERENCE_API_KEY is not None
+    client = ChatOpenAI(
+        model=model_name,
+        temperature=temperature,
+        api_key=settings.CHEAPER_INFERENCE_API_KEY,
+        base_url="https://api.cheaperinference.com/v1",
+    )
+    return client
+
+
 @overload
 def get_llm(
     ctx: MobileUseContext,
@@ -284,6 +295,8 @@ def get_llm(
         return get_azure_llm(llm.model, temperature)
     elif llm.provider == "minimax":
         return get_minimax_llm(llm.model, temperature)
+    elif llm.provider == "cheaperinference":
+        return get_cheaperinference_llm(llm.model, temperature)
     elif llm.provider == "minitap":
         return get_minitap_llm(
             trace_id=ctx.trace_id,
