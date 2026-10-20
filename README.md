@@ -38,6 +38,31 @@ Mobile-use is a powerful, open-source AI agent that controls your Android or IOS
 - 📊 **Data Scraping**: Extract information from any app and structure it into your desired format (e.g., JSON) using a natural language description.
 - 🔧 **Extensible & Customizable**: Easily configure different LLMs to power the agents that power mobile-use. Supports OpenAI, Google, xAI, OpenRouter, MiniMax, and more.
 
+## Public web search
+
+The agent can use [Parallel Search MCP](https://docs.parallel.ai/integrations/mcp/search-mcp)
+to search the public web and fetch page excerpts before taking an action on the
+phone. Search uses Fast mode, with no Parallel account or API key required. For
+example: “Find the museum's current opening hours on its website, then draft a
+message with the hours and source link.”
+
+`web_search` and `web_fetch` are available by default. They connect to
+`https://search.parallel.ai/mcp` only when called and do not navigate the device.
+Queries and requested URLs are sent to Parallel, so use these tools for public
+information rather than private app content. Anonymous service limits apply;
+failed requests return tool errors so the agent can adjust its plan.
+
+To disable both tools, set `MOBILE_USE_WEB_SEARCH_ENABLED=false` in `.env` before
+starting mobile-use. In the SDK, an explicit builder setting takes precedence:
+
+```python
+from minitap.mobile_use.sdk.builders import Builders
+
+config = Builders.AgentConfig.with_web_search(False).build()
+```
+
+Existing LLM profiles, credentials and device/app-lock settings are unchanged.
+
 ## Benchmarks
 
 <p align="center">
