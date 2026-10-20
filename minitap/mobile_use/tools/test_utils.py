@@ -1,22 +1,17 @@
 import asyncio
-import sys
 from unittest.mock import Mock, patch
 
 import pytest
 
-# Mock the problematic langgraph import at module level
-sys.modules["langgraph.prebuilt.chat_agent_executor"] = Mock()
-sys.modules["minitap.mobile_use.graph.state"] = Mock()
-
-from minitap.mobile_use.context import DeviceContext, DevicePlatform, MobileUseContext  # noqa: E402
-from minitap.mobile_use.tools.types import Target  # noqa: E402
-from minitap.mobile_use.tools.utils import (  # noqa: E402
+from minitap.mobile_use.context import DeviceContext, DevicePlatform, MobileUseContext
+from minitap.mobile_use.tools.types import Target
+from minitap.mobile_use.tools.utils import (
     IdSelectorRequest,
     SelectorRequestWithCoordinates,
     focus_element_if_needed,
     move_cursor_to_end_if_bounds,
 )
-from minitap.mobile_use.utils.ui_hierarchy import ElementBounds  # noqa: E402
+from minitap.mobile_use.utils.ui_hierarchy import ElementBounds
 
 
 @pytest.fixture
