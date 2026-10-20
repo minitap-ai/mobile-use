@@ -7,7 +7,11 @@ import copy
 from langchain_core.callbacks.base import Callbacks
 
 from minitap.mobile_use.clients.ios_client_config import BrowserStackClientConfig, IosClientConfig
-from minitap.mobile_use.config import get_default_llm_config, get_default_minitap_llm_config
+from minitap.mobile_use.config import (
+    get_default_llm_config,
+    get_default_minitap_llm_config,
+    settings,
+)
 from minitap.mobile_use.context import DevicePlatform
 from minitap.mobile_use.controllers.cloud_device_controller import (
     CloudAndroidController,
@@ -55,6 +59,7 @@ class AgentConfigBuilder:
         self._ios_client_config: IosClientConfig | None = None
         self._browserstack_config: BrowserStackClientConfig | None = None
         self._video_recording_enabled: bool = False
+        self._web_search_enabled: bool = settings.MOBILE_USE_WEB_SEARCH_ENABLED
         self._cloud_device_config: CloudDeviceConfig | None = None
         self._cloud_android_controller: CloudAndroidController | None = None
         self._cloud_ios_controller: CloudIosController | None = None
@@ -325,6 +330,15 @@ class AgentConfigBuilder:
         self._device_platform = DevicePlatform.IOS
         return self
 
+    def with_web_search(self, enabled: bool = True) -> "AgentConfigBuilder":
+        """Enable or disable public web search and page fetching for all tasks.
+
+        Defaults to MOBILE_USE_WEB_SEARCH_ENABLED (true when unset). Explicit
+        configuration here takes precedence over that environment setting.
+        """
+        self._web_search_enabled = enabled
+        return self
+
     def with_video_recording_tools(self) -> "AgentConfigBuilder":
         """
         Enable video recording tools (start_video_recording, stop_video_recording).
@@ -410,6 +424,7 @@ class AgentConfigBuilder:
             ios_client_config=self._ios_client_config,
             browserstack_config=self._browserstack_config,
             video_recording_enabled=self._video_recording_enabled,
+            web_search_enabled=self._web_search_enabled,
             cloud_device_config=self._cloud_device_config,
             cloud_android_controller=self._cloud_android_controller,
             cloud_ios_controller=self._cloud_ios_controller,
