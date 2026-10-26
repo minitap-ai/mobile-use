@@ -74,9 +74,12 @@ asyncio.run(main())
 While that package has the focused window, both observations and action-time
 element lookup use a fresh Poco `Dump` call. Node names become `resource-id`
 selectors, node text remains selectable, and repeated names retain depth-first
-order for indexed taps. Bounds use the screenshot's actual dimensions and Poco's
-normalized position, size, and anchor point. Invisible subtrees and targets with
-empty/off-screen bounds are excluded; partially visible bounds are clipped.
+order for indexed taps. Poco positions are relative to the game window, so
+bounds map Poco's normalized position, size, and anchor point into that window's
+frame from `dumpsys window windows`. This accounts for display cutouts and
+letterboxing; without a readable frame the full screenshot is used. Invisible
+subtrees and targets with empty/off-screen bounds are excluded; partially visible
+bounds are clipped to the window.
 
 Other apps and system windows use the native hierarchy. A timeout, connection
 failure, malformed response, or a tree with no usable bounds logs a warning and
@@ -95,16 +98,19 @@ within the configured timeout. Failed requests discard their connection, and
 The initial integration supports screen-space game observation and coordinate,
 name, text, and indexed taps through existing Android input. It does not expose
 Poco's attribute-setting APIs or promise engine-specific text editing, arbitrary
-3D-object targeting, render-offset correction, or iOS/cloud-device support.
+3D-object targeting, in-window render-offset correction, or iOS/cloud-device support.
 Keep the device orientation fixed during an agent run, as existing percentage
 tools use the dimensions recorded at initialization.
 
 Offline tests exercise a TCP RPC endpoint, response framing and errors,
 normalization, controller observation, refreshed indexed taps, and native
-fallback. They do not establish compatibility with an actual Unity or Unreal
-build. Before relying on a game, verify its named controls align with screenshot
-bounds and that taps change the intended game state, including scene changes,
-system dialogs, and disconnect/reconnect.
+fallback. The NetEase Unity tutorial demo was also checked on an Android 11
+emulator, where its window is letterboxed: its controls aligned with screenshot
+bounds and a named tap changed scenes. That does not establish compatibility with
+every Unity or Unreal build.
+Before relying on a game, verify its named controls align with screenshot bounds
+and that taps change the intended game state, including scene changes, system
+dialogs, and disconnect/reconnect.
 
 ### Unreal limitation
 

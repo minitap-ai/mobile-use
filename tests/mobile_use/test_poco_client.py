@@ -24,6 +24,7 @@ from minitap.mobile_use.clients.ui_automator_client import (
 )
 from minitap.mobile_use.config import get_default_llm_config
 from minitap.mobile_use.context import DeviceContext, DevicePlatform, MobileUseContext
+from minitap.mobile_use.controllers.android_controller import parse_window_frame
 from minitap.mobile_use.controllers.controller_factory import create_device_controller
 from minitap.mobile_use.controllers.unified_controller import UnifiedMobileController
 
@@ -283,6 +284,57 @@ def test_non_finite_geometry_skips_only_affected_node(tree, field, coordinate):
     assert result[-1]["bounds"] == "[650,200][850,300]"
 
 
+def test_normalize_maps_into_the_game_window_viewport(tree):
+    result = normalize_hierarchy(PocoNode.model_validate(tree), 1000, 500, (100, 0, 900, 500))
+    assert [element["bounds"] for element in result] == [
+        "[220,200][380,300]",
+        "[620,200][780,300]",
+    ]
+    tree["children"][0]["payload"].update(pos=[0, 0.5], size=[0.4, 0.2])
+    result = normalize_hierarchy(PocoNode.model_validate(tree), 1000, 500, (100, 0, 900, 500))
+    assert result[0]["bounds"] == "[100,200][260,300]"
+
+
+@pytest.mark.parametrize("viewport", [(900, 0, 100, 500), (1200, 0, 1500, 500)])
+def test_invalid_viewport_falls_back_to_full_screen(tree, viewport):
+    result = normalize_hierarchy(PocoNode.model_validate(tree), 1000, 500, viewport)
+    assert result[0]["bounds"] == "[150,200][350,300]"
+
+
+ANDROID_11_WINDOWS = """WINDOW MANAGER WINDOWS (dumpsys window windows)
+  Window #5 Window{1a u0 com.example.game/com.example.Dialog}:
+    mAttrs={(0,0)(wrapxwrap) ty=APPLICATION_PANEL fmt=TRANSLUCENT}
+    mFrame=[500,200][700,300] last=[0,0][0,0]
+  Window #6 Window{9c u0 com.example.game/com.unity3d.player.UnityPlayerActivity}:
+    mAttrs={(0,0)(fillxfill) ty=BASE_APPLICATION fmt=TRANSLUCENT}
+    Frames: containing=[70,0][2079,1080] parent=[0,0][2280,1080]
+        display=[70,0][2079,1080]
+    mFrame=[70,0][2079,1080] last=[70,0][2079,1080]
+  Window #7 Window{7f u0 com.example.game.helper/.Main}:
+    mAttrs={(0,0)(fillxfill) ty=BASE_APPLICATION fmt=TRANSLUCENT}
+    mFrame=[0,0][2280,1080] last=[0,0][0,0]
+"""
+
+ANDROID_14_WINDOWS = """WINDOW MANAGER WINDOWS (dumpsys window windows)
+  Window #3 Window{4e u0 com.example.game/com.unity3d.player.UnityPlayerActivity}:
+    mAttrs={(0,0)(fillxfill) sim={adjust=pan} ty=BASE_APPLICATION fmt=TRANSPARENT}
+    Frames: parent=[0,0][2400,1080] display=[0,0][2400,1080] frame=[0,0][2274,1080]
+"""
+
+
+@pytest.mark.parametrize(
+    ("output", "package", "frame"),
+    [
+        (ANDROID_11_WINDOWS, "com.example.game", (70, 0, 2079, 1080)),
+        (ANDROID_14_WINDOWS, "com.example.game", (0, 0, 2274, 1080)),
+        (ANDROID_11_WINDOWS, "com.example", None),
+        ("mCurrentFocus=Window{10 u0 com.example.game/.MainActivity}", "com.example.game", None),
+    ],
+)
+def test_parse_window_frame(output, package, frame):
+    assert parse_window_frame(output, package) == frame
+
+
 def test_malformed_coordinates_are_rejected(tree):
     tree["children"][0]["payload"]["pos"] = ["invalid", 0.5]
     with pytest.raises(ValidationError):
@@ -341,6 +393,29 @@ async def test_game_observation_and_indexed_tap_use_fresh_poco_data(tree):
         assert len(requests) == 2
         assert requests[0]["id"] != requests[1]["id"]
         assert requests[0]["connection_id"] == requests[1]["connection_id"]
+
+
+@pytest.mark.asyncio
+async def test_game_window_frame_offsets_observed_and_tapped_bounds(tree):
+    async with rpc_server(tree) as (client, _):
+        ctx, adb, _ = make_context(client)
+        focus = "mCurrentFocus=Window{10 u0 com.example.game/.MainActivity}"
+        windows = (
+            "  Window #1 Window{10 u0 com.example.game/.MainActivity}:\n"
+            "    mAttrs={(0,0)(fillxfill) ty=BASE_APPLICATION}\n"
+            "    mFrame=[100,0][900,500] last=[0,0][0,0]\n"
+        )
+        adb.device.return_value.shell.side_effect = lambda cmd: (
+            windows if cmd == "dumpsys window windows" else focus
+        )
+        screen = await create_device_controller(ctx).get_screen_data()
+        assert [element["bounds"] for element in screen.elements] == [
+            "[220,200][380,300]",
+            "[620,200][780,300]",
+        ]
+        result = await UnifiedMobileController(ctx).tap_element(resource_id="Play", index=1)
+        assert result.error is None
+        adb.device.return_value.shell.assert_called_with("input tap 700 250")
 
 
 @pytest.mark.asyncio

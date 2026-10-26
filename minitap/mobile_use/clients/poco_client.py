@@ -119,10 +119,26 @@ class PocoClient:
                     pass
 
 
-def normalize_hierarchy(root: PocoNode, width: int, height: int) -> list[dict]:
-    """Convert screen-relative Poco nodes to flat Android selectors and pixel bounds."""
+def normalize_hierarchy(
+    root: PocoNode,
+    width: int,
+    height: int,
+    viewport: tuple[int, int, int, int] | None = None,
+) -> list[dict]:
+    """Convert viewport-relative Poco nodes to flat Android selectors and pixel bounds.
+
+    Poco positions are normalized to the game's window. ``viewport`` is that window's
+    ``(left, top, right, bottom)`` in screenshot pixels and defaults to the full screen.
+    """
     if width <= 0 or height <= 0:
         raise ValueError("Screen dimensions must be positive")
+    view_left, view_top, view_right, view_bottom = viewport or (0, 0, width, height)
+    view_left, view_right = max(0, view_left), min(width, view_right)
+    view_top, view_bottom = max(0, view_top), min(height, view_bottom)
+    if view_left >= view_right or view_top >= view_bottom:
+        view_left, view_top, view_right, view_bottom = 0, 0, width, height
+    view_width = view_right - view_left
+    view_height = view_bottom - view_top
     elements: list[dict] = []
     nodes = [root]
     while nodes:
@@ -138,16 +154,16 @@ def normalize_hierarchy(root: PocoNode, width: int, height: int) -> list[dict]:
             continue
         pos_x, pos_y = payload.pos
         anchor_x, anchor_y = payload.anchorPoint
-        left = (pos_x - anchor_x * size_x) * width
-        top = (pos_y - anchor_y * size_y) * height
-        right = left + size_x * width
-        bottom = top + size_y * height
+        left = view_left + (pos_x - anchor_x * size_x) * view_width
+        top = view_top + (pos_y - anchor_y * size_y) * view_height
+        right = left + size_x * view_width
+        bottom = top + size_y * view_height
         if not all(math.isfinite(value) for value in (left, top, right, bottom)):
             continue
-        x1 = round(max(0, min(width, left)))
-        y1 = round(max(0, min(height, top)))
-        x2 = round(max(0, min(width, right)))
-        y2 = round(max(0, min(height, bottom)))
+        x1 = round(max(view_left, min(view_right, left)))
+        y1 = round(max(view_top, min(view_bottom, top)))
+        x2 = round(max(view_left, min(view_right, right)))
+        y2 = round(max(view_top, min(view_bottom, bottom)))
         if x1 >= x2 or y1 >= y2:
             continue
         name = node.name or payload.name

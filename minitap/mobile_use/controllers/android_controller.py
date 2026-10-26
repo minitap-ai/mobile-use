@@ -121,7 +121,8 @@ class AndroidDeviceController(MobileDeviceController):
             raise RuntimeError("Failed to capture screenshot via UIAutomator2")
         with image:
             hierarchy = await client.dump_hierarchy()
-            elements = normalize_hierarchy(hierarchy, image.width, image.height)
+            viewport = await asyncio.to_thread(self._get_window_frame, client.config.package_name)
+            elements = normalize_hierarchy(hierarchy, image.width, image.height, viewport)
             if not elements:
                 raise ValueError("Poco returned no visible elements with usable bounds")
             buffer = BytesIO()
@@ -293,6 +294,19 @@ class AndroidDeviceController(MobileDeviceController):
             return None
         except Exception as e:
             logger.error(f"Failed to get current foreground package: {e}")
+            return None
+
+    def _get_window_frame(self, package: str) -> tuple[int, int, int, int] | None:
+        """Return the app window's frame, which excludes system bars and cutouts."""
+        try:
+            output = self.device.shell("dumpsys window windows")
+            if isinstance(output, bytes):
+                output = output.decode("utf-8", errors="replace")
+            if not isinstance(output, str):
+                return None
+            return parse_window_frame(output, package)
+        except Exception as e:
+            logger.warning(f"Failed to read window frame for {package}: {e}")
             return None
 
     def _extract_bounds(self, element: dict) -> Bounds | None:
@@ -553,3 +567,22 @@ class AndroidDeviceController(MobileDeviceController):
                 success=False,
                 message=f"Failed to stop recording: {e}",
             )
+
+
+_WINDOW_FRAME_RE = re.compile(r"\bm?[Ff]rame=\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]")
+
+
+def parse_window_frame(dumpsys_output: str, package: str) -> tuple[int, int, int, int] | None:
+    """Parse the application window frame of ``package`` from ``dumpsys window windows``."""
+    header = re.compile(rf"\bu\d+ {re.escape(package)}/")
+    for block in dumpsys_output.split("Window #")[1:]:
+        first_line = block.split("\n", 1)[0]
+        if not header.search(first_line) or "ty=BASE_APPLICATION" not in block:
+            continue
+        match = _WINDOW_FRAME_RE.search(block)
+        if match is None:
+            continue
+        left, top, right, bottom = (int(value) for value in match.groups())
+        if left < right and top < bottom:
+            return left, top, right, bottom
+    return None
