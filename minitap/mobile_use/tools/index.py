@@ -23,6 +23,7 @@ from minitap.mobile_use.tools.scratchpad import (
     save_note_wrapper,
 )
 from minitap.mobile_use.tools.tool_wrapper import CompositeToolWrapper, ToolWrapper
+from minitap.mobile_use.tools.web import web_tools_wrapper
 
 EXECUTOR_WRAPPERS_TOOLS = [
     back_wrapper,
@@ -41,6 +42,7 @@ EXECUTOR_WRAPPERS_TOOLS = [
     save_note_wrapper,
     read_note_wrapper,
     list_notes_wrapper,
+    web_tools_wrapper,
 ]
 
 VIDEO_RECORDING_WRAPPERS = [

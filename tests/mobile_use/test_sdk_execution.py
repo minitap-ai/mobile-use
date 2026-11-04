@@ -1,17 +1,8 @@
-import importlib
-import sys
-
 import pytest
 
-# A legacy outputter test installs a process-wide module mock during collection.
-vertex_module = sys.modules.get("langchain_google_vertexai")
-if vertex_module is not None and not hasattr(vertex_module, "__path__"):
-    sys.modules.pop("langchain_google_vertexai", None)
-    importlib.import_module("langchain_google_vertexai")
-
-from minitap.mobile_use.sdk import Agent  # noqa: E402
-from minitap.mobile_use.sdk.builders import Builders  # noqa: E402
-from minitap.mobile_use.sdk.types import CloudDevicePlatform, TaskRequest  # noqa: E402
+from minitap.mobile_use.sdk import Agent
+from minitap.mobile_use.sdk.builders import Builders
+from minitap.mobile_use.sdk.types import CloudDevicePlatform, TaskRequest
 
 
 @pytest.mark.asyncio

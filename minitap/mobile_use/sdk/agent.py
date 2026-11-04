@@ -625,6 +625,7 @@ class Agent:
             ios_client=self._ios_client,
             cloud_android_controller=cloud_android_controller,
             llm_config=agent_profile.llm_config,
+            web_search_enabled=self._config.web_search_enabled,
             video_recording_enabled=(
                 self._config.video_recording_enabled
                 and agent_profile.llm_config.utils.video_analyzer is not None

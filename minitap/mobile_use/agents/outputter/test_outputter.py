@@ -1,22 +1,12 @@
-import sys
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from pydantic import BaseModel
 
-sys.modules["langgraph.prebuilt.chat_agent_executor"] = Mock()
-sys.modules["minitap.mobile_use.graph.state"] = Mock()
-sys.modules["langchain_google_vertexai"] = Mock()
-sys.modules["langchain_google_genai"] = Mock()
-sys.modules["langchain_openai"] = Mock()
-sys.modules["langchain_cerebras"] = Mock()
-sys.modules["langchain_azure_ai"] = Mock()
-sys.modules["langchain_azure_ai.chat_models"] = Mock()
-
-from minitap.mobile_use.agents.outputter.outputter import outputter  # noqa: E402
-from minitap.mobile_use.config import LLM, OutputConfig  # noqa: E402
-from minitap.mobile_use.context import MobileUseContext  # noqa: E402
-from minitap.mobile_use.utils.logger import get_logger  # noqa: E402
+from minitap.mobile_use.agents.outputter.outputter import outputter
+from minitap.mobile_use.config import LLM, OutputConfig
+from minitap.mobile_use.context import MobileUseContext
+from minitap.mobile_use.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

@@ -8,10 +8,11 @@ from collections.abc import Callable, Coroutine
 from enum import StrEnum
 from pathlib import Path
 from typing import Literal
+from uuid import uuid4
 
 from adbutils import AdbClient
 from openai import BaseModel
-from pydantic import ConfigDict
+from pydantic import ConfigDict, Field
 
 from minitap.mobile_use.agents.planner.types import Subgoal
 from minitap.mobile_use.clients.ios_client import IosClientWrapper
@@ -88,6 +89,9 @@ class MobileUseContext(BaseModel):
     on_agent_thought: Callable[[AgentNode, str], Coroutine] | None = None
     on_plan_changes: Callable[[list[Subgoal], IsReplan], Coroutine] | None = None
     video_recording_enabled: bool = False
+    web_search_enabled: bool = True
+    # Owned by this task, independently of the MCP connection and tool wrappers.
+    web_search_session_id: str = Field(default_factory=lambda: str(uuid4()))
 
     def get_adb_client(self) -> AdbClient:
         if self.adb_client is None:
