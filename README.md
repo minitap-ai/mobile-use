@@ -36,7 +36,7 @@ Mobile-use is a powerful, open-source AI agent that controls your Android or IOS
 - 🗣️ **Natural Language Control**: Interact with your phone using your native language.
 - 📱 **UI-Aware Automation**: Intelligently navigates through app interfaces (note: currently has limited effectiveness with games as they don't provide accessibility tree data).
 - 📊 **Data Scraping**: Extract information from any app and structure it into your desired format (e.g., JSON) using a natural language description.
-- 🔧 **Extensible & Customizable**: Easily configure different LLMs to power the agents that power mobile-use. Supports OpenAI, Google, xAI, OpenRouter, MiniMax, and more.
+- 🔧 **Extensible & Customizable**: Easily configure different LLMs to power the agents that power mobile-use. Supports OpenAI, Google, xAI, OpenRouter, MiniMax, Cheaper Inference, and more.
 
 ## Benchmarks
 
@@ -100,6 +100,15 @@ Mobile-use runs on your own Android or iOS device with your choice of supported 
     2. Copy the contents of the `anthropic` preset object from `llm-config.defaults.jsonc` into your `llm-config.override.jsonc`, or set `"provider": "anthropic"` on individual agent nodes.
 
     Available models: `claude-sonnet-4-6` (200K context, recommended), `claude-haiku-4-5-20251001` (200K context, faster/cheaper).
+
+    **Using Cheaper Inference:**
+
+    [Cheaper Inference](https://cheaperinference.com) is an OpenAI-compatible LLM gateway. To use it:
+
+    1. Set `CHEAPER_INFERENCE_API_KEY` in your `.env` (get a key at [cheaperinference.com/signup](https://cheaperinference.com/signup))
+    2. In your `llm-config.override.jsonc`, set `"provider": "cheaperinference"` on the agent nodes you want, and choose a model such as `gpt-5.4-mini`.
+
+    Available models: see [cheaperinference.com/markets](https://cheaperinference.com/markets).
 
     > [!NOTE]
     > If you want to use Google Vertex AI, you must either:
