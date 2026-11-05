@@ -6,13 +6,22 @@ This module defines the exception hierarchy used throughout the Mobile-use SDK.
 
 from typing import Literal
 
+from minitap.mobile_use.errors import AgentError, AppLockViolationError, MobileUseError
 
-class MobileUseError(Exception):
-    """Base exception class for all Mobile-use SDK exceptions."""
 
-    def __init__(self, message="An error occurred in the Mobile-use SDK"):
-        self.message = message
-        super().__init__(self.message)
+__all__ = [
+    "MobileUseError",
+    "DeviceError",
+    "DeviceNotFoundError",
+    "ServerError",
+    "ServerStartupError",
+    "AgentError",
+    "AppLockViolationError",
+    "AgentNotInitializedError",
+    "AgentTaskRequestError",
+    "AgentProfileNotFoundError",
+    "ExecutableNotFoundError",
+]
 
 
 class DeviceError(MobileUseError):
@@ -46,13 +55,6 @@ class ServerStartupError(ServerError):
             message = "Failed to start Mobile-use servers"
         super().__init__(message)
         self.server_name = server_name
-
-
-class AgentError(MobileUseError):
-    """Exception raised for errors related to the Mobile-use agent."""
-
-    def __init__(self, message="An agent-related error occurred"):
-        super().__init__(message)
 
 
 class AgentNotInitializedError(AgentError):

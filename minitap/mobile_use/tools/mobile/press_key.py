@@ -13,6 +13,8 @@ from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.unified_controller import UnifiedMobileController
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
+from minitap.mobile_use.utils.app_launch_utils import get_strict_locked_app_package
+from minitap.mobile_use.utils.app_lock_events import record_app_lock_event
 
 
 class Key(Enum):
@@ -41,14 +43,25 @@ def get_press_key_tool(ctx: MobileUseContext):
     ) -> Command:
         """Press a key on the device."""
         controller = UnifiedMobileController(ctx)
-        match key:
-            case Key.HOME:
-                output = await controller.go_home()
-            case Key.BACK:
-                output = await controller.go_back()
-            case Key.ENTER:
-                output = await controller.press_enter()
-        has_failed = not output
+        locked_app_package = get_strict_locked_app_package(ctx)
+        if key == Key.HOME and locked_app_package:
+            record_app_lock_event(
+                locked_app_package=locked_app_package,
+                action="press_key",
+                decision="blocked",
+                reason="home_key",
+            )
+            has_failed = True
+            output = "Strict app lock blocks the Home key because it would leave the approved app."
+        else:
+            match key:
+                case Key.HOME:
+                    output = await controller.go_home()
+                case Key.BACK:
+                    output = await controller.go_back()
+                case Key.ENTER:
+                    output = await controller.press_enter()
+            has_failed = not output
 
         agent_outcome = (
             press_key_wrapper.on_failure_fn(key)

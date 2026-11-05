@@ -37,6 +37,7 @@ from minitap.mobile_use.controllers.cloud_device_controller import (
     CloudIosController,
 )
 from minitap.mobile_use.controllers.platform_specific_commands_controller import get_first_device
+from minitap.mobile_use.errors import AppLockViolationError
 from minitap.mobile_use.graph.graph import get_graph
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.sdk.builders.agent_config_builder import get_default_agent_config
@@ -1097,13 +1098,19 @@ class Agent:
     async def _prepare_app_lock(self, task: Task, context: MobileUseContext):
         """Prepare app lock by launching the locked app if specified."""
         if not task.request.locked_app_package:
+            if task.request.app_lock_policy == "strict":
+                raise AppLockViolationError(
+                    "Strict app lock requires a locked_app_package after app installation"
+                )
             return
 
         task_name = task.get_name()
         logger.info(f"[{task_name}] Preparing app lock for: {task.request.locked_app_package}")
 
         app_lock_status = await _handle_initial_app_launch(
-            ctx=context, locked_app_package=task.request.locked_app_package
+            ctx=context,
+            locked_app_package=task.request.locked_app_package,
+            app_lock_policy=task.request.app_lock_policy,
         )
 
         if context.execution_setup is None:
@@ -1111,9 +1118,14 @@ class Agent:
         else:
             context.execution_setup.app_lock_status = app_lock_status
 
-        if app_lock_status.locked_app_initial_launch_success is False:
+        if app_lock_status.locked_app_initial_launch_success is not True:
             error = app_lock_status.locked_app_initial_launch_error
-            logger.warning(f"[{task_name}] Failed to launch locked app: {error}")
+            logger.warning(f"[{task_name}] Could not verify locked app launch: {error}")
+            if task.request.app_lock_policy == "strict":
+                raise AppLockViolationError(
+                    f"Strict app lock could not launch {task.request.locked_app_package}: "
+                    f"{error or 'foreground verification failed'}"
+                )
 
     def _prepare_tracing(self, task: Task, context: MobileUseContext):
         """Prepare tracing setup if record_trace is enabled."""
