@@ -171,6 +171,17 @@ def get_openrouter_llm(model_name: str, temperature: float = 1):
     return client
 
 
+def get_requesty_llm(model_name: str, temperature: float = 1) -> ChatOpenAI:
+    assert settings.REQUESTY_API_KEY is not None
+    client = ChatOpenAI(
+        model=model_name,
+        temperature=temperature,
+        api_key=settings.REQUESTY_API_KEY,
+        base_url=settings.REQUESTY_BASE_URL,
+    )
+    return client
+
+
 def get_grok_llm(model_name: str, temperature: float = 1) -> ChatOpenAI:
     assert settings.XAI_API_KEY is not None
     client = ChatOpenAI(
@@ -278,6 +289,8 @@ def get_llm(
         return get_vertex_llm(llm.model, temperature)
     elif llm.provider == "openrouter":
         return get_openrouter_llm(llm.model, temperature)
+    elif llm.provider == "requesty":
+        return get_requesty_llm(llm.model, temperature)
     elif llm.provider == "xai":
         return get_grok_llm(llm.model, temperature)
     elif llm.provider == "azure":

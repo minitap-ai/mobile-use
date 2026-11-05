@@ -36,7 +36,7 @@ Mobile-use is a powerful, open-source AI agent that controls your Android or IOS
 - 🗣️ **Natural Language Control**: Interact with your phone using your native language.
 - 📱 **UI-Aware Automation**: Intelligently navigates through app interfaces (note: currently has limited effectiveness with games as they don't provide accessibility tree data).
 - 📊 **Data Scraping**: Extract information from any app and structure it into your desired format (e.g., JSON) using a natural language description.
-- 🔧 **Extensible & Customizable**: Easily configure different LLMs to power the agents that power mobile-use. Supports OpenAI, Google, xAI, OpenRouter, MiniMax, and more.
+- 🔧 **Extensible & Customizable**: Easily configure different LLMs to power the agents that power mobile-use. Supports OpenAI, Google, xAI, OpenRouter, Requesty, MiniMax, and more.
 
 ## Benchmarks
 
