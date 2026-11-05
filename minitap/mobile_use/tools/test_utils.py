@@ -47,6 +47,7 @@ def mock_context():
 
     # Cloud controller (None for local device tests)
     ctx.cloud_android_controller = None
+    ctx.poco_client = None
 
     return ctx
 

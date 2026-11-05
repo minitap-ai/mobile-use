@@ -9,6 +9,7 @@ from pathlib import Path
 from adbutils import AdbClient, AdbDevice
 from PIL import Image
 
+from minitap.mobile_use.clients.poco_client import PocoClient, normalize_hierarchy
 from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
 from minitap.mobile_use.controllers.device_controller import (
     MobileDeviceController,
@@ -41,12 +42,14 @@ class AndroidDeviceController(MobileDeviceController):
         ui_adb_client: UIAutomatorClient,
         device_width: int,
         device_height: int,
+        poco_client: PocoClient | None = None,
     ):
         self.device_id = device_id
         self.adb_client = adb_client
         self.ui_adb_client = ui_adb_client
         self.device_width = device_width
         self.device_height = device_height
+        self.poco_client = poco_client
         self._device: AdbDevice | None = None
 
     @property
@@ -90,6 +93,15 @@ class AndroidDeviceController(MobileDeviceController):
     async def get_screen_data(self) -> ScreenDataResponse:
         """Get screen data using the UIAutomator2 client"""
         try:
+            if (
+                self.poco_client is not None
+                and await asyncio.to_thread(self._get_current_foreground_package)
+                == self.poco_client.config.package_name
+            ):
+                try:
+                    return await self._get_poco_screen_data(self.poco_client)
+                except Exception as e:
+                    logger.warning(f"Poco hierarchy unavailable; using native hierarchy: {e}")
             logger.info("Using UIAutomator2 for screen data retrieval")
             ui_data = self.ui_adb_client.get_screen_data()
             return ScreenDataResponse(
@@ -102,6 +114,26 @@ class AndroidDeviceController(MobileDeviceController):
         except Exception as e:
             logger.error(f"Failed to get screen data: {e}")
             raise
+
+    async def _get_poco_screen_data(self, client: PocoClient) -> ScreenDataResponse:
+        image = await asyncio.to_thread(self.ui_adb_client.get_screenshot)
+        if image is None:
+            raise RuntimeError("Failed to capture screenshot via UIAutomator2")
+        with image:
+            hierarchy = await client.dump_hierarchy()
+            viewport = await asyncio.to_thread(self._get_window_frame, client.config.package_name)
+            elements = normalize_hierarchy(hierarchy, image.width, image.height, viewport)
+            if not elements:
+                raise ValueError("Poco returned no visible elements with usable bounds")
+            buffer = BytesIO()
+            image.save(buffer, format="PNG")
+            return ScreenDataResponse(
+                base64=base64.b64encode(buffer.getvalue()).decode("utf-8"),
+                elements=elements,
+                width=image.width,
+                height=image.height,
+                platform="android",
+            )
 
     async def screenshot(self) -> str:
         try:
@@ -262,6 +294,19 @@ class AndroidDeviceController(MobileDeviceController):
             return None
         except Exception as e:
             logger.error(f"Failed to get current foreground package: {e}")
+            return None
+
+    def _get_window_frame(self, package: str) -> tuple[int, int, int, int] | None:
+        """Return the app window's frame, which excludes system bars and cutouts."""
+        try:
+            output = self.device.shell("dumpsys window windows")
+            if isinstance(output, bytes):
+                output = output.decode("utf-8", errors="replace")
+            if not isinstance(output, str):
+                return None
+            return parse_window_frame(output, package)
+        except Exception as e:
+            logger.warning(f"Failed to read window frame for {package}: {e}")
             return None
 
     def _extract_bounds(self, element: dict) -> Bounds | None:
@@ -522,3 +567,22 @@ class AndroidDeviceController(MobileDeviceController):
                 success=False,
                 message=f"Failed to stop recording: {e}",
             )
+
+
+_WINDOW_FRAME_RE = re.compile(r"\bm?[Ff]rame=\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]")
+
+
+def parse_window_frame(dumpsys_output: str, package: str) -> tuple[int, int, int, int] | None:
+    """Parse the application window frame of ``package`` from ``dumpsys window windows``."""
+    header = re.compile(rf"\bu\d+ {re.escape(package)}/")
+    for block in dumpsys_output.split("Window #")[1:]:
+        first_line = block.split("\n", 1)[0]
+        if not header.search(first_line) or "ty=BASE_APPLICATION" not in block:
+            continue
+        match = _WINDOW_FRAME_RE.search(block)
+        if match is None:
+            continue
+        left, top, right, bottom = (int(value) for value in match.groups())
+        if left < right and top < bottom:
+            return left, top, right, bottom
+    return None

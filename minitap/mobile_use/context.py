@@ -15,6 +15,7 @@ from pydantic import ConfigDict
 
 from minitap.mobile_use.agents.planner.types import Subgoal
 from minitap.mobile_use.clients.ios_client import IosClientWrapper
+from minitap.mobile_use.clients.poco_client import PocoClient
 from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
 from minitap.mobile_use.config import AgentNode, LLMConfig
 from minitap.mobile_use.controllers.cloud_device_controller import CloudAndroidController
@@ -84,6 +85,7 @@ class MobileUseContext(BaseModel):
     ui_adb_client: UIAutomatorClient | None = None
     ios_client: IosClientWrapper | None = None
     cloud_android_controller: CloudAndroidController | None = None
+    poco_client: PocoClient | None = None
     execution_setup: ExecutionSetup | None = None
     on_agent_thought: Callable[[AgentNode, str], Coroutine] | None = None
     on_plan_changes: Callable[[list[Subgoal], IsReplan], Coroutine] | None = None
