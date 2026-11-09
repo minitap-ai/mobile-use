@@ -75,17 +75,24 @@ is cross-checked (must agree). Rows written by c3f77e7 (before the gate) stored 
 `score`; `status` and `rescore` re-apply the gate to them (`matrix.py rescore <spec>` writes
 `results.official.jsonl`; the ledger is never rewritten).
 
-**Study protocol (enforced).** Spec `protocol` = `{"seeding": "upstream_suite", "score_def":
-"official_done_gated"}` (the only accepted values, also the default). Every scored harness row
-must prove upstream suite seeding: `instance_seed` must equal `sha256(f"{seed}_{task}_0") %
-2**32` (upstream `suite_utils._get_instance_seed`, i=0), and `seeding` must be absent,
-`"official"` or `"upstream_suite"` (`"legacy"`/`"random"`/`"direct"` = direct `random.seed(seed)`,
-P0-A's pilot). A harness-side official score (`official_score` or `score_official`) must agree with
-the matrix's own done-gate. A violating row is `outcome = "protocol_rejected"` (with
-`protocol_reason`): it is not a result, it is not retried, and it **halts its environment** for
-the session (event `env_halted_protocol`); the cell stays pending and runs again once the harness
-is fixed. Row fields: `seeding` (`"upstream_suite"` when verified), `instance_seed`,
-`expected_instance_seed`, `score_def` (`"official_done_gated"`), `protocol_reason`.
+**Study protocol (enforced, one profile per benchmark).** Spec `protocol`:
+
+| `benchmark` | `seeding` | `score_def` | success | row proof required |
+|---|---|---|---|---|
+| `androidworld` (default) | `upstream_suite` | `official_done_gated` | `is_successful` AND agent status `completed`/`ended_incomplete` (timeout, step limit = failure) | `instance_seed == sha256(f"{seed}_{task}_0") % 2**32`; `seeding` absent/`official`/`upstream_suite` |
+| `miniwob` | `seeded_apk` | `miniwob_reward` | official reward == 1 at the end of the episode; the environment ends it itself (`stopped_by_env`) | `apk_sha` (the seeded APK fixes the problem); `seeding` absent/`seeded_apk` |
+
+The three keys must match a profile exactly. On every scored row: the harness's `benchmark`
+field (or a `stopped_by_env` status, MiniWoB-only) must match the spec's benchmark; direct
+seeding (`legacy`/`random`/`direct`) is rejected; a harness-side official score (`official_score`
+or `score_official`) must agree with the matrix's own definition. A violating row is
+`outcome = "protocol_rejected"` (with `protocol_reason`): not a result, not retried, and it
+**halts its environment** for the session (event `env_halted_protocol`); the cell stays pending
+and runs again once fixed. **`run`, `status` and `rescore` refuse a spec whose protocol does not
+match the rows already in its ledger** (e.g. a MiniWoB ledger under the AndroidWorld done-gate,
+which would turn every `stopped_by_env` success into a failure), and write nothing. Row fields:
+`benchmark`, `score_def`, `seeding`, `instance_seed`, `expected_instance_seed` (AndroidWorld),
+`apk_sha` (MiniWoB), `protocol_reason`.
 
 **Several processes, one ledger.** Two matrix processes may share an `out_dir` (e.g. one per
 environment, with disjoint cells): appends are flock-ed single lines and every read picks up the

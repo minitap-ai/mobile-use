@@ -23,8 +23,11 @@
   "plan": [
     { "phase": 0, "env": "limrun", "task_set": "aw-limrun-93", "label": "AW-116",
       "configs": ["full", "full-jan2026", "v1-as-shipped"] },
+    // a0-single-agent also on the 23 emulator tasks, so the single-agent baseline exists on the
+    // full 116 (Table 1): its Limrun-93 cells are in phase 1 below. The emulator cells are run by
+    // P1-P's process (specs/aw-rework-emulator.jsonc), after v1-as-shipped.
     { "phase": 0, "env": "emulator", "task_set": "aw-emulator-23", "label": "AW-116",
-      "configs": ["full", "full-jan2026", "v1-as-shipped"] },
+      "configs": ["full", "full-jan2026", "v1-as-shipped", "a0-single-agent"] },
     { "phase": 1, "env": "limrun", "task_set": "aw-limrun-93", "label": "AW-Limrun-93 subset",
       "configs": [
         "a0-single-agent", "decomposition-only",

@@ -64,6 +64,15 @@ FAKE_HARNESS = textwrap.dedent(
         rec["score"] = 0.0
     elif outcome == "infra":
         rec.update(status="error", error_kind="llm_api", infra_suspect=True, score=0.0)
+    elif outcome in ("mw_success", "mw_fail", "mw_noapk"):
+        rec.pop("seeding"); rec.pop("instance_seed")
+        rec.update(benchmark="MobileMiniWoB++", apk_sha="f" * 64)
+        if outcome == "mw_success":
+            rec.update(status="stopped_by_env", score=1.0)
+        elif outcome == "mw_fail":
+            rec.update(status="completed", score=0.0)
+        else:
+            rec.update(status="stopped_by_env", score=1.0, apk_sha=None)
     elif outcome == "legacy":
         rec.update(seeding="legacy", instance_seed=None, score=1.0)
     elif outcome == "badseed":
@@ -694,3 +703,116 @@ def test_rescore_rejects_old_rows_whose_harness_used_legacy_seeding(world):
     matrix.main(["rescore", str(spec.path)])
     off = rows(spec.out_dir / "results.official.jsonl")[0]
     assert off["outcome"] == "protocol_rejected" and off["protocol_reason"] == "seeding_legacy"
+
+
+def _with_protocol(spec, tmp, name, protocol):
+    d = matrix.load_jsonc(spec.path)
+    if protocol is None:
+        d.pop("protocol", None)
+    else:
+        d["protocol"] = protocol
+    (tmp / name).write_text(json.dumps(d))
+    return matrix.Spec.load(tmp / name)
+
+
+MW = {"benchmark": "miniwob", "seeding": "seeded_apk", "score_def": "miniwob_reward"}
+
+
+def test_miniwob_protocol_scores_reward_and_accepts_stopped_by_env(world):
+    make, tmp = world
+    base = make(
+        tasks=("A", "B", "C"), plan={"A": ["mw_success"], "B": ["mw_fail"], "C": ["mw_success"]}
+    )
+    spec = _with_protocol(base, tmp, "mw.jsonc", MW)
+    run(spec)
+    final = {r["task"]: r for r in rows(spec.out_dir / "results.jsonl")}
+    assert final["A"]["outcome"] == "success" and final["A"]["status"] == "stopped_by_env"
+    assert final["B"]["outcome"] == "agent_failure"
+    for r in final.values():
+        assert r["score_def"] == "miniwob_reward" and r["seeding"] == "seeded_apk"
+        assert r["benchmark"] == "miniwob" and r["expected_instance_seed"] is None
+    groups = matrix.summarize(spec, matrix.Ledger(spec.out_dir))["by_group"]
+    assert groups[0]["success"] == 2 and groups[0]["agent_failure"] == 1
+
+
+def test_miniwob_row_without_apk_sha_is_rejected(world):
+    make, tmp = world
+    spec = _with_protocol(make(tasks=("A",), plan={"A": ["mw_noapk"]}), tmp, "mw.jsonc", MW)
+    run(spec)
+    att = rows(spec.out_dir / "attempts.jsonl")
+    assert (
+        att[0]["outcome"] == "protocol_rejected" and att[0]["protocol_reason"] == "apk_sha_missing"
+    )
+
+
+def test_miniwob_rows_under_androidworld_spec_are_rejected_at_run_time(world):
+    make, _ = world
+    spec = make(tasks=("A",), plan={"A": ["mw_success"]})  # no protocol = androidworld
+    run(spec)
+    att = rows(spec.out_dir / "attempts.jsonl")
+    assert att[0]["outcome"] == "protocol_rejected"
+    assert att[0]["protocol_reason"] == "benchmark_mismatch:miniwob"
+
+
+def test_commands_refuse_a_spec_whose_score_def_does_not_match_its_rows(world):
+    make, tmp = world
+    base = make(tasks=("A", "B"), plan={"A": ["mw_success"], "B": ["mw_success"]})
+    mw = _with_protocol(base, tmp, "mw.jsonc", MW)
+    run(mw)
+    aw = _with_protocol(base, tmp, "aw.jsonc", None)  # same out_dir, AndroidWorld protocol
+    for cmd in ("rescore", "status", "run"):
+        with pytest.raises(SystemExit, match="does not match the rows"):
+            matrix.main(
+                [cmd, str(aw.path), "--skip-checkout-check"]
+                if cmd == "run"
+                else [cmd, str(aw.path)]
+            )
+    assert not (aw.out_dir / "results.official.jsonl").exists()
+    assert matrix.main(["rescore", str(mw.path)]) == 0
+    off = rows(mw.out_dir / "results.official.jsonl")
+    assert [r["outcome"] for r in off] == ["success", "success"]
+
+
+def test_old_miniwob_rows_without_score_def_are_detected_by_status(world):
+    """Rows of the c3f77e7 tooling carry no score_def/benchmark: stopped_by_env identifies them."""
+    make, tmp = world
+    base = make(tasks=("A", "B"), plan={"A": ["mw_success"], "B": ["mw_fail"]})
+    mw = _with_protocol(base, tmp, "mw.jsonc", MW)
+    run(mw)
+    drop = (
+        "score_def",
+        "benchmark",
+        "seeding",
+        "instance_seed",
+        "expected_instance_seed",
+        "apk_sha",
+        "score_raw",
+        "episode_done",
+        "protocol_reason",
+    )
+    old = [
+        {k: v for k, v in r.items() if k not in drop} for r in rows(mw.out_dir / "results.jsonl")
+    ]
+    (mw.out_dir / "results.jsonl").write_text("".join(json.dumps(r) + "\n" for r in old))
+    aw = _with_protocol(base, tmp, "aw.jsonc", None)
+    with pytest.raises(SystemExit, match="benchmark 'miniwob'"):
+        matrix.main(["rescore", str(aw.path)])
+    assert matrix.main(["rescore", str(mw.path)]) == 0
+    off = {r["task"]: r for r in rows(mw.out_dir / "results.official.jsonl")}
+    assert off["A"]["outcome"] == "success" and off["A"]["score_def"] == "miniwob_reward"
+    assert off["B"]["outcome"] == "agent_failure"
+
+
+@pytest.mark.parametrize(
+    "protocol",
+    [
+        {"benchmark": "miniwob", "score_def": "official_done_gated"},
+        {"benchmark": "androidworld", "seeding": "seeded_apk"},
+        {"benchmark": "nope"},
+    ],
+)
+def test_inconsistent_protocol_is_rejected(world, protocol):
+    make, tmp = world
+    spec = make(tasks=("A",))
+    with pytest.raises(ValueError, match="protocol"):
+        _with_protocol(spec, tmp, "x.jsonc", protocol)

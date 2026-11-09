@@ -226,6 +226,7 @@ class Spec:
     key_check: bool
     key_min_remaining_usd: float
     est_cost_per_cell_usd: float
+    protocol: dict = field(default_factory=lambda: dict(PROTOCOLS[DEFAULT_BENCHMARK]))
     raw: dict = field(default_factory=dict)
 
     @classmethod
@@ -252,12 +253,7 @@ class Spec:
                 raise ValueError(
                     f"plan entry {item} uses configs not in the spec's configs: {unknown}"
                 )
-        protocol = {"seeding": SEEDING, "score_def": SCORE_DEF, **(d.get("protocol") or {})}
-        if protocol != {"seeding": SEEDING, "score_def": SCORE_DEF}:
-            raise ValueError(
-                f"{path}: protocol must be seeding={SEEDING!r}, score_def={SCORE_DEF!r} "
-                f"(got {protocol})"
-            )
+        protocol = resolve_protocol(d.get("protocol"), str(path))
         budget = d.get("budget") or {}
         mu = d["mobile_use"]
         return cls(
@@ -279,6 +275,7 @@ class Spec:
             key_check=bool(budget.get("openrouter_key_check", False)),
             key_min_remaining_usd=float(budget.get("key_min_remaining_usd", 25.0)),
             est_cost_per_cell_usd=float(budget.get("est_cost_per_cell_usd", 1.5)),
+            protocol=protocol,
             raw=d,
         )
 
@@ -354,13 +351,55 @@ def cost_from_events(out_dir: Path) -> float | None:
 # graph ended on its own (status completed / ended_incomplete); max_steps, timeout and errors are
 # not done, so they score 0 even if the device state happens to satisfy the evaluator.
 EPISODE_DONE_STATUSES = {"completed", "ended_incomplete"}
-
-# Study protocol (decided 2026-11-09), enforced on every scored row:
-SEEDING = "upstream_suite"  # task params exactly as upstream create_suite/_instantiate_task
-SCORE_DEF = "official_done_gated"  # success = is_successful AND the agent ended the episode
-LEGACY_SCORE_RULES = {"aw_suite_utils_done_gate"}  # tooling c6a5924, same definition
-SEEDING_ACCEPTED = {None, "official", "upstream_suite"}  # names used by the harnesses
+LEGACY_SCORE_RULES = {"aw_suite_utils_done_gate"}  # tooling c6a5924 = official_done_gated
 SEEDING_REJECTED = {"legacy", "random", "direct"}
+
+# Study protocol (decided 2026-11-09), one profile per benchmark, enforced on every scored row.
+#  androidworld: task params exactly as upstream create_suite (instance seed
+#                sha256(f"{seed}_{task}_0") % 2**32); success = is_successful AND the agent ended
+#                the episode itself (upstream done-gate).
+#  miniwob:      MobileMiniWoB++ (P1-B): the seeded APK fixes the problem (apk_sha per row);
+#                success = official reward == 1 at the end of the episode, which the environment
+#                itself ends as soon as the reward is non-zero (status "stopped_by_env").
+PROTOCOLS = {
+    "androidworld": {
+        "benchmark": "androidworld",
+        "seeding": "upstream_suite",
+        "score_def": "official_done_gated",
+    },
+    "miniwob": {"benchmark": "miniwob", "seeding": "seeded_apk", "score_def": "miniwob_reward"},
+}
+DEFAULT_BENCHMARK = "androidworld"
+SEEDING = PROTOCOLS["androidworld"]["seeding"]
+SCORE_DEF = PROTOCOLS["androidworld"]["score_def"]
+MINIWOB_DONE_STATUSES = {"stopped_by_env", "completed", "ended_incomplete"}
+BENCHMARK_ALIASES = {
+    "androidworld": "androidworld",
+    "android_world": "androidworld",
+    "miniwob": "miniwob",
+    "miniwob++": "miniwob",
+    "mobileminiwob++": "miniwob",
+    "mobileminiwob": "miniwob",
+}
+
+
+def resolve_protocol(conf: dict | None, where: str = "spec") -> dict:
+    conf = dict(conf or {})
+    bench = conf.get("benchmark", DEFAULT_BENCHMARK)
+    if bench not in PROTOCOLS:
+        raise ValueError(f"{where}: unknown protocol benchmark {bench!r} ({sorted(PROTOCOLS)})")
+    full = {**PROTOCOLS[bench], **conf}
+    if full != PROTOCOLS[bench]:
+        raise ValueError(f"{where}: protocol for {bench} must be {PROTOCOLS[bench]} (got {full})")
+    return full
+
+
+def harness_benchmark(h: dict) -> str | None:
+    """Benchmark a harness (or matrix) row comes from; None if it doesn't say (AW harnesses)."""
+    name = h.get("benchmark")
+    if name is None:
+        return "miniwob" if h.get("status") == "stopped_by_env" else None
+    return BENCHMARK_ALIASES.get(str(name).lower(), f"unknown:{name}")
 
 
 def expected_instance_seed(seed: int, task: str) -> int:
@@ -368,34 +407,46 @@ def expected_instance_seed(seed: int, task: str) -> int:
     return int(hashlib.sha256(f"{seed}_{task}_0".encode()).hexdigest(), 16) % (2**32)
 
 
-def official_score(h: dict) -> tuple[float | None, float | None, bool]:
-    """-> (official score, raw is_successful score, episode done). Always computed here from the
-    agent status and the raw evaluator score; a harness-side official score is only cross-checked
-    (check_protocol), so there is one definition for every environment."""
+def official_score(h: dict, score_def: str = SCORE_DEF) -> tuple[float | None, float | None, bool]:
+    """-> (official score, raw evaluator score, episode done), computed here for every harness;
+    a harness-side official score is only cross-checked (check_protocol)."""
     raw = _num(h.get("score_raw", h.get("score")))
+    if score_def == "miniwob_reward":
+        done = h.get("status") in MINIWOB_DONE_STATUSES
+        return (raw if raw is not None else None), raw, done
     done = h.get("status") in EPISODE_DONE_STATUSES
     if raw is None:
         return None, None, done
     return (raw if done else 0.0), raw, done
 
 
-def check_protocol(h: dict, task: str, seed: int) -> str | None:
+def check_protocol(h: dict, task: str, seed: int, protocol: dict | None = None) -> str | None:
     """Reason why a scored harness row violates the study protocol, or None."""
+    protocol = protocol or PROTOCOLS[DEFAULT_BENCHMARK]
+    hb = harness_benchmark(h)
+    if hb is not None and hb != protocol["benchmark"]:
+        return f"benchmark_mismatch:{hb}"
     seeding = h.get("seeding")
     if seeding in SEEDING_REJECTED:
         return f"seeding_{seeding}"
-    if seeding not in SEEDING_ACCEPTED:
-        return f"seeding_unknown:{seeding}"
-    inst = h.get("instance_seed")
-    if inst is None:
-        return "instance_seed_missing"
-    try:
-        if int(inst) != expected_instance_seed(seed, task):
-            return "instance_seed_mismatch"
-    except (TypeError, ValueError):
-        return "instance_seed_invalid"
+    if protocol["seeding"] == "upstream_suite":
+        if seeding not in (None, "official", "upstream_suite"):
+            return f"seeding_unknown:{seeding}"
+        inst = h.get("instance_seed")
+        if inst is None:
+            return "instance_seed_missing"
+        try:
+            if int(inst) != expected_instance_seed(seed, task):
+                return "instance_seed_mismatch"
+        except (TypeError, ValueError):
+            return "instance_seed_invalid"
+    elif protocol["seeding"] == "seeded_apk":
+        if seeding not in (None, "seeded_apk"):
+            return f"seeding_unknown:{seeding}"
+        if not h.get("apk_sha"):
+            return "apk_sha_missing"
     harness_official = h.get("official_score", h.get("score_official"))
-    mine = official_score(h)[0]
+    mine = official_score(h, protocol["score_def"])[0]
     if (
         harness_official is not None
         and mine is not None
@@ -405,7 +456,7 @@ def check_protocol(h: dict, task: str, seed: int) -> str | None:
     return None
 
 
-def classify(h: dict) -> tuple[str, str | None]:
+def classify(h: dict, score_def: str = SCORE_DEF) -> tuple[str, str | None]:
     """-> (outcome, infra_reason). outcome: success | agent_failure | infra_failure."""
     status = h.get("status")
     if status in INFRA_STATUSES:
@@ -418,22 +469,52 @@ def classify(h: dict) -> tuple[str, str | None]:
         h.get("_expected_sha") and h.get("git_sha") not in (None, h["_expected_sha"])
     ):
         return "infra_failure", "sha_mismatch"
-    score, _raw, _done = official_score(h)
+    score, _raw, _done = official_score(h, score_def)
     if score is None:
         return "infra_failure", "no_score"
     return ("success" if score >= 1.0 else "agent_failure"), None
 
 
-def official_outcome(row: dict) -> str:
-    """Outcome under the official gate, also for rows written before the gate existed."""
-    gated = row.get("score_def") == SCORE_DEF or row.get("score_rule") in LEGACY_SCORE_RULES
-    if gated or row.get("outcome") not in (
-        "success",
-        "agent_failure",
-    ):
+def row_is_gated(row: dict, score_def: str) -> bool:
+    if row.get("score_def") is not None:
+        return row["score_def"] == score_def
+    return score_def == SCORE_DEF and row.get("score_rule") in LEGACY_SCORE_RULES
+
+
+def official_outcome(row: dict, score_def: str = SCORE_DEF) -> str:
+    """Outcome under the spec's score definition, also for rows written before it existed."""
+    if row_is_gated(row, score_def) or row.get("outcome") not in ("success", "agent_failure"):
         return row["outcome"]
-    score, _raw, _done = official_score(row)
+    score, _raw, _done = official_score(row, score_def)
     return "success" if (score or 0.0) >= 1.0 else "agent_failure"
+
+
+def ledger_protocol_problems(spec: Spec, ledger: Ledger) -> list[str]:
+    """Rows whose score definition / benchmark contradict the spec's protocol. A spec whose
+    protocol doesn't match its rows must not be rescored, summarized or resumed (it would turn
+    e.g. every MiniWoB success into a failure under the AndroidWorld done-gate)."""
+    problems: Counter[str] = Counter()
+    for row in ledger.final.values():
+        sd = row.get("score_def")
+        if sd is not None and sd != spec.protocol["score_def"]:
+            problems[f"rows scored with {sd!r}"] += 1
+            continue
+        hb = harness_benchmark(row)
+        if hb is None and row.get("out_dir"):
+            hb = harness_benchmark(_harness_row(Path(row["out_dir"]), row.get("task", "")) or {})
+        if hb is not None and hb != spec.protocol["benchmark"]:
+            problems[f"rows from benchmark {hb!r}"] += 1
+    return [f"{k}: {v}" for k, v in sorted(problems.items())]
+
+
+def refuse_if_protocol_mismatch(spec: Spec, ledger: Ledger) -> None:
+    problems = ledger_protocol_problems(spec, ledger)
+    if problems:
+        raise SystemExit(
+            f"{spec.path}: protocol {spec.protocol} does not match the rows of {spec.out_dir} "
+            f"({'; '.join(problems)}). Set the right `protocol` in the spec "
+            f"(benchmarks: {sorted(PROTOCOLS)}); nothing was written."
+        )
 
 
 def build_row(
@@ -450,10 +531,11 @@ def build_row(
 ) -> dict:
     h = dict(h)
     h["_expected_sha"] = spec.mobile_use_sha
-    outcome, infra_reason = classify(h)
+    proto = spec.protocol
+    outcome, infra_reason = classify(h, proto["score_def"])
     protocol_reason = None
     if outcome in ("success", "agent_failure"):
-        protocol_reason = check_protocol(h, cell.task, cell.seed)
+        protocol_reason = check_protocol(h, cell.task, cell.seed, proto)
         if protocol_reason:
             outcome = "protocol_rejected"
     m = h.get("metrics") or {}
@@ -482,15 +564,19 @@ def build_row(
         "outcome": outcome,
         "infra_reason": infra_reason,
         "status": h.get("status"),
-        "score": official_score(h)[0],
-        "score_raw": official_score(h)[1],
-        "episode_done": official_score(h)[2],
-        "score_def": SCORE_DEF,
-        "seeding": SEEDING
-        if outcome != "protocol_rejected" and h.get("instance_seed") is not None
+        "benchmark": proto["benchmark"],
+        "score": official_score(h, proto["score_def"])[0],
+        "score_raw": official_score(h, proto["score_def"])[1],
+        "episode_done": official_score(h, proto["score_def"])[2],
+        "score_def": proto["score_def"],
+        "seeding": proto["seeding"]
+        if outcome in ("success", "agent_failure")
         else h.get("seeding"),
         "instance_seed": h.get("instance_seed"),
-        "expected_instance_seed": expected_instance_seed(cell.seed, cell.task),
+        "expected_instance_seed": expected_instance_seed(cell.seed, cell.task)
+        if proto["seeding"] == "upstream_suite"
+        else None,
+        "apk_sha": h.get("apk_sha"),
         "protocol_reason": protocol_reason,
         "error": h.get("error") or h.get("score_error"),
         "error_kind": h.get("error_kind"),
@@ -914,7 +1000,7 @@ def summarize(spec: Spec, ledger: Ledger, stop_reason: str | None = None) -> dic
         if row is None:
             groups[g]["pending"] += 1
             continue
-        groups[g][official_outcome(row)] += 1
+        groups[g][official_outcome(row, spec.protocol["score_def"])] += 1
         cost[g] += row.get("total_cost_usd_all_attempts") or 0.0
     by_group = []
     for (config, env, seed), cnt in sorted(groups.items()):
@@ -999,12 +1085,14 @@ def main(argv: list[str] | None = None) -> int:
         # is_successful score as "score". Write the official view next to the ledger (the ledger
         # itself is never rewritten).
         ledger = Ledger(spec.out_dir)
+        refuse_if_protocol_mismatch(spec, ledger)
+        proto = spec.protocol
         out_path = spec.out_dir / "results.official.jsonl"
         changed, rejected = 0, 0
         with open(out_path, "w", encoding="utf-8") as f:
             for row in ledger.final.values():
                 r = dict(row)
-                if r.get("score_def") != SCORE_DEF and r.get("outcome") in (
+                if not row_is_gated(r, proto["score_def"]) and r.get("outcome") in (
                     "success",
                     "agent_failure",
                 ):
@@ -1015,16 +1103,20 @@ def main(argv: list[str] | None = None) -> int:
                         "status": r.get("status"),
                         "score": r.get("score_raw", r.get("score")),
                     }
-                    score, raw, done = official_score(h)
-                    reason = check_protocol(h, r["task"], int(r["seed"]))
+                    score, raw, done = official_score(h, proto["score_def"])
+                    reason = check_protocol(h, r["task"], int(r["seed"]), proto)
                     r.update(
+                        benchmark=proto["benchmark"],
                         score=score,
                         score_raw=raw,
                         episode_done=done,
-                        score_def=SCORE_DEF,
-                        seeding=SEEDING if not reason else h.get("seeding"),
+                        score_def=proto["score_def"],
+                        seeding=proto["seeding"] if not reason else h.get("seeding"),
                         instance_seed=h.get("instance_seed"),
-                        expected_instance_seed=expected_instance_seed(int(r["seed"]), r["task"]),
+                        expected_instance_seed=expected_instance_seed(int(r["seed"]), r["task"])
+                        if proto["seeding"] == "upstream_suite"
+                        else None,
+                        apk_sha=h.get("apk_sha"),
                         protocol_reason=reason,
                         outcome="protocol_rejected"
                         if reason
@@ -1046,8 +1138,11 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0
     if a.command == "status":
-        print(json.dumps(summarize(spec, Ledger(spec.out_dir)), indent=2))
+        ledger = Ledger(spec.out_dir)
+        refuse_if_protocol_mismatch(spec, ledger)
+        print(json.dumps(summarize(spec, ledger), indent=2))
         return 0
+    refuse_if_protocol_mismatch(spec, Ledger(spec.out_dir))
     if not a.skip_checkout_check:
         check_checkout(spec)
     for c in spec.configs:
