@@ -16,8 +16,8 @@
     "openrouter_cost_usd": 1.92e-05,
     "upstream_cost_usd": 1.92e-05,
     "is_byok": false,
-    "latency_s": 5.9003,
-    "generation_id": "gen-1794236805-Nu63Qro7GoMQRXWZ1UZr"
+    "latency_s": 0.8401,
+    "generation_id": "gen-1794239497-djaWnkDttuRc7RRG4Wzw"
   },
   {
     "model": "google/gemini-2.5-pro",
@@ -35,13 +35,13 @@
     "resolved_model": "google/gemini-2.5-pro",
     "resolved_provider": "Google AI Studio",
     "prompt_tokens": 14,
-    "completion_tokens": 402,
-    "cost_usd": 0.0040375,
-    "openrouter_cost_usd": 0.0040375,
-    "upstream_cost_usd": 0.0040375,
+    "completion_tokens": 55,
+    "cost_usd": 0.0005675,
+    "openrouter_cost_usd": 0.0005675,
+    "upstream_cost_usd": 0.0005675,
     "is_byok": false,
-    "latency_s": 7.4507,
-    "generation_id": "gen-1794236808-b3AWwjQtMLkJ2Z7Fxi8G"
+    "latency_s": 2.1561,
+    "generation_id": "gen-1794239498-CkAC8gBLyLgU6AKWW6ax"
   },
   {
     "model": "google/gemini-2.5-pro",
@@ -58,13 +58,13 @@
     "resolved_model": "google/gemini-2.5-pro",
     "resolved_provider": "Google AI Studio",
     "prompt_tokens": 57,
-    "completion_tokens": 149,
-    "cost_usd": 0.00156125,
-    "openrouter_cost_usd": 0.00156125,
-    "upstream_cost_usd": 0.00156125,
+    "completion_tokens": 138,
+    "cost_usd": 0.00145125,
+    "openrouter_cost_usd": 0.00145125,
+    "upstream_cost_usd": 0.00145125,
     "is_byok": false,
-    "latency_s": 3.6905,
-    "generation_id": "gen-1794236813-6RcxfbolDDhmRNfwB5kL"
+    "latency_s": 2.5622,
+    "generation_id": "gen-1794239500-pSvE4mjOIZEMYvA8798N"
   },
   {
     "model": "google/gemini-3-flash-preview",
@@ -91,17 +91,17 @@
       "routing-gpt4o-cortex"
     ],
     "ok": true,
-    "detail": "video=The video features a solid red background with no text.",
+    "detail": "video=The video consists of a solid red screen with no text.",
     "resolved_model": "google/gemini-3-flash-preview",
     "resolved_provider": "Google",
     "prompt_tokens": 138,
-    "completion_tokens": 11,
-    "cost_usd": 0.000102,
-    "openrouter_cost_usd": 0.000102,
-    "upstream_cost_usd": 0.000102,
+    "completion_tokens": 12,
+    "cost_usd": 0.000105,
+    "openrouter_cost_usd": 0.000105,
+    "upstream_cost_usd": 0.000105,
     "is_byok": false,
-    "latency_s": 1.0011,
-    "generation_id": "gen-1794236817-2v89QPlEUsQkFccdgoYA"
+    "latency_s": 1.0795,
+    "generation_id": "gen-1794239503-HaNEvj0U81LDrvkM2trt"
   },
   {
     "model": "google/gemini-3.1-pro-preview",
@@ -122,13 +122,13 @@
     "resolved_model": "google/gemini-3.1-pro-preview",
     "resolved_provider": "Google",
     "prompt_tokens": 58,
-    "completion_tokens": 203,
-    "cost_usd": 0.002552,
-    "openrouter_cost_usd": 0.002552,
-    "upstream_cost_usd": 0.002552,
+    "completion_tokens": 254,
+    "cost_usd": 0.003164,
+    "openrouter_cost_usd": 0.003164,
+    "upstream_cost_usd": 0.003164,
     "is_byok": false,
-    "latency_s": 3.5152,
-    "generation_id": "gen-1794236818-vhGhQyMSgsRJBzkOOQZT"
+    "latency_s": 5.4139,
+    "generation_id": "gen-1794239504-1MNdj0pU4jdkvBWVA7Fh"
   },
   {
     "model": "google/gemini-3.1-pro-preview",
@@ -143,13 +143,13 @@
     "resolved_model": "google/gemini-3.1-pro-preview",
     "resolved_provider": "Google",
     "prompt_tokens": 41,
-    "completion_tokens": 120,
-    "cost_usd": 0.001522,
-    "openrouter_cost_usd": 0.001522,
-    "upstream_cost_usd": 0.001522,
+    "completion_tokens": 106,
+    "cost_usd": 0.001354,
+    "openrouter_cost_usd": 0.001354,
+    "upstream_cost_usd": 0.001354,
     "is_byok": false,
-    "latency_s": 3.3302,
-    "generation_id": "gen-1794236822-ZKIZo0aCOGS4DHp0d6SM"
+    "latency_s": 2.6758,
+    "generation_id": "gen-1794239509-MwWRz090Hgmglh3PvxEX"
   },
   {
     "model": "meta-llama/llama-3.1-8b-instruct",
@@ -174,8 +174,8 @@
     "openrouter_cost_usd": 1.298e-05,
     "upstream_cost_usd": 1.298e-05,
     "is_byok": false,
-    "latency_s": 0.3457,
-    "generation_id": "gen-1794236825-BHomqF7K40S5hZB4JFec"
+    "latency_s": 0.2914,
+    "generation_id": "gen-1794239512-aVtoJRFie2r0ynJqMsJa"
   },
   {
     "model": "meta-llama/llama-3.3-70b-instruct",
@@ -193,15 +193,15 @@
     "ok": true,
     "detail": "tool_calls=['tap']",
     "resolved_model": "meta-llama/llama-3.3-70b-instruct",
-    "resolved_provider": "AkashML",
-    "prompt_tokens": 251,
+    "resolved_provider": "CoreWeave",
+    "prompt_tokens": 248,
     "completion_tokens": 23,
-    "cost_usd": 4.616e-05,
-    "openrouter_cost_usd": 4.616e-05,
-    "upstream_cost_usd": 4.616e-05,
+    "cost_usd": 0.00019241,
+    "openrouter_cost_usd": 0.00019241,
+    "upstream_cost_usd": 0.00019241,
     "is_byok": false,
-    "latency_s": 0.8543,
-    "generation_id": "gen-1794236825-ZVN4E71ZFLwefgFXuEBf"
+    "latency_s": 0.484,
+    "generation_id": "gen-1794239512-rebpML494Q6hDxwCufE8"
   },
   {
     "model": "meta-llama/llama-4-scout",
@@ -226,8 +226,8 @@
     "openrouter_cost_usd": 7.5e-06,
     "upstream_cost_usd": 7.5e-06,
     "is_byok": false,
-    "latency_s": 0.5677,
-    "generation_id": "gen-1794236826-TvavnFZZKGeRUePdo1oO"
+    "latency_s": 2.3829,
+    "generation_id": "gen-1794239512-XPPLpGiTDUfLGti95XxD"
   },
   {
     "model": "openai/gpt-4o",
@@ -245,8 +245,8 @@
     "openrouter_cost_usd": 0.0,
     "upstream_cost_usd": 0.00019,
     "is_byok": true,
-    "latency_s": 0.9891,
-    "generation_id": "gen-1794236827-hFpgZnc5n6vQsttSKRZh"
+    "latency_s": 1.678,
+    "generation_id": "gen-1794239515-xr88tqbuG10oyI8fibuT"
   },
   {
     "model": "openai/gpt-5-nano",
@@ -266,13 +266,13 @@
     "resolved_model": "openai/gpt-5-nano",
     "resolved_provider": "OpenAI",
     "prompt_tokens": 48,
-    "completion_tokens": 374,
-    "cost_usd": 0.000152,
+    "completion_tokens": 528,
+    "cost_usd": 0.0002136,
     "openrouter_cost_usd": 0.0,
-    "upstream_cost_usd": 0.000152,
+    "upstream_cost_usd": 0.0002136,
     "is_byok": true,
-    "latency_s": 9.3208,
-    "generation_id": "gen-1794236828-Jr3xoly2VACgjurhrR6K"
+    "latency_s": 10.8867,
+    "generation_id": "gen-1794239517-N6FcABWGdWcY9fmFcFPM"
   },
   {
     "model": "openai/gpt-oss-120b",
@@ -290,15 +290,15 @@
     "ok": true,
     "detail": "structured=Answer(city='Paris')",
     "resolved_model": "openai/gpt-oss-120b",
-    "resolved_provider": "CoreWeave",
-    "prompt_tokens": 80,
-    "completion_tokens": 10,
-    "cost_usd": 4.1e-06,
-    "openrouter_cost_usd": 4.1e-06,
-    "upstream_cost_usd": 4.1e-06,
+    "resolved_provider": "DeepInfra",
+    "prompt_tokens": 67,
+    "completion_tokens": 39,
+    "cost_usd": 9.109e-06,
+    "openrouter_cost_usd": 9.109e-06,
+    "upstream_cost_usd": 9.109e-06,
     "is_byok": false,
-    "latency_s": 0.6626,
-    "generation_id": "gen-1794236837-hMtmvnWQsgAJ8FyJl8Iz"
+    "latency_s": 1.5848,
+    "generation_id": "gen-1794239527-Ev2Yyys7kmSJ6g9YtHGM"
   },
   {
     "model": "qwen/qwen3-vl-8b-instruct",
@@ -325,8 +325,8 @@
     "openrouter_cost_usd": 1.2e-05,
     "upstream_cost_usd": 1.2e-05,
     "is_byok": false,
-    "latency_s": 0.4308,
-    "generation_id": "gen-1794236838-uaSIe47Kvt5jbUMjBdLi"
+    "latency_s": 0.5843,
+    "generation_id": "gen-1794239529-saRGAERidXgVGpZ37sOh"
   },
   {
     "model": "qwen/qwen3-vl-8b-instruct",
@@ -347,7 +347,7 @@
     "openrouter_cost_usd": 5.55e-05,
     "upstream_cost_usd": 5.55e-05,
     "is_byok": false,
-    "latency_s": 0.7894,
-    "generation_id": "gen-1794236838-dY2fNd5xCvYMBNG7E11u"
+    "latency_s": 0.6982,
+    "generation_id": "gen-1794239530-KUPFChzJDNlJesB77CwW"
   }
 ]

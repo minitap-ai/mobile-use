@@ -95,3 +95,14 @@ def test_fallback_required_when_allowed(tmp_path):
     )
     with pytest.raises(ValueError, match="fallback"):
         load_benchmark_config(child)
+
+
+def test_every_model_has_a_single_pinned_provider_without_fallback():
+    for path in RUNNABLE:
+        cfg = load_benchmark_config(path).config
+        pins = cfg.llm_policy.openrouter_provider_by_model
+        for role, _provider, model in iter_model_ids(cfg):
+            assert model in pins, f"{path.name}: {role} model {model} has no provider pin"
+            pin = pins[model]
+            assert pin.get("allow_fallbacks") is False, (model, pin)
+            assert len(pin.get("order", [])) == 1, (model, pin)

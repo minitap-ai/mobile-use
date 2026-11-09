@@ -108,7 +108,9 @@ def get_composite_swipe_tools(ctx: MobileUseContext) -> list[BaseTool]:
         start_y: int = Field(description="Start Y coordinate in pixels"),
         end_x: int = Field(description="End X coordinate in pixels"),
         end_y: int = Field(description="End Y coordinate in pixels"),
-        duration: int = Field(description="Duration in ms", ge=1, le=10000, default=400),
+        # paper/androidworld-rework, audit A11: a `= Field(default=400)` default in a tool
+        # signature reached the function as a FieldInfo when the model omitted `duration`.
+        duration: Annotated[int, Field(description="Duration in ms", ge=1, le=10000)] = 400,
         tool_call_id: Annotated[str, InjectedToolCallId] = None,  # type: ignore
         state: Annotated[State, InjectedState] = None,  # type: ignore
     ) -> Command:
@@ -129,7 +131,9 @@ def get_composite_swipe_tools(ctx: MobileUseContext) -> list[BaseTool]:
         start_y_percent: int = Field(description="Start Y percent (0-100)", ge=0, le=100),
         end_x_percent: int = Field(description="End X percent (0-100)", ge=0, le=100),
         end_y_percent: int = Field(description="End Y percent (0-100)", ge=0, le=100),
-        duration: int = Field(description="Duration in ms", ge=1, le=10000, default=400),
+        # paper/androidworld-rework, audit A11: a `= Field(default=400)` default in a tool
+        # signature reached the function as a FieldInfo when the model omitted `duration`.
+        duration: Annotated[int, Field(description="Duration in ms", ge=1, le=10000)] = 400,
         tool_call_id: Annotated[str, InjectedToolCallId] = None,  # type: ignore
         state: Annotated[State, InjectedState] = None,  # type: ignore
     ) -> Command:

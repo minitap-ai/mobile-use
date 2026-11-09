@@ -8,8 +8,10 @@
   "name": "_base",
   "description": "Base: paper-era full system, Platform Default routing via OpenRouter.",
 
-  // PENDING DECISIONS are listed in benchmarks/README.md (model ids that no longer work as in
-  // January 2026). Search this file for "PENDING".
+  // Model substitutions vs. the paper (decided by Pilou on 2026-11-09, see benchmarks/README.md):
+  // Cortex google/gemini-3-pro-preview -> google/gemini-3.1-pro-preview (paper id removed from
+  // OpenRouter), Executor meta-llama/llama-3.1-70b-instruct -> meta-llama/llama-3.3-70b-instruct
+  // (no tool-calling endpoint left for 3.1 70B).
 
   "ablation": {
     "use_multi_agent": true,
@@ -54,26 +56,51 @@
     // (tools / response_format), instead of silently dropping them.
     "openrouter_provider": {
       "require_parameters": true
+    },
+    // One pinned OpenRouter endpoint per model, no provider fallback (decided 2026-11-09).
+    // Choice: unquantized or fp8 weights, endpoint supporting what the role sends (tools for the
+    // Executor / a0 Cortex, json_schema for the others), 100 % (or best) 1-day uptime on the
+    // OpenRouter endpoints API on 2026-11-09. Values are OpenRouter endpoint tags.
+    // Every model used by any config must have a pin (tests/mobile_use/benchmark/test_config.py).
+    "openrouter_provider_by_model": {
+      // Google Vertex standard tier (99.93 % 1d); AI Studio 98.9 %, the flex tier was down.
+      "google/gemini-3.1-pro-preview": { "order": ["google-vertex/global"], "allow_fallbacks": false },
+      // Same provider as the Cortex for the video analyzer (100 % 1d).
+      "google/gemini-3-flash-preview": { "order": ["google-vertex/global"], "allow_fallbacks": false },
+      // DeepInfra fp8 standard endpoint (json_schema, 100 % 1d); the only other endpoint (Vertex)
+      // publishes neither quantization nor uptime.
+      "meta-llama/llama-4-scout": { "order": ["deepinfra/fp8"], "allow_fallbacks": false },
+      // bf16 (most endpoints serve the MXFP4 weights); DeepInfra bf16: tools + json_schema, 100 % 1d.
+      "openai/gpt-oss-120b": { "order": ["deepinfra/bf16"], "allow_fallbacks": false },
+      // No bf16 endpoint exists; CoreWeave serves unquantized fp16 with tool calling, 100 % 1d
+      // (fp8 alternatives with tools: AkashML, DeepInfra turbo).
+      "meta-llama/llama-3.3-70b-instruct": { "order": ["coreweave/fp16"], "allow_fallbacks": false },
+      // Only bf16 endpoint, and the only one with json_schema support, 100 % 1d.
+      "meta-llama/llama-3.1-8b-instruct": { "order": ["coreweave/bf16"], "allow_fallbacks": false },
+      // First-party OpenAI (billed through the account's BYOK OpenAI key).
+      "openai/gpt-5-nano": { "order": ["openai"], "allow_fallbacks": false },
+      "openai/gpt-4o": { "order": ["openai"], "allow_fallbacks": false },
+      // Single endpoint on OpenRouter (bf16).
+      "qwen/qwen3-vl-8b-instruct": { "order": ["parasail/bf16"], "allow_fallbacks": false },
+      // Google AI Studio standard tier, the only provider listed (99.93 % / 100 % 1d).
+      "google/gemini-2.5-pro": { "order": ["google-ai-studio"], "allow_fallbacks": false },
+      "google/gemini-2.5-flash": { "order": ["google-ai-studio"], "allow_fallbacks": false }
     }
   },
 
   "llm": {
     "cortex": {
       "provider": "openrouter",
-      // PENDING: paper id google/gemini-3-pro-preview is no longer listed on OpenRouter
-      // (checked 2026-11-09). Closest available: google/gemini-3.1-pro-preview (same line,
-      // newer preview) or google/gemini-2.5-pro (the paper's own fallback and the model of the
-      // "Degrade X" rows). Default here: gemini-3.1-pro-preview.
+      // Paper: google/gemini-3-pro-preview (404 "no longer available" on OpenRouter, 2026-11-09).
       "model": "google/gemini-3.1-pro-preview"
     },
     "planner": { "provider": "openrouter", "model": "meta-llama/llama-4-scout" },
     "orchestrator": { "provider": "openrouter", "model": "openai/gpt-oss-120b" },
     "executor": {
       "provider": "openrouter",
-      // PENDING: paper id meta-llama/llama-3.1-70b-instruct still resolves, but its only
-      // OpenRouter endpoint (Amazon Bedrock) supports no tool calling, and the Executor is a
-      // tool-calling agent. Closest available: meta-llama/llama-3.3-70b-instruct (also the
-      // Executor of the hardcoded Minitap profile, config.py get_default_minitap_llm_config).
+      // Paper: meta-llama/llama-3.1-70b-instruct (its only OpenRouter endpoint, Amazon Bedrock,
+      // has no tool calling, 2026-11-09). 3.3 70B is also the Executor of the hardcoded Minitap
+      // profile (config.py get_default_minitap_llm_config).
       "model": "meta-llama/llama-3.3-70b-instruct",
       // The Executor binds its tools with parallel_tool_calls=true (executor.py). No OpenRouter
       // endpoint of any model used here declares `parallel_tool_calls` (checked 2026-11-09), so

@@ -3,6 +3,18 @@
 Branch `paper/androidworld-rework`. Every run of the study uses **one commit of this branch**;
 the experimental condition is selected **only** by the config file.
 
+## Version to run
+
+- Pin the SHA published in the P0-E report (Notion "P0-E - mobile-use paper branch (worker
+  report)"); it is the head of the branch when this file was last updated. A file cannot name
+  the commit that contains it, so the SHA lives in the report, and every run records
+  `git_sha` + `git_dirty` in `run_start` and `result.json`. **Reject results with
+  `git_dirty: true` or a different `git_sha`.**
+- Since the first pin: paper-era bugs A10 (resource-id lookup / bounds / missing await: the
+  text read-back now works on Android) and A11 (swipe default duration) are fixed for every
+  condition; each model is pinned to one OpenRouter endpoint with no provider fallback
+  (`benchmarks/README.md`, "Models and pinned providers").
+
 ## Entry point
 
 ```python
@@ -81,7 +93,7 @@ Rules:
 | `max_steps` | LangGraph recursion limit (`max_steps`) hit | score (agent failure) |
 | `timeout` | `timeout_s` wall-clock cap hit | score (agent failure); report the rate |
 | `error` + `error_kind=agent` | exception inside the agent code | score as failure; report |
-| `error` + `error_kind=llm_api` | OpenRouter error after retries (fallbacks are disabled) | infra: re-queue, log |
+| `error` + `error_kind=llm_api` | OpenRouter error after retries (model and provider fallbacks are disabled; a pinned endpoint being down lands here) | infra: re-queue, log |
 | `error` + `error_kind=device` | adb / uiautomator2 error | infra: re-queue, log |
 | `init_error` | agent could not attach to the device | infra: re-queue, log |
 

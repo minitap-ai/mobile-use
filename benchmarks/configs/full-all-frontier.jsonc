@@ -1,7 +1,7 @@
 {
   // P3 #3: "All Frontier" = the frontier model on all seven agents (paper Table 4 row 2).
-  // PENDING: paper model google/gemini-3-pro-preview is gone; same replacement as the Cortex
-  // of _base.jsonc. video_analyzer keeps the Platform Default model (not part of the table).
+  // Paper model google/gemini-3-pro-preview is gone; google/gemini-3.1-pro-preview as decided
+  // (see _base.jsonc). video_analyzer keeps the Platform Default model (not part of the table).
   "extends": "full.jsonc",
   "name": "full-all-frontier",
   "description": "Full system, frontier model on all seven agents.",

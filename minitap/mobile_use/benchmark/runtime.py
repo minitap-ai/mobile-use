@@ -34,6 +34,8 @@ class LLMPolicy:
     retry_backoff_s: float = 2.0
     # Default OpenRouter `provider` routing object, merged under each model's own preferences.
     openrouter_provider: dict[str, Any] = field(default_factory=dict)
+    # Per-model provider pins (e.g. {"order": ["deepinfra/bf16"], "allow_fallbacks": false}).
+    openrouter_provider_by_model: dict[str, dict[str, Any]] = field(default_factory=dict)
     openrouter_app_title: str = "mobile-use AndroidWorld paper rework"
 
 

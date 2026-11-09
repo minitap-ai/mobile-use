@@ -23,19 +23,32 @@ same commit; a condition is a file in `benchmarks/configs/`.
 | Trace folder suffix `_NO_ERROR`/`_ERROR` (was `_PASS`/`_FAIL`, which only meant "no exception", audit A7) | always | `sdk/agent.py` |
 | Telemetry forced off | benchmark only | `benchmark/runner.py` |
 
+Paper-era bugs **fixed** on this branch (decided 2026-11-09; they apply to every condition,
+including `full-jan2026.jsonc`, which is therefore "January feature set + these fixes"):
+- **A10, post-validation was inert on Android.** Since the UIAutomator2 client became the
+  Android screen source (730e4d7, 2025-11-26, i.e. in every paper run), the resource-id path
+  could not work:
+  1. `utils.ui_hierarchy.find_element_by_resource_id` matched only the Maestro key
+     `resourceId`, never the `resource-id` key UIAutomator2 emits, so the post-validation
+     read-back of `focus_and_input_text` / `focus_and_clear_text` was always empty and focusing
+     by resource-id always fell back to coordinates;
+  2. the same helper re-initialised its index counter at every match, so
+     `resource_id_index >= 1` never matched;
+  3. `get_bounds_for_element` parsed only the Maestro dict, not UIAutomator2's
+     `"[x1,y1][x2,y2]"` string (the "move cursor to end" tap was skipped);
+  4. `tools/utils.focus_element_if_needed` called the async `tap()` without `await` on the
+     resource-id branch, so that tap never happened.
+  All four are fixed (comments tagged `audit A10`), with regression tests
+  (`tests/mobile_use/benchmark/test_paper_era_fixes.py`). The v1 paper's validator therefore
+  never compared or even saw the typed text on Android.
+- **A11, swipes failed when the model omitted `duration`.** `swipe_coordinates` /
+  `swipe_percentages` declared `duration: int = Field(default=400)` in the tool signature, so an
+  omitted duration reached the tool as a `FieldInfo` and failed validation. Now
+  `Annotated[int, Field(...)] = 400`, with a regression test.
+
 Unchanged on purpose (kept identical to January for comparability, documented):
 - **A9**: operator-precedence bug in the Cortex device/focused-app message (`cortex.py`, comment
   at the message construction). The Cortex receives device info + date, never the focused app.
-- **A10**: `utils.ui_hierarchy.find_element_by_resource_id` matches the Maestro key
-  `resourceId`, but the UIAutomator2 client emits `resource-id`, so on Android it **never
-  matches**: focusing by resource-id always falls back to bounds/coordinates, and the
-  post-validation read-back of `focus_and_input_text` / `focus_and_clear_text` is always empty.
-  Present since 730e4d7 (2025-11-26), so in every paper run. The new text check uses its own
-  lookup and is not affected. Fixing the helper is an open decision.
-- **A11**: `swipe_coordinates` / `swipe_percentages` declare `duration: int = Field(default=400)`
-  in the tool signature; when the model omits `duration`, the tool receives the `FieldInfo` and
-  fails validation ("Input should be a valid integer"). Present at v3.4.0 and on today's main.
-  The agent usually retries with an explicit duration. Fixing it is an open decision.
 - Temperatures as in code: Cortex/Orchestrator/Outputter/Planner/Executor/Contextor 1,
   Hopper 0, Video analyzer 0.2 (`get_llm` default is 1).
 
@@ -45,7 +58,7 @@ Unchanged on purpose (kept identical to January for comparability, documented):
 |---|---|
 | `use_multi_agent` | monolithic single agent (Cortex model) instead of the 6-agent graph |
 | `use_sequential_execution` | tool calls run in parallel, no abort-on-failure |
-| `use_post_validation` | no read-back after text input (see A10: the read-back was already empty on Android) |
+| `use_post_validation` | no read-back after text input (on Android the read-back only works since the A10 fix; it was always empty in January) |
 | `use_deterministic_text` | simple tap + type instead of focus → cursor-to-end → type |
 | `use_vision` | no screenshot to the Cortex (text-only) |
 | `use_meta_reasoning` | no agent-thought history in the Cortex context, no self-monitoring prompt rules |
@@ -105,11 +118,34 @@ password). The verdict line is appended to the tool result the Cortex reads. Wit
 `text_check.mismatch_as_error: true`, MISMATCH/CASE_ONLY also mark the tool call failed
 (default false). Every check is a `text_check` event.
 
-## Pending decisions (model ids, 2026-11-09)
+## Models and pinned providers (decided 2026-11-09)
 
-| Paper id | Status on OpenRouter | Used now | Alternatives |
-|---|---|---|---|
-| `google/gemini-3-pro-preview` (Cortex; all agents in All Frontier) | **404, "no longer available"** | `google/gemini-3.1-pro-preview` | `google/gemini-2.5-pro` (paper fallback) |
-| `meta-llama/llama-3.1-70b-instruct` (Executor) | listed, single endpoint (Bedrock) with **no tool calling and no response_format** → 404 for the Executor | `meta-llama/llama-3.3-70b-instruct` | `openai/gpt-5-mini` (paper fallback) |
+Substitutions vs. the paper:
 
-All other ids of the configs resolve and pass a capability call (see `smoke_models.last.json`).
+| Paper id | Status on OpenRouter (2026-11-09) | Used |
+|---|---|---|
+| `google/gemini-3-pro-preview` (Cortex; all agents in All Frontier) | 404 "no longer available" | `google/gemini-3.1-pro-preview` |
+| `meta-llama/llama-3.1-70b-instruct` (Executor) | single endpoint (Bedrock) without tool calling or response_format | `meta-llama/llama-3.3-70b-instruct` |
+
+Each model is pinned to exactly one OpenRouter endpoint, with no provider fallback
+(`llm_policy.openrouter_provider_by_model` in `_base.jsonc`:
+`{"order": ["<endpoint tag>"], "allow_fallbacks": false}`). A test checks that every model of
+every config is pinned. Selection rule: unquantized (bf16/fp16) or fp8 weights, the endpoint
+supports what the role sends, best 1-day uptime on the OpenRouter endpoints API (2026-11-09):
+
+| Model | Pinned endpoint | Why |
+|---|---|---|
+| google/gemini-3.1-pro-preview | `google-vertex/global` | 99.93 % 1d (AI Studio 98.9 %, flex tier down) |
+| google/gemini-3-flash-preview | `google-vertex/global` | same provider as the Cortex, 100 % 1d |
+| meta-llama/llama-4-scout | `deepinfra/fp8` | fp8, json_schema, 100 % 1d; other endpoint (Vertex) publishes no quantization/uptime |
+| openai/gpt-oss-120b | `deepinfra/bf16` | bf16 (most endpoints serve MXFP4), tools + json_schema, 100 % 1d |
+| meta-llama/llama-3.3-70b-instruct | `coreweave/fp16` | no bf16 endpoint exists; unquantized fp16 with tool calling, 100 % 1d |
+| meta-llama/llama-3.1-8b-instruct | `coreweave/bf16` | only bf16 endpoint and only one with json_schema, 100 % 1d |
+| openai/gpt-5-nano, openai/gpt-4o | `openai` | first party (billed via the account's BYOK OpenAI key) |
+| qwen/qwen3-vl-8b-instruct | `parasail/bf16` | only endpoint |
+| google/gemini-2.5-pro, google/gemini-2.5-flash | `google-ai-studio` | only provider (standard tier) |
+
+A wrong tag fails loudly (checked: `deepinfra/fp4` for gpt-oss-120b returns 404 "Every
+candidate endpoint was removed during routing"). The served provider of every call is logged
+(`resolved_provider`). If a pinned endpoint goes down, tasks end with `error_kind=llm_api`
+(infra, re-queue) instead of silently changing provider.

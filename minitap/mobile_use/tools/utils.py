@@ -154,7 +154,9 @@ async def focus_element_if_needed(
 
     if elt_from_id:
         if not is_element_focused(elt_from_id):
-            tap(
+            # paper/androidworld-rework, audit A10: this coroutine was never awaited, so the tap
+            # never happened (unreachable on Android until the resource-id lookup was fixed).
+            await tap(
                 ctx=ctx,
                 selector_request=IdSelectorRequest(id=target.resource_id),  # type: ignore
                 index=target.resource_id_index,

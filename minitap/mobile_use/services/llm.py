@@ -172,7 +172,12 @@ def get_openrouter_llm(
         kwargs["disable_streaming"] = True
         # Ask OpenRouter to return the charged cost in `usage.cost`.
         extra_body["usage"] = {"include": True}
-        merged_routing = {**policy.openrouter_provider, **(provider_routing or {})}
+        # benchmark default < per-model pin < per-agent override from the config entry
+        merged_routing = {
+            **policy.openrouter_provider,
+            **policy.openrouter_provider_by_model.get(model_name, {}),
+            **(provider_routing or {}),
+        }
         if merged_routing:
             extra_body["provider"] = merged_routing
     elif provider_routing:

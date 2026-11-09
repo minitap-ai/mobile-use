@@ -94,5 +94,5 @@ def test_find_by_resource_id_accepts_both_hierarchy_formats():
     assert find_by_resource_id(ui, "android:id/search_src_text")["text"] == "first"
     assert find_by_resource_id(ui, "android:id/search_src_text", 1)["text"] == "second"
     assert find_by_resource_id([{"resourceId": "x", "text": "m"}], "x")["text"] == "m"
-    # Documents audit A10: the shared paper-era helper does not match UIAutomator2 elements.
-    assert find_element_by_resource_id(ui, "android:id/search_src_text") is None
+    # Audit A10 (fixed on this branch): the shared helper now matches UIAutomator2 elements too.
+    assert find_element_by_resource_id(ui, "android:id/search_src_text")["text"] == "first"

@@ -35,6 +35,7 @@ class LLMPolicyConfig(BaseModel):
     same_model_retries: int = Field(default=2, ge=0)
     retry_backoff_s: float = Field(default=2.0, ge=0)
     openrouter_provider: dict[str, Any] = Field(default_factory=dict)
+    openrouter_provider_by_model: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
     def to_policy(self) -> LLMPolicy:
         return LLMPolicy(
@@ -44,6 +45,9 @@ class LLMPolicyConfig(BaseModel):
             same_model_retries=self.same_model_retries,
             retry_backoff_s=self.retry_backoff_s,
             openrouter_provider=dict(self.openrouter_provider),
+            openrouter_provider_by_model={
+                k: dict(v) for k, v in self.openrouter_provider_by_model.items()
+            },
         )
 
 

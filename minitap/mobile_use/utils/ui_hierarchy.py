@@ -1,3 +1,4 @@
+import re
 from pydantic import BaseModel, Field
 
 from minitap.mobile_use.utils.logger import get_logger
@@ -59,14 +60,21 @@ def find_element_by_resource_id(
     if is_rich_hierarchy:
         return __find_element_by_ressource_id_in_rich_hierarchy(ui_hierarchy, resource_id)
 
+    # Matches still to skip before returning one. paper/androidworld-rework, audit A10: this
+    # counter used to be re-initialised at every match, so any index >= 1 never matched.
+    remaining = [index or 0]
+
     def search_recursive(elements: list[dict]) -> dict | None:
         for element in elements:
             if isinstance(element, dict):
-                if element.get("resourceId") == resource_id:
-                    idx = index or 0
-                    if idx == 0:
+                # paper/androidworld-rework, audit A10: the UIAutomator2 client (Android) emits
+                # "resource-id"; only the Maestro key "resourceId" used to be matched, so this
+                # lookup never matched on Android (focus by id + post-validation read-back inert).
+                element_id = element.get("resourceId", element.get("resource-id"))
+                if element_id == resource_id:
+                    if remaining[0] == 0:
                         return element
-                    idx -= 1
+                    remaining[0] -= 1
                     continue
 
                 children = element.get("children", [])
@@ -121,8 +129,20 @@ class ElementBounds(BaseModel):
         )
 
 
+_BOUNDS_STR_RE = re.compile(r"^\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]$")
+
+
 def get_bounds_for_element(element: dict) -> ElementBounds | None:
     bounds = element.get("bounds", None)
+    if isinstance(bounds, str):
+        # paper/androidworld-rework, audit A10: UIAutomator2 gives "[x1,y1][x2,y2]"; only the
+        # Maestro dict format {x, y, width, height} used to be parsed.
+        match = _BOUNDS_STR_RE.match(bounds.strip())
+        if not match:
+            logger.error(f"Failed to parse bounds string: {bounds!r}")
+            return None
+        x1, y1, x2, y2 = (int(v) for v in match.groups())
+        return ElementBounds(x=x1, y=y1, width=x2 - x1, height=y2 - y1)
     if bounds:
         try:
             return ElementBounds(**bounds)
