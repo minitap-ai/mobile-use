@@ -307,6 +307,11 @@ async def with_fallback(
 ) -> T:
     runtime = get_runtime()
     allow_fallback = runtime is None or runtime.llm_policy.allow_fallback
+    if runtime is not None:
+        # Benchmark mode: retry the SAME model a few times on any failure (e.g. HTTP 200 with
+        # `choices: null` from an upstream provider, which the OpenAI client does not retry, or
+        # an unparsable structured output) before giving up or falling back.
+        main_call = _with_same_model_retries(main_call, runtime, none_should_fallback)
     try:
         result = await main_call()
         if result is None and none_should_fallback:
@@ -331,6 +336,30 @@ async def with_fallback(
             raise LLMFallbackDisabledError(f"Main LLM inference failed: {e}") from e
         llm_logger.warning(f"❗ Main LLM inference failed: {e}. Falling back...")
         return await fallback_call()
+
+
+def _with_same_model_retries(
+    call: Callable[[], Awaitable[T]], runtime, none_is_failure: bool
+) -> Callable[[], Awaitable[T]]:
+    retries = runtime.llm_policy.same_model_retries
+    backoff = runtime.llm_policy.retry_backoff_s
+
+    async def wrapped() -> T:
+        attempt = 0
+        while True:
+            try:
+                result = await call()
+                if result is None and none_is_failure and attempt < retries:
+                    raise ValueError("main call returned None")
+                return result
+            except Exception as e:
+                if attempt >= retries:
+                    raise
+                attempt += 1
+                runtime.record_retry(attempt=attempt, reason=f"{type(e).__name__}: {e}")
+                await asyncio.sleep(backoff * attempt)
+
+    return wrapped
 
 
 class LLMFallbackDisabledError(RuntimeError):

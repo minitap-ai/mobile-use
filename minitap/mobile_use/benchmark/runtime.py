@@ -29,6 +29,9 @@ class LLMPolicy:
     allow_fallback: bool = False
     max_retries: int = 4
     timeout_s: float = 180.0
+    # Retries of the same model at the agent level (any exception, incl. malformed responses).
+    same_model_retries: int = 2
+    retry_backoff_s: float = 2.0
     # Default OpenRouter `provider` routing object, merged under each model's own preferences.
     openrouter_provider: dict[str, Any] = field(default_factory=dict)
     openrouter_app_title: str = "mobile-use AndroidWorld paper rework"
@@ -70,6 +73,7 @@ class BenchmarkRuntime:
         self.resolved_providers: defaultdict[str, Counter[str]] = defaultdict(Counter)
         self.fallback_attempts = 0
         self.fallback_blocked = 0
+        self.same_model_retries = 0
         self.tool_calls: Counter[str] = Counter()
         self.tool_failures: Counter[str] = Counter()
         self.node_runs: Counter[str] = Counter()
@@ -192,6 +196,10 @@ class BenchmarkRuntime:
             output=output,
         )
 
+    def record_retry(self, *, attempt: int, reason: str) -> None:
+        self.same_model_retries += 1
+        self.event("llm_retry", attempt=attempt, reason=reason)
+
     def record_node(self, node: str) -> None:
         self.node_runs[node] += 1
         self.event("node", node=node)
@@ -246,6 +254,7 @@ class BenchmarkRuntime:
                 "byok_calls": self.llm_byok_calls,
                 "fallback_attempts": self.fallback_attempts,
                 "fallback_blocked": self.fallback_blocked,
+                "same_model_retries": self.same_model_retries,
             },
             "tools": {
                 "calls_by_tool": dict(self.tool_calls),

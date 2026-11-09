@@ -32,6 +32,8 @@ class LLMPolicyConfig(BaseModel):
     allow_fallback: bool = False
     max_retries: int = Field(default=4, ge=0)
     timeout_s: float = Field(default=180.0, gt=0)
+    same_model_retries: int = Field(default=2, ge=0)
+    retry_backoff_s: float = Field(default=2.0, ge=0)
     openrouter_provider: dict[str, Any] = Field(default_factory=dict)
 
     def to_policy(self) -> LLMPolicy:
@@ -39,6 +41,8 @@ class LLMPolicyConfig(BaseModel):
             allow_fallback=self.allow_fallback,
             max_retries=self.max_retries,
             timeout_s=self.timeout_s,
+            same_model_retries=self.same_model_retries,
+            retry_backoff_s=self.retry_backoff_s,
             openrouter_provider=dict(self.openrouter_provider),
         )
 

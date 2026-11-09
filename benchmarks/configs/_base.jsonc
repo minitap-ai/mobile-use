@@ -45,6 +45,10 @@
     "allow_fallback": false,   // a fallback would silently change the model under test
     "max_retries": 4,          // HTTP-level retries inside the OpenAI client (same model)
     "timeout_s": 180,
+    // Agent-level retries of the SAME model on any failure (malformed 200 responses, parse
+    // errors...), with linear backoff; each one is an `llm_retry` event.
+    "same_model_retries": 2,
+    "retry_backoff_s": 2,
     // OpenRouter provider routing, sent as the request `provider` object.
     // require_parameters: only route to endpoints that support every parameter we send
     // (tools / response_format), instead of silently dropping them.

@@ -13,7 +13,7 @@ from minitap.mobile_use.services.llm import LLMFallbackDisabledError, with_fallb
 def runtime(tmp_path):
     def make(allow_fallback=False):
         r = rt.BenchmarkRuntime(
-            tmp_path / "events.jsonl", "run-1", rt.LLMPolicy(allow_fallback=allow_fallback)
+            tmp_path / "events.jsonl", "run-1", rt.LLMPolicy(allow_fallback=allow_fallback, retry_backoff_s=0)
         )
         rt.activate(r)
         return r
@@ -159,3 +159,19 @@ def test_runner_module_forces_telemetry_off():
     assert os.environ["MOBILE_USE_TELEMETRY_ENABLED"] == "false"
     telemetry._config._enabled = False
     assert telemetry.is_enabled is False
+
+
+@pytest.mark.asyncio
+async def test_same_model_retry_recovers_transient_failure(runtime, tmp_path):
+    r = runtime(allow_fallback=False)
+    calls = {"n": 0}
+
+    async def flaky():
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise TypeError("'NoneType' object is not iterable")
+        return "ok"
+
+    assert await with_fallback(flaky, _ok) == "ok"
+    assert calls["n"] == 3 and r.same_model_retries == 2 and r.fallback_blocked == 0
+    assert [e["type"] for e in read_events(tmp_path / "events.jsonl")] == ["llm_retry", "llm_retry"]
