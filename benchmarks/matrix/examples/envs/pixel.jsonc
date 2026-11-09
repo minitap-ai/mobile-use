@@ -1,0 +1,26 @@
+{
+  // DRAFT by P0-E, to be confirmed by the owner (P1-P). Farm Pixels (paris-02) through P0-A's
+  // tools/run_agent.py: its workarounds detect the "phys" profile by itself (SELinux Enforcing).
+  // P1-P's recommendation is NOT to use phones for AndroidWorld (SMS-send impossible without a
+  // SIM); the hook exists so a "real devices" row can be run if decided. Leasing/banning a phone
+  // and restoring its baseline stay with the owner, outside the matrix.
+  "owner": "P1-P",
+  "cwd": "../../aw-limrun",
+  "python": ".venv/bin/python",
+  "command": [
+    "{python}", "tools/run_agent.py", "{serial}", "{out_dir}",
+    "--tasks", "{task}", "--config", "{config_path}",
+    "--mobile-use", "{mobile_use_path}", "--expect-sha", "{mobile_use_sha}",
+    "--seed", "{seed}", "--timeout-s", "{timeout_s}", "--run-id", "{run_id}"
+  ],
+  "result_file": "{out_dir}/results.jsonl",
+  "devices_file": "../devices/pixel.txt",
+  "max_concurrency": 6,
+  "quarantine_after_infra": 1,
+  "harness_overhead_s": 1200,
+  "env_vars": { "GRPC_VERBOSITY": "ERROR" },
+  // adb safety: P0-A's shim (no kill-server). If phones are reached through a forwarded adb
+  // server (e.g. ANDROID_ADB_SERVER_PORT=15037), use {"mode": "server_port", "port": 15037}
+  // instead, and the harness must pass --adb-port to the agent runner (it doesn't today).
+  "adb_safety": { "mode": "shim", "path": "../../aw-limrun/aw_limrun/adb_env.py" }
+}

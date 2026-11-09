@@ -1,0 +1,25 @@
+{
+  // DRAFT by P0-E, to be confirmed by the owner (P1-P). Stock official emulator (android_env +
+  // gRPC + console, no shim) through P1-P's run_emulator.py (in progress), same CLI and row
+  // shape as P0-A's tools/run_agent.py plus the two emulator ports.
+  // Each device line carries its ports: {"serial": "emulator-5554", "console_port": 5554, "grpc_port": 8554}
+  "owner": "P1-P",
+  "cwd": "../../aw-physical",
+  "python": "../aw-limrun/.venv/bin/python",
+  "command": [
+    "{python}", "run_emulator.py", "{serial}", "{out_dir}",
+    "--console-port", "{console_port}", "--grpc-port", "{grpc_port}",
+    "--tasks", "{task}", "--config", "{config_path}",
+    "--mobile-use", "{mobile_use_path}", "--expect-sha", "{mobile_use_sha}",
+    "--seed", "{seed}", "--timeout-s", "{timeout_s}", "--run-id", "{run_id}"
+  ],
+  "result_file": "{out_dir}/results.jsonl",
+  "devices_file": "../devices/emulator.txt",
+  "max_concurrency": 1,           // this Mac fits 1 emulator (P1-P); raise on a KVM VM
+  "quarantine_after_infra": 2,
+  "harness_overhead_s": 900,
+  "env_vars": { "GRPC_VERBOSITY": "ERROR" },
+  // adb safety (mandatory): android_env's adb_path must be tools/adbwrap, which drops
+  // `adb kill-server` (it would drop every Limrun tunnel on the shared server).
+  "adb_safety": { "mode": "adbwrap", "path": "../../aw-physical/tools/adbwrap" }
+}

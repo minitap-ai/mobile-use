@@ -1,0 +1,25 @@
+{
+  // DRAFT by P0-E, to be confirmed by the owner (P0-A). Env hook for benchmarks/matrix/matrix.py.
+  // One harness call = one AndroidWorld task on one device (P0-A's tools/run_agent.py, unchanged).
+  "owner": "P0-A",
+  "cwd": "../../aw-limrun",
+  "python": ".venv/bin/python",
+  "command": [
+    "{python}", "tools/run_agent.py", "{serial}", "{out_dir}",
+    "--tasks", "{task}", "--config", "{config_path}",
+    "--mobile-use", "{mobile_use_path}", "--expect-sha", "{mobile_use_sha}",
+    "--seed", "{seed}", "--timeout-s", "{timeout_s}", "--run-id", "{run_id}"
+  ],
+  "result_file": "{out_dir}/results.jsonl",
+  // One device per line ("127.0.0.1:<port>" or a JSON object with "serial" + extra template
+  // fields). The owner maintains it (create/tunnel/app setup happen outside the matrix); it is
+  // re-read on every scheduling pass, so devices can be added or removed live.
+  "devices_file": "../devices/limrun.txt",
+  "max_concurrency": 8,           // P0-A measured 8 concurrent devices without 429s
+  "quarantine_after_infra": 2,    // consecutive infra failures before a device is skipped
+  "harness_overhead_s": 900,      // init + teardown + scoring on top of the agent timeout
+  "env_vars": { "GRPC_VERBOSITY": "ERROR" },
+  // adb safety (mandatory): P0-A's AdbOnlyEnv controller never runs `adb kill-server` (it
+  // reconnects instead), so the shared adb server and its Limrun tunnels survive retries.
+  "adb_safety": { "mode": "shim", "path": "../../aw-limrun/aw_limrun/adb_env.py" }
+}

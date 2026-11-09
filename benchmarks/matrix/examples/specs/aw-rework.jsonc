@@ -1,0 +1,47 @@
+{
+  // AndroidWorld paper rework: every run of P2 + P3 in ONE matrix (one out_dir), so the ablation
+  // rows are paired with full.jsonc on exactly the same (task, seed) cells.
+  // Phase 0: headline + reference rows on all 116 tasks (93 Limrun + 23 stock emulator).
+  // Phase 1: ablations + routing on the Limrun-93 subset only (label "AW-Limrun-93 subset");
+  //          their reference is full.jsonc's phase-0 Limrun cells (same keys, run once).
+  "name": "aw-rework",
+  "out_dir": "../runs/aw-rework",
+  // Clean pinned checkout used ONLY for runs (a detached git worktree; never edit it).
+  "mobile_use": { "path": "../mobile-use-pin", "sha": "REPLACE_WITH_PINNED_SHA" },
+  "configs": [
+    "full", "full-jan2026", "v1-as-shipped",
+    "a0-single-agent", "decomposition-only",
+    "no-post-validation", "no-text-match-check", "no-meta-reasoning", "no-loop-detector",
+    "no-sequential-execution", "no-hybrid-perception", "no-scratchpad", "no-data-fidelity", "no-video",
+    "full-all-frontier", "cortex-budget", "planner-budget", "noncortex-budget"
+  ],
+  "seeds": [30, 31, 32],
+  "task_sets": {
+    "aw-limrun-93": { "file": "../tasksets/aw-limrun-93.txt" },
+    "aw-emulator-23": { "file": "../tasksets/aw-emulator-23.txt" }
+  },
+  "plan": [
+    { "phase": 0, "env": "limrun", "task_set": "aw-limrun-93", "label": "AW-116",
+      "configs": ["full", "full-jan2026", "v1-as-shipped"] },
+    { "phase": 0, "env": "emulator", "task_set": "aw-emulator-23", "label": "AW-116",
+      "configs": ["full", "full-jan2026", "v1-as-shipped"] },
+    { "phase": 1, "env": "limrun", "task_set": "aw-limrun-93", "label": "AW-Limrun-93 subset",
+      "configs": [
+        "a0-single-agent", "decomposition-only",
+        "no-post-validation", "no-text-match-check", "no-meta-reasoning", "no-loop-detector",
+        "no-sequential-execution", "no-hybrid-perception", "no-scratchpad", "no-data-fidelity", "no-video",
+        "full-all-frontier", "cortex-budget", "planner-budget", "noncortex-budget"
+      ] }
+  ],
+  "envs": { "limrun": "../envs/limrun.jsonc", "emulator": "../envs/emulator.jsonc", "pixel": "../envs/pixel.jsonc" },
+  "timeout_s": 1800,            // 30-min agent cap (P0-A pilot protocol)
+  "max_infra_attempts": 3,
+  "order": ["phase", "seed", "config", "task"],
+  "budget": {
+    "max_usd": 0,                    // PROPOSAL pending: set by Pilou before `run` (0 = no cap)
+    "reserve_per_inflight_usd": 3,
+    "openrouter_key_check": true,
+    "key_min_remaining_usd": 50,
+    "est_cost_per_cell_usd": 1.45    // P2 pilot mean, 71 attempts (full.jsonc)
+  }
+}
