@@ -1,0 +1,8 @@
+{
+  // Table 2 leave-one-out: full system minus the deterministic text MATCH/MISMATCH check
+  // (post-validation read-back stays on; only the explicit verdict is removed).
+  "extends": "full.jsonc",
+  "name": "no-text-match-check",
+  "description": "Full system without the deterministic text match check.",
+  "ablation": { "use_text_match_check": false }
+}

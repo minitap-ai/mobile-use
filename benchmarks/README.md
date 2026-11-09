@@ -84,9 +84,24 @@ Unchanged on purpose (kept identical to January for comparability, documented):
 | `cortex-budget.jsonc` | P3 #6 | none | Platform Default, Cortex = Qwen3-VL-8B |
 | `planner-budget.jsonc` | P3 #7a | none | All Frontier, Planner = Qwen3-VL-8B |
 | `noncortex-budget.jsonc` | P3 #7b | none | frontier Cortex, Qwen3-VL-8B elsewhere |
-| `no-data-fidelity.jsonc` | stretch | data_fidelity_prompts | Platform Default |
+| `no-data-fidelity.jsonc` | Table 2 | data_fidelity_prompts | Platform Default |
+| `no-loop-detector.jsonc` | Table 2 (leave-one-out) | loop_detector | Platform Default |
+| `no-text-match-check.jsonc` | Table 2 (leave-one-out) | text_match_check | Platform Default |
+| `no-sequential-execution.jsonc` | Table 2 "Sequential execution" | sequential_execution | Platform Default |
+| `no-hybrid-perception.jsonc` | Table 2 "Hybrid perception" | vision (text-only) | Platform Default |
+| `no-scratchpad.jsonc` | Table 2 "Scratchpad memory" | scratchpad | Platform Default |
+| `decomposition-only.jsonc` | WMAC: what decomposition adds | multi_agent only (monolithic agent, every other mechanism on; the loop detector is inert there because it lives in the multi-agent Cortex) | Platform Default; Cortex `require_parameters: false` (the monolithic agent sends `parallel_tool_calls`) |
 | `no-video.jsonc` | stretch | video_recording | Platform Default |
-| `routing/*.jsonc` | paper Table 4 rows | none | Gemini 2.5 Pro / Qwen3-VL-8B / GPT-4o / Gemini 2.5 Flash as in the paper |
+| `routing/*.jsonc` | **not used in the paper** (v1 Table 4 rows on Gemini 2.5 Pro, kept for reference; each has `paper_reference: "NOT USED IN THE PAPER …"`) | none | Gemini 2.5 Pro / Qwen3-VL-8B / GPT-4o / Gemini 2.5 Flash |
+
+Table 2 row **"UIAutomator2 → Maestro" is dropped**: no flag can switch the Android screen source
+back to Maestro on this branch: the UIAutomator2 client arrived in 730e4d7 (2025-11-26) and the
+Maestro code paths were removed from the controllers on 2025-12-03 (7dd6354, eb8b899, d56698d),
+so the row can't be re-measured.
+
+`tests/mobile_use/benchmark/test_config_diffs.py` checks that every runnable config differs from
+`full.jsonc` by exactly the flags (and, for routing rows, only the models) listed for it, and
+`test_full_unchanged.py` proves the `full.jsonc` system is frozen since 4fe7ea4.
 
 Files starting with `_` are bases (`extends`). The resolved config and its SHA-256 are written
 into every `run_start` event and `result.json`.

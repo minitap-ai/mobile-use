@@ -1,0 +1,8 @@
+{
+  // Table 2 row "Hybrid perception": UI hierarchy only, no screenshot to the Cortex (and the
+  // text-only perception section of the Cortex prompt). Only use_vision off.
+  "extends": "full.jsonc",
+  "name": "no-hybrid-perception",
+  "description": "Full system in text-only mode (UI hierarchy, no screenshots).",
+  "ablation": { "use_vision": false }
+}

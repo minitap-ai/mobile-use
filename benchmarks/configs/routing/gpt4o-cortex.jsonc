@@ -1,8 +1,12 @@
 {
+  // NOT USED IN THE PAPER: v1 routing study on Gemini 2.5 Pro, kept for reference only (P0-D
+  // decision 5: the paper's routing rows are full-all-frontier, full, cortex-budget,
+  // planner-budget, noncortex-budget).
   // Paper Table 4 'GPT-4o Cortex': Cortex GPT-4o, others Qwen3-VL-8B (GPT-4o snapshot not stated in the paper; openai/gpt-4o is the 2024-05-13 alias on OpenRouter).
   // Hopper/outputter are not in the paper table: Qwen3-VL-8B like the other budget agents (UNVERIFIED).
   "extends": "../full.jsonc",
   "name": "routing-gpt4o-cortex",
+  "paper_reference": "NOT USED IN THE PAPER (v1 Gemini 2.5 routing study, reference only)",
   "description": "Paper Table 4 'GPT-4o Cortex': Cortex GPT-4o, others Qwen3-VL-8B (GPT-4o snapshot not stated in the paper; openai/gpt-4o is the 2024-05-13 alias on OpenRouter).",
   "llm": {
     "cortex": { "provider": "openrouter", "model": "openai/gpt-4o" },

@@ -1,0 +1,8 @@
+{
+  // Table 2 row "Sequential execution": tool calls of one Cortex decision run in parallel,
+  // without abort-on-failure (only use_sequential_execution off).
+  "extends": "full.jsonc",
+  "name": "no-sequential-execution",
+  "description": "Full system with parallel tool execution (no abort-on-failure).",
+  "ablation": { "use_sequential_execution": false }
+}

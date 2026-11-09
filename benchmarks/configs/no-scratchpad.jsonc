@@ -1,0 +1,7 @@
+{
+  // Table 2 row "Scratchpad memory": no save_note / read_note / list_notes tools.
+  "extends": "full.jsonc",
+  "name": "no-scratchpad",
+  "description": "Full system without the scratchpad (note) tools.",
+  "ablation": { "use_scratchpad": false }
+}

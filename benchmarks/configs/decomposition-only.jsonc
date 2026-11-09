@@ -1,0 +1,15 @@
+{
+  // WMAC "what decomposition adds": full.jsonc with ONLY use_multi_agent=false, i.e. the single
+  // monolithic agent (on the Cortex model) keeps every other mechanism (sequential execution,
+  // post-validation, text check, vision, prompts, scratchpad, video). Compare with full.jsonc.
+  // Effects to disclose: the loop detector is hooked in the multi-agent Cortex node, so it is
+  // inactive here even though its flag is on (the agent logs a warning).
+  // One routing difference is required, not chosen: the monolithic agent binds its tools with
+  // parallel_tool_calls=true on the Cortex model, which no OpenRouter endpoint declares, so the
+  // Cortex needs require_parameters=false (same as a0-single-agent.jsonc).
+  "extends": "full.jsonc",
+  "name": "decomposition-only",
+  "description": "Full system minus task decomposition (monolithic agent, every other mechanism on).",
+  "ablation": { "use_multi_agent": false },
+  "llm": { "cortex": { "openrouter_provider": { "require_parameters": false } } }
+}

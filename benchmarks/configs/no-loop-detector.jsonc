@@ -1,0 +1,7 @@
+{
+  // Table 2 leave-one-out: full system minus the deterministic loop detector (only that flag).
+  "extends": "full.jsonc",
+  "name": "no-loop-detector",
+  "description": "Full system without the deterministic loop detector.",
+  "ablation": { "use_loop_detector": false }
+}
