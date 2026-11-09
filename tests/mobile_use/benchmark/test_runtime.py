@@ -13,7 +13,9 @@ from minitap.mobile_use.services.llm import LLMFallbackDisabledError, with_fallb
 def runtime(tmp_path):
     def make(allow_fallback=False):
         r = rt.BenchmarkRuntime(
-            tmp_path / "events.jsonl", "run-1", rt.LLMPolicy(allow_fallback=allow_fallback, retry_backoff_s=0)
+            tmp_path / "events.jsonl",
+            "run-1",
+            rt.LLMPolicy(allow_fallback=allow_fallback, retry_backoff_s=0),
         )
         rt.activate(r)
         return r
