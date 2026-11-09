@@ -62,6 +62,8 @@ FAKE_HARNESS = textwrap.dedent(
         rec["score"] = 0.0
     elif outcome == "infra":
         rec.update(status="error", error_kind="llm_api", infra_suspect=True, score=0.0)
+    elif outcome == "timeout_success":
+        rec.update(status="timeout", score=1.0)
     elif outcome == "badsha":
         rec.update(git_sha="b" * 40, score=1.0)
     elif outcome == "nometrics":
@@ -509,3 +511,87 @@ def test_flat_rows_with_matrix_fields_are_accepted(world):
     assert row["outcome"] == "success" and row["cost_usd"] == 1.25 and row["cost_source"] == "row"
     assert (row["prompt_tokens"], row["completion_tokens"], row["llm_calls"]) == (10, 2, 3)
     assert row["agent_wall_s"] == 99.0
+
+
+@pytest.mark.parametrize(
+    "harness,expected",
+    [
+        ({"status": "completed", "score": 1.0}, ("success", 1.0, 1.0, True)),
+        ({"status": "ended_incomplete", "score": 1.0}, ("success", 1.0, 1.0, True)),
+        ({"status": "timeout", "score": 1.0}, ("agent_failure", 0.0, 1.0, False)),
+        ({"status": "max_steps", "score": 1.0}, ("agent_failure", 0.0, 1.0, False)),
+        ({"status": "completed", "score": 0.0}, ("agent_failure", 0.0, 0.0, True)),
+        # a harness that already applied the gate (P1-P official_score) is trusted
+        (
+            {"status": "timeout", "score": 1.0, "official_score": 0.0},
+            ("agent_failure", 0.0, 1.0, False),
+        ),
+    ],
+)
+def test_official_done_gate(world, harness, expected):
+    make, tmp = world
+    spec = make(tasks=("T1",))
+    h = {"task": "T1", "git_sha": SHA, "git_dirty": False, **harness}
+    row = matrix.build_row(
+        spec.cells()[0],
+        spec,
+        h,
+        attempt=1,
+        device={"serial": "d"},
+        out_dir=tmp,
+        exit_code=0,
+        cell_wall_s=1.0,
+        started="t",
+    )
+    assert (row["outcome"], row["score"], row["score_raw"], row["episode_done"]) == expected
+    assert row["score_rule"] == matrix.SCORE_RULE
+
+
+def test_timeout_with_satisfied_state_is_not_a_success_end_to_end(world):
+    make, _ = world
+    spec = make(tasks=("T1",), plan={"T1": ["timeout_success"]})
+    run(spec)
+    r = rows(spec.out_dir / "results.jsonl")[0]
+    assert r["outcome"] == "agent_failure" and r["score"] == 0.0 and r["score_raw"] == 1.0
+
+
+def test_rescore_rows_written_before_the_gate(world):
+    make, _ = world
+    spec = make(tasks=("T1", "T2"))
+    run(spec)
+    # rewrite the ledger as c3f77e7 would have: raw score, no score_rule, timeout counted as success
+    res = rows(spec.out_dir / "results.jsonl")
+    old = []
+    for r in res:
+        r = {k: v for k, v in r.items() if k not in ("score_raw", "episode_done", "score_rule")}
+        if r["task"] == "T2":
+            r["status"] = "timeout"  # raw score 1.0 kept, outcome "success" as the old code wrote
+        old.append(r)
+    (spec.out_dir / "results.jsonl").write_text("".join(json.dumps(r) + "\n" for r in old))
+    summary = matrix.summarize(spec, matrix.Ledger(spec.out_dir))
+    assert summary["by_group"][0]["success"] == 1 and summary["by_group"][0]["agent_failure"] == 1
+    assert matrix.main(["rescore", str(spec.path)]) == 0
+    off = {r["task"]: r for r in rows(spec.out_dir / "results.official.jsonl")}
+    assert off["T2"]["outcome"] == "agent_failure" and off["T2"]["score"] == 0.0
+    assert off["T1"]["outcome"] == "success"
+    assert rows(spec.out_dir / "results.jsonl") == old  # the ledger itself is untouched
+
+
+def test_two_processes_share_spend_and_final_rows(tmp_path):
+    a, b = matrix.Ledger(tmp_path), matrix.Ledger(tmp_path)
+    a.add_attempt({"key": "k1", "outcome": "success", "cost_usd": 1.5})
+    assert b.spent_usd() == 1.5  # b sees a's spend without restarting
+    b.add_attempt({"key": "k2", "outcome": "agent_failure", "cost_usd": 0.5})
+    assert a.spent_usd() == 2.0
+    a.finalize({"key": "k1", "outcome": "success"}, a.attempts["k1"])
+    b.refresh()
+    assert "k1" in b.final
+    b.finalize({"key": "k1", "outcome": "success"}, b.attempts["k1"])  # no duplicate row
+    assert len(rows(tmp_path / "results.jsonl")) == 1
+    # a partially written line (another writer mid-append) is not consumed early
+    with open(tmp_path / "attempts.jsonl", "a") as f:
+        f.write('{"key": "k3", "outcome": "success", "cost_usd": 1')
+    assert a.spent_usd() == 2.0
+    with open(tmp_path / "attempts.jsonl", "a") as f:
+        f.write(".0}\n")
+    assert a.spent_usd() == 3.0

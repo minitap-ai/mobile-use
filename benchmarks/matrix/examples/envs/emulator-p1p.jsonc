@@ -1,0 +1,33 @@
+{
+  // P1-P's private twin of envs/emulator.jsonc (only the devices_file differs). CONFIRMED by P1-P (2026-11-09 20:30 CET). Stock official emulator (android_env + gRPC + console,
+  // no shim) through local/aw-physical/run_emulator.py: P0-A's CLI + the two emulator ports, P0-A's
+  // row shape, ONE attempt and ONE row per call (the matrix re-queues). Inside the runner: setup is
+  // re-run whenever the device boot_id changed (Android wipes the snapshot dir at boot); an init that
+  // logs "Snapshot not found" -> status harness_init_error, infra_suspect=true, infra_reason
+  // snapshot_missing (then forced re-setup); AdbControllerError in init (Settings rm race) ->
+  // harness_init_error / init_adb_race. Extra fields: official_score (upstream's done-gate), done,
+  // start_on_home_screen, device_date_*, instance_seed (upstream create_suite seeding).
+  // Devices: THIS file's devices_file is intentionally left empty; the emulator cells are driven by
+  // P1-P's single process (specs/aw-rework-emulator.jsonc -> envs/emulator-p1p.jsonc, same env name
+  // "emulator", same ledger), so a second matrix process can never put two tasks on one emulator.
+  // Each device line carries its ports: {"serial": "emulator-5554", "console_port": 5554, "grpc_port": 8554}
+  "owner": "P1-P",
+  "cwd": "../../aw-physical",
+  "python": "../aw-limrun/.venv/bin/python",
+  "command": [
+    "{python}", "run_emulator.py", "{serial}", "{out_dir}",
+    "--console-port", "{console_port}", "--grpc-port", "{grpc_port}",
+    "--tasks", "{task}", "--config", "{config_path}",
+    "--mobile-use", "{mobile_use_path}", "--expect-sha", "{mobile_use_sha}",
+    "--seed", "{seed}", "--timeout-s", "{timeout_s}", "--run-id", "{run_id}"
+  ],
+  "result_file": "{out_dir}/results.jsonl",
+  "devices_file": "../devices/emulator-p1p.txt",
+  "max_concurrency": 1,           // this Mac fits 1 emulator (P1-P); raise on a KVM VM
+  "quarantine_after_infra": 2,
+  "harness_overhead_s": 1500,   // env load 17-31 s + a stock re-setup after a boot (260-300 s, up to 3 tries)
+  "env_vars": { "GRPC_VERBOSITY": "ERROR" },
+  // adb safety (mandatory): android_env's adb_path must be tools/adbwrap, which drops
+  // `adb kill-server` (it would drop every Limrun tunnel on the shared server).
+  "adb_safety": { "mode": "adbwrap", "path": "../../aw-physical/tools/adbwrap" }
+}

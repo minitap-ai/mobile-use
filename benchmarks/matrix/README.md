@@ -8,9 +8,10 @@ runs the pinned mobile-use agent (`minitap.mobile_use.benchmark.runner`), scores
 
 ```bash
 set -a; source ~/.opencode-creds/openrouter-paper.env; set +a   # the agent and the key guard need it
-python benchmarks/matrix/matrix.py plan   local/matrix/specs/p2-headline.jsonc   # cell count, cost estimate, devices
-python benchmarks/matrix/matrix.py run    local/matrix/specs/p2-headline.jsonc   # resumable
-python benchmarks/matrix/matrix.py status local/matrix/specs/p2-headline.jsonc   # per config/env/seed
+python benchmarks/matrix/matrix.py plan   local/matrix/specs/aw-rework.jsonc   # cell count, cost estimate, devices
+python benchmarks/matrix/matrix.py run    local/matrix/specs/aw-rework.jsonc   # resumable
+python benchmarks/matrix/matrix.py status local/matrix/specs/aw-rework.jsonc   # per config/env/seed
+python benchmarks/matrix/matrix.py rescore local/matrix/specs/aw-rework.jsonc  # official view of old rows
 touch <out_dir>/STOP                                                            # stop launching, let running cells finish
 ```
 
@@ -62,6 +63,20 @@ score error error_kind final_answer cost_usd cost_source prompt_tokens completio
 agent_wall_s init_s cell_wall_s git_sha git_dirty expected_sha config_resolved_sha256 aw_sha
 device harness_run_id harness_exit_code workarounds out_dir started_at ended_at`, and in
 `results.jsonl` also `attempts attempt_outcomes total_cost_usd_all_attempts`.
+
+**Official score (done-gate).** AndroidWorld's own runner counts a task only if the agent ended
+the episode itself: `agent_successful = task_successful if interaction_results.done else 0.0`
+(`suite_utils._run_task`, upstream @55ddaf5). The matrix applies the same rule to every row,
+whatever the harness: `score` = official score, `score_raw` = the harness's `is_successful`,
+`episode_done` = agent status `completed` or `ended_incomplete` (max_steps, timeout and errors
+are not done), `score_rule = "aw_suite_utils_done_gate"`. A harness `official_score` field, if
+present, is used as is. Rows written by c3f77e7 (before the gate) stored the raw score as
+`score`; `status` and `rescore` re-apply the gate to them (`matrix.py rescore <spec>` writes
+`results.official.jsonl`; the ledger is never rewritten).
+
+**Several processes, one ledger.** Two matrix processes may share an `out_dir` (e.g. one per
+environment, with disjoint cells): appends are flock-ed single lines and every read picks up the
+other process's lines first, so the spend guard sees the total spend.
 
 `outcome`:
 - `success`: official score 1.0;

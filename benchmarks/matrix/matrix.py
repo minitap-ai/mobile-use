@@ -26,6 +26,7 @@ Guarantees:
 from __future__ import annotations
 
 import argparse
+import fcntl
 import glob
 import hashlib
 import json
@@ -341,6 +342,26 @@ def cost_from_events(out_dir: Path) -> float | None:
     return total if seen else None
 
 
+# AndroidWorld's own rule (suite_utils._run_task, upstream @55ddaf5):
+#   agent_successful = task_successful if interaction_results.done else 0.0
+# i.e. a task only counts if the agent ended the episode itself. For mobile-use, "done" = the
+# graph ended on its own (status completed / ended_incomplete); max_steps, timeout and errors are
+# not done, so they score 0 even if the device state happens to satisfy the evaluator.
+EPISODE_DONE_STATUSES = {"completed", "ended_incomplete"}
+SCORE_RULE = "aw_suite_utils_done_gate"
+
+
+def official_score(h: dict) -> tuple[float | None, float | None, bool]:
+    """-> (official score, raw is_successful score, episode done)."""
+    raw = _num(h.get("score_raw", h.get("score")))
+    done = h.get("status") in EPISODE_DONE_STATUSES
+    if h.get("official_score") is not None:  # harness applied the gate itself (P1-P)
+        return _num(h["official_score"]), raw, done
+    if raw is None:
+        return None, None, done
+    return (raw if done else 0.0), raw, done
+
+
 def classify(h: dict) -> tuple[str, str | None]:
     """-> (outcome, infra_reason). outcome: success | agent_failure | infra_failure."""
     status = h.get("status")
@@ -354,10 +375,21 @@ def classify(h: dict) -> tuple[str, str | None]:
         h.get("_expected_sha") and h.get("git_sha") not in (None, h["_expected_sha"])
     ):
         return "infra_failure", "sha_mismatch"
-    score = _num(h.get("score"))
+    score, _raw, _done = official_score(h)
     if score is None:
         return "infra_failure", "no_score"
     return ("success" if score >= 1.0 else "agent_failure"), None
+
+
+def official_outcome(row: dict) -> str:
+    """Outcome under the official gate, also for rows written before the gate existed."""
+    if row.get("score_rule") == SCORE_RULE or row.get("outcome") not in (
+        "success",
+        "agent_failure",
+    ):
+        return row["outcome"]
+    score, _raw, _done = official_score(row)
+    return "success" if (score or 0.0) >= 1.0 else "agent_failure"
 
 
 def build_row(
@@ -401,7 +433,10 @@ def build_row(
         "outcome": outcome,
         "infra_reason": infra_reason,
         "status": h.get("status"),
-        "score": _num(h.get("score")),
+        "score": official_score(h)[0],
+        "score_raw": official_score(h)[1],
+        "episode_done": official_score(h)[2],
+        "score_rule": SCORE_RULE,
         "error": h.get("error") or h.get("score_error"),
         "error_kind": h.get("error_kind"),
         "final_answer": h.get("final_answer"),
@@ -430,7 +465,12 @@ def build_row(
 
 # --------------------------------------------------------------------------- runner
 class Ledger:
-    """attempts.jsonl (every attempt) + results.jsonl (one final row per cell) + events.jsonl."""
+    """attempts.jsonl (every attempt) + results.jsonl (one final row per cell) + events.jsonl.
+
+    The files are the source of truth and may be shared by several matrix processes (e.g. one per
+    environment on the same out_dir): appends are flock-ed single lines, and every read first
+    picks up the lines other processes appended, so the spend guard sees the total spend.
+    """
 
     def __init__(self, out_dir: Path):
         self.out_dir = out_dir
@@ -441,27 +481,45 @@ class Ledger:
         self.lock = threading.Lock()
         self.attempts: dict[str, list[dict]] = defaultdict(list)
         self.final: dict[str, dict] = {}
-        for p, target in ((self.attempts_path, "a"), (self.results_path, "r")):
-            if p.exists():
-                for line in p.read_text(encoding="utf-8").splitlines():
-                    if not line.strip():
-                        continue
-                    row = json.loads(line)
-                    if target == "a":
-                        self.attempts[row["key"]].append(row)
-                    else:
-                        self.final[row["key"]] = row
+        self._offsets = {self.attempts_path: 0, self.results_path: 0}
+        self.refresh()
+
+    def _read_new(self, path: Path) -> list[dict]:
+        if not path.exists():
+            return []
+        with open(path, "rb") as f:
+            f.seek(self._offsets[path])
+            data = f.read()
+        end = data.rfind(b"\n")
+        if end < 0:
+            return []  # nothing complete yet (a writer is mid-line)
+        chunk = data[: end + 1]
+        self._offsets[path] += len(chunk)
+        return [json.loads(x) for x in chunk.decode("utf-8").splitlines() if x.strip()]
+
+    def refresh(self) -> None:
+        with self.lock:
+            for row in self._read_new(self.attempts_path):
+                self.attempts[row["key"]].append(row)
+            for row in self._read_new(self.results_path):
+                self.final.setdefault(row["key"], row)
 
     def _append(self, path: Path, row: dict):
+        line = json.dumps(row, ensure_ascii=False, default=str) + "\n"
         with open(path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(row, ensure_ascii=False, default=str) + "\n")
+            fcntl.flock(f, fcntl.LOCK_EX)
+            try:
+                f.write(line)
+                f.flush()
+            finally:
+                fcntl.flock(f, fcntl.LOCK_UN)
 
     def add_attempt(self, row: dict):
-        with self.lock:
-            self.attempts[row["key"]].append(row)
-            self._append(self.attempts_path, row)
+        self._append(self.attempts_path, row)
+        self.refresh()
 
     def finalize(self, row: dict, attempts: list[dict]):
+        self.refresh()
         with self.lock:
             if row["key"] in self.final:
                 return
@@ -471,14 +529,14 @@ class Ledger:
             final["total_cost_usd_all_attempts"] = round(
                 sum(a.get("cost_usd") or 0.0 for a in attempts), 6
             )
-            self.final[row["key"]] = final
-            self._append(self.results_path, final)
+        self._append(self.results_path, final)
+        self.refresh()
 
     def event(self, kind: str, **fields):
-        with self.lock:
-            self._append(self.events_path, {"ts": now(), "type": kind, **fields})
+        self._append(self.events_path, {"ts": now(), "type": kind, **fields})
 
     def spent_usd(self) -> float:
+        self.refresh()
         with self.lock:
             return sum(a.get("cost_usd") or 0.0 for rows in self.attempts.values() for a in rows)
 
@@ -573,6 +631,7 @@ class Runner:
 
     # ---------------------------------------------------------------- scheduling
     def pending(self) -> list[Cell]:
+        self.ledger.refresh()
         out = []
         for c in self.spec.cells():
             if c.key in self.ledger.final or c.key in self.inflight_keys:
@@ -780,7 +839,7 @@ def summarize(spec: Spec, ledger: Ledger, stop_reason: str | None = None) -> dic
         if row is None:
             groups[g]["pending"] += 1
             continue
-        groups[g][row["outcome"]] += 1
+        groups[g][official_outcome(row)] += 1
         cost[g] += row.get("total_cost_usd_all_attempts") or 0.0
     by_group = []
     for (config, env, seed), cnt in sorted(groups.items()):
@@ -811,7 +870,7 @@ def summarize(spec: Spec, ledger: Ledger, stop_reason: str | None = None) -> dic
 # --------------------------------------------------------------------------- CLI
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("command", choices=["plan", "run", "status"])
+    ap.add_argument("command", choices=["plan", "run", "status", "rescore"])
     ap.add_argument("spec")
     ap.add_argument("--out", help="output directory (default: spec out_dir)")
     ap.add_argument("--max-cells", type=int, help="launch at most N cells in this session")
@@ -848,6 +907,37 @@ def main(argv: list[str] | None = None) -> int:
                 },
                 indent=2,
                 default=str,
+            )
+        )
+        return 0
+    if a.command == "rescore":
+        # Rows written before the official done-gate (mobile-use c3f77e7) stored the raw
+        # is_successful score as "score". Write the official view next to the ledger (the ledger
+        # itself is never rewritten).
+        ledger = Ledger(spec.out_dir)
+        out_path = spec.out_dir / "results.official.jsonl"
+        changed = 0
+        with open(out_path, "w", encoding="utf-8") as f:
+            for row in ledger.final.values():
+                r = dict(row)
+                if r.get("score_rule") != SCORE_RULE and r.get("outcome") in (
+                    "success",
+                    "agent_failure",
+                ):
+                    score, raw, done = official_score(r)
+                    r.update(
+                        score=score,
+                        score_raw=raw,
+                        episode_done=done,
+                        score_rule=SCORE_RULE,
+                        outcome=official_outcome(row),
+                    )
+                    changed += r["outcome"] != row["outcome"]
+                f.write(json.dumps(r, ensure_ascii=False, default=str) + "\n")
+        print(
+            json.dumps(
+                {"rows": len(ledger.final), "outcome_changed": changed, "written": str(out_path)},
+                indent=2,
             )
         )
         return 0
