@@ -1,0 +1,7 @@
+{
+  // Reference point of the routing study: every agent on Gemini 2.5 Pro (not a row of the
+  // published table, but the baseline the "Degrade X" rows are defined against).
+  "extends": "_all-gemini-2.5-pro.jsonc",
+  "name": "routing-all-gemini-2.5-pro",
+  "description": "Every agent on Gemini 2.5 Pro."
+}

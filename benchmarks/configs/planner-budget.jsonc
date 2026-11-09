@@ -1,0 +1,8 @@
+{
+  // P3 #7a (resolves R12): one non-Cortex agent downgraded. Starts from All Frontier and
+  // replaces only the Planner with the budget model.
+  "extends": "full-all-frontier.jsonc",
+  "name": "planner-budget",
+  "description": "All Frontier except the Planner (Qwen3-VL-8B).",
+  "llm": { "planner": { "provider": "openrouter", "model": "qwen/qwen3-vl-8b-instruct" } }
+}

@@ -1,0 +1,100 @@
+{
+  // Shared base for every benchmark condition of the AndroidWorld paper rework.
+  // Not a runnable condition by itself (files starting with "_" are bases).
+  //
+  // = the January 2026 full system (branch ablation/a9-final, every paper-era flag on) with the
+  //   "Platform Default" routing (llm-config.defaults.jsonc "recommended" preset), served by
+  //   OpenRouter directly instead of the shut-down `minitap` provider.
+  "name": "_base",
+  "description": "Base: paper-era full system, Platform Default routing via OpenRouter.",
+
+  // PENDING DECISIONS are listed in benchmarks/README.md (model ids that no longer work as in
+  // January 2026). Search this file for "PENDING".
+
+  "ablation": {
+    "use_multi_agent": true,
+    "use_sequential_execution": true,
+    "use_post_validation": true,
+    "use_deterministic_text": true,
+    "use_vision": true,
+    "use_meta_reasoning": true,
+    "use_scratchpad": true,
+    "use_video_recording": true,
+    "use_data_fidelity_prompts": true,
+    // Added on paper/androidworld-rework (not in the January 2026 system): off in the base.
+    "use_loop_detector": false,
+    "use_text_match_check": false
+  },
+
+  "loop_detector": {
+    "window": 12,              // transitions looked at for "repeat"
+    "repeat_threshold": 3,     // same (state, action) >= 3 times in the window -> trigger
+    "no_change_threshold": 3,  // 3 consecutive UI actions with no screen change -> trigger
+    "cycle_window": 8,         // last 8 transitions ...
+    "cycle_max_distinct": 2,   // ... visiting <= 2 distinct screens -> trigger
+    "cooldown": 3,             // transitions before the detector may fire again
+    "escalate_after": 2,       // 2 triggers without reaching a new screen -> forced replan
+    "include_bounds": false
+  },
+
+  "text_check": {
+    "mismatch_as_error": false // verdict is reported to the Cortex; the tool call stays "success"
+  },
+
+  "llm_policy": {
+    "allow_fallback": false,   // a fallback would silently change the model under test
+    "max_retries": 4,          // HTTP-level retries inside the OpenAI client (same model)
+    "timeout_s": 180,
+    // OpenRouter provider routing, sent as the request `provider` object.
+    // require_parameters: only route to endpoints that support every parameter we send
+    // (tools / response_format), instead of silently dropping them.
+    "openrouter_provider": {
+      "require_parameters": true
+    }
+  },
+
+  "llm": {
+    "cortex": {
+      "provider": "openrouter",
+      // PENDING: paper id google/gemini-3-pro-preview is no longer listed on OpenRouter
+      // (checked 2026-11-09). Closest available: google/gemini-3.1-pro-preview (same line,
+      // newer preview) or google/gemini-2.5-pro (the paper's own fallback and the model of the
+      // "Degrade X" rows). Default here: gemini-3.1-pro-preview.
+      "model": "google/gemini-3.1-pro-preview"
+    },
+    "planner": { "provider": "openrouter", "model": "meta-llama/llama-4-scout" },
+    "orchestrator": { "provider": "openrouter", "model": "openai/gpt-oss-120b" },
+    "executor": {
+      "provider": "openrouter",
+      // PENDING: paper id meta-llama/llama-3.1-70b-instruct still resolves, but its only
+      // OpenRouter endpoint (Amazon Bedrock) supports no tool calling, and the Executor is a
+      // tool-calling agent. Closest available: meta-llama/llama-3.3-70b-instruct (also the
+      // Executor of the hardcoded Minitap profile, config.py get_default_minitap_llm_config).
+      "model": "meta-llama/llama-3.3-70b-instruct"
+    },
+    "contextor": { "provider": "openrouter", "model": "meta-llama/llama-3.1-8b-instruct" },
+    "utils": {
+      // gpt-5-nano accepts no `temperature` parameter; mobile-use always sends one (hopper 0,
+      // outputter 1). With require_parameters=true OpenRouter finds no endpoint (404), so it is
+      // disabled for this model only: OpenRouter then drops `temperature` (OpenAI's gpt-5 models
+      // only run at their default temperature anyway).
+      "hopper": {
+        "provider": "openrouter",
+        "model": "openai/gpt-5-nano",
+        "openrouter_provider": { "require_parameters": false }
+      },
+      "outputter": {
+        "provider": "openrouter",
+        "model": "openai/gpt-5-nano",
+        "openrouter_provider": { "require_parameters": false }
+      },
+      "video_analyzer": { "provider": "openrouter", "model": "google/gemini-3-flash-preview" }
+    }
+  },
+
+  "agent": {
+    "max_steps": 400,   // LangGraph recursion limit (= paper step limit)
+    "timeout_s": null,  // optional wall-clock cap per task, seconds
+    "record_trace": false
+  }
+}

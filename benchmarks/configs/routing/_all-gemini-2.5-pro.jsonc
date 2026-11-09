@@ -1,0 +1,18 @@
+{
+  // Base of the paper's routing study (Table 4 rows 3-9): "all-frontier baseline (Gemini 2.5 Pro)".
+  // The table lists 5 agents; hopper and outputter are not given in the paper and are set to the
+  // same frontier model here (UNVERIFIED against the January runs).
+  "extends": "../full.jsonc",
+  "name": "_routing-all-gemini-2.5-pro",
+  "llm": {
+    "cortex": { "provider": "openrouter", "model": "google/gemini-2.5-pro" },
+    "planner": { "provider": "openrouter", "model": "google/gemini-2.5-pro" },
+    "orchestrator": { "provider": "openrouter", "model": "google/gemini-2.5-pro" },
+    "executor": { "provider": "openrouter", "model": "google/gemini-2.5-pro" },
+    "contextor": { "provider": "openrouter", "model": "google/gemini-2.5-pro" },
+    "utils": {
+      "hopper": { "provider": "openrouter", "model": "google/gemini-2.5-pro" },
+      "outputter": { "provider": "openrouter", "model": "google/gemini-2.5-pro" }
+    }
+  }
+}

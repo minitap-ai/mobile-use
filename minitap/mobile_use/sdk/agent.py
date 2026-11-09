@@ -23,7 +23,11 @@ from minitap.mobile_use.clients.idb_client import IdbClientWrapper
 from minitap.mobile_use.clients.ios_client import DeviceType, IosClientWrapper, get_ios_client
 from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
 from minitap.mobile_use.clients.wda_client import WdaClientWrapper
+from minitap.mobile_use.benchmark.loop_detector import LoopDetector, LoopDetectorConfig
+from minitap.mobile_use.benchmark.runtime import get_runtime
+from minitap.mobile_use.benchmark.text_check import TextCheckConfig
 from minitap.mobile_use.config import (
+    AblationConfig,
     AgentNode,
     OutputConfig,
     initialize_ablation_config,
@@ -99,8 +103,28 @@ class Agent:
     _task_lock: asyncio.Lock
     _cloud_mobile_id: str | None = None
 
-    def __init__(self, *, config: AgentConfig | None = None):
+    def __init__(
+        self,
+        *,
+        config: AgentConfig | None = None,
+        ablation_config: AblationConfig | None = None,
+        loop_detector_config: LoopDetectorConfig | None = None,
+        text_check_config: TextCheckConfig | None = None,
+    ):
+        """
+        Args:
+            config: Agent configuration.
+            ablation_config: Explicit ablation flags. When None (default), flags are read from
+                MOBILE_USE_ABLATION_CONFIG / ablation-config.*.jsonc as before.
+            loop_detector_config: Thresholds for the loop detector (use_loop_detector).
+            text_check_config: Options of the deterministic text check (use_text_match_check).
+        """
         self._config = config or get_default_agent_config()
+        self._ablation_config_override = ablation_config
+        self._loop_detector_config = loop_detector_config
+        self._text_check_config = text_check_config
+        # State snapshot of the last task, read by the benchmark runner.
+        self.last_task_state: State | None = None
         self._tasks = []
         self._tmp_traces_dir = Path(tempfile.gettempdir()) / "mobile-use-traces"
         self._initialized = False
@@ -685,8 +709,14 @@ class Agent:
         if platform_service:
             api_key = platform_service._api_key
 
-        # Initialize ablation config (reads from override file if present)
-        ablation_config = initialize_ablation_config()
+        # Initialize ablation config: explicit config first, else files (override if present)
+        ablation_config = self._ablation_config_override or initialize_ablation_config()
+        loop_detector: LoopDetector | None = None
+        if ablation_config.use_loop_detector:
+            if ablation_config.use_multi_agent:
+                loop_detector = LoopDetector(self._loop_detector_config)
+            else:
+                logger.warning("use_loop_detector is ignored by the monolithic (a0) graph")
 
         context = MobileUseContext(
             trace_id=task.id,
@@ -703,6 +733,8 @@ class Agent:
                 and agent_profile.llm_config.utils.video_analyzer is not None
             ),
             ablation_config=ablation_config,
+            loop_detector=loop_detector,
+            text_check_config=self._text_check_config,
         )
 
         self._prepare_tracing(task=task, context=context)
@@ -728,6 +760,9 @@ class Agent:
             has_locked_app=request.locked_app_package is not None,
         )
 
+        self.last_task_state = None
+        benchmark_runtime = get_runtime()
+
         async def _execute_task_logic():
             last_state: State | None = None
             last_state_snapshot: dict | None = None
@@ -747,6 +782,7 @@ class Agent:
                     if stream_mode == "values":
                         last_state_snapshot = payload  # type: ignore
                         last_state = State(**last_state_snapshot)  # type: ignore
+                        self.last_task_state = last_state
                         if task.request.thoughts_output_path:
                             record_events(
                                 output_path=task.request.thoughts_output_path,
@@ -754,6 +790,9 @@ class Agent:
                             )
 
                     if stream_mode == "updates":
+                        if benchmark_runtime is not None:
+                            for node_name in payload:  # type: ignore
+                                benchmark_runtime.record_node(str(node_name))
                         for _, value in payload.items():  # type: ignore node name, node output
                             if value and "agents_thoughts" in value:
                                 new_thoughts = value["agents_thoughts"]
@@ -1015,7 +1054,10 @@ class Agent:
             return
 
         task_name = task.get_name()
-        status = "_PASS" if task.status == "completed" else "_FAIL"
+        # NOTE (04 - Audit A7): this suffix only says whether the graph raised. It is NOT a task
+        # success signal; success is decided by the benchmark's own evaluator. It used to be
+        # "_PASS"/"_FAIL", which was easy to misread as a score.
+        status = "_NO_ERROR" if task.status == "completed" else "_ERROR"
         ts = task.created_at.strftime("%Y-%m-%dT%H-%M-%S")
         new_name = f"{exec_setup_ctx.trace_name}{status}_{ts}"
 

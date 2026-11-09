@@ -6,7 +6,7 @@ from typing import Annotated, Any, Literal
 import google.auth
 from dotenv import load_dotenv
 from google.auth.exceptions import DefaultCredentialsError
-from pydantic import BaseModel, Field, SecretStr, ValidationError, model_validator
+from pydantic import AliasChoices, BaseModel, Field, SecretStr, ValidationError, model_validator
 from pydantic_settings import BaseSettings
 
 from minitap.mobile_use.utils.file import load_jsonc
@@ -22,7 +22,13 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: SecretStr | None = None
     GOOGLE_API_KEY: SecretStr | None = None
     XAI_API_KEY: SecretStr | None = None
-    OPEN_ROUTER_API_KEY: SecretStr | None = None
+    # Both spellings are accepted. The benchmark runner (minitap.mobile_use.benchmark)
+    # explicitly re-reads OPENROUTER_API_KEY from the process environment so that a key
+    # found in a local .env file can never silently replace the benchmark key.
+    OPEN_ROUTER_API_KEY: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("OPEN_ROUTER_API_KEY", "OPENROUTER_API_KEY"),
+    )
     MINITAP_API_KEY: SecretStr | None = None
 
     OPENAI_BASE_URL: str | None = None
@@ -125,6 +131,10 @@ def validate_vertex_ai_credentials():
 class LLM(BaseModel):
     provider: LLMProvider
     model: str
+    # Optional OpenRouter provider-routing preferences, sent as the `provider` request field
+    # (see https://openrouter.ai/docs/features/provider-routing). Only used when
+    # provider == "openrouter". Merged on top of the benchmark-wide defaults.
+    openrouter_provider: dict[str, Any] | None = None
 
     def validate_provider(self, name: str):
         match self.provider:
@@ -429,7 +439,11 @@ class AblationConfig(BaseModel):
     to the overall system performance. When all features are enabled, this represents
     the full mobile-use system (100% AndroidWorld performance).
     """
-    
+
+    # Unknown keys are rejected: a typo in a flag name must fail loudly, never silently
+    # fall back to the default value of the flag.
+    model_config = {"extra": "forbid"}
+
     # Architecture features
     use_multi_agent: Annotated[
         bool,
@@ -503,6 +517,31 @@ class AblationConfig(BaseModel):
         ),
     ]
 
+    # Features added on paper/androidworld-rework (not part of the January 2026 system).
+    # Both default to False so that the paper-era behaviour is unchanged unless a config
+    # explicitly enables them.
+    use_loop_detector: Annotated[
+        bool,
+        Field(
+            default=False,
+            description=(
+                "Deterministic loop detector: hashes (UI state, executed action) pairs and, "
+                "on repetition / no-progress / oscillation, injects an explicit warning into "
+                "the Cortex context and can force a replan. Multi-agent graph only."
+            ),
+        ),
+    ]
+    use_text_match_check: Annotated[
+        bool,
+        Field(
+            default=False,
+            description=(
+                "After focus_and_input_text, deterministically compare the read-back field "
+                "value with the intended text and return MATCH/MISMATCH to the Cortex."
+            ),
+        ),
+    ]
+
     def __str__(self):
         return f"""
 Ablation Configuration:
@@ -515,6 +554,8 @@ Ablation Configuration:
   Scratchpad (notes): {self.use_scratchpad}
   Video recording: {self.use_video_recording}
   Data fidelity prompts: {self.use_data_fidelity_prompts}
+  Loop detector: {self.use_loop_detector}
+  Text match check: {self.use_text_match_check}
 """
 
     def get_enabled_features(self) -> list[str]:
@@ -538,6 +579,10 @@ Ablation Configuration:
             features.append("video_recording")
         if self.use_data_fidelity_prompts:
             features.append("data_fidelity_prompts")
+        if self.use_loop_detector:
+            features.append("loop_detector")
+        if self.use_text_match_check:
+            features.append("text_match_check")
         return features
 
     def get_disabled_features(self) -> list[str]:
@@ -561,6 +606,10 @@ Ablation Configuration:
             features.append("video_recording")
         if not self.use_data_fidelity_prompts:
             features.append("data_fidelity_prompts")
+        if not self.use_loop_detector:
+            features.append("loop_detector")
+        if not self.use_text_match_check:
+            features.append("text_match_check")
         return features
 
 
@@ -582,6 +631,16 @@ def get_default_ablation_config() -> AblationConfig:
     )
 
 
+ABLATION_CONFIG_PATH_ENV = "MOBILE_USE_ABLATION_CONFIG"
+
+
+def load_ablation_config_file(path: Path) -> AblationConfig:
+    """Load a complete ablation config from an explicit file (strict: unknown keys fail)."""
+    with open(path) as f:
+        data = load_jsonc(f)
+    return AblationConfig.model_validate(data, strict=True)
+
+
 def parse_ablation_config() -> AblationConfig:
     """
     Parse ablation config from files, with override support.
@@ -589,6 +648,13 @@ def parse_ablation_config() -> AblationConfig:
     Loads defaults from ablation-config.defaults.jsonc and merges
     with ablation-config.override.jsonc if it exists.
     """
+    explicit_path = os.getenv(ABLATION_CONFIG_PATH_ENV)
+    if explicit_path:
+        # An explicit file wins over the repo-level defaults/override files, so that a single
+        # commit can serve every ablation config (selected by file, not by branch).
+        logger.info(f"Loading ablation config from {ABLATION_CONFIG_PATH_ENV}={explicit_path}")
+        return load_ablation_config_file(Path(explicit_path))
+
     default_config = get_default_ablation_config()
     
     # Try to load defaults file

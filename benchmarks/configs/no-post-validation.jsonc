@@ -1,0 +1,7 @@
+{
+  // P3 #4: full minus post-validation (no read-back after text input, hence no text verdict).
+  "extends": "full.jsonc",
+  "name": "no-post-validation",
+  "description": "Full system without post-validation (and without the text match check).",
+  "ablation": { "use_post_validation": false, "use_text_match_check": false }
+}

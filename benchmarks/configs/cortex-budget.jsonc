@@ -1,0 +1,8 @@
+{
+  // P3 #6: Cortex downgraded to a budget model; other agents as in Platform Default.
+  // Budget model = Qwen3-VL-8B, the "budget" model of the paper's routing study.
+  "extends": "full.jsonc",
+  "name": "cortex-budget",
+  "description": "Full system, Platform Default routing with a budget Cortex (Qwen3-VL-8B).",
+  "llm": { "cortex": { "provider": "openrouter", "model": "qwen/qwen3-vl-8b-instruct" } }
+}

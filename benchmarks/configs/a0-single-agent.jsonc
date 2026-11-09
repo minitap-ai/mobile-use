@@ -1,0 +1,22 @@
+{
+  // P3 #1: single-agent baseline = ablation/a0-baseline flags (every feature off: monolithic
+  // agent, parallel tool execution, no post-validation, simple text input, no screenshots, no
+  // meta-reasoning, no scratchpad, no video, no data-fidelity prompt). The monolithic agent
+  // uses the Cortex model (monolithic.py calls get_llm(name="cortex")).
+  "extends": "_base.jsonc",
+  "name": "a0-single-agent",
+  "description": "Monolithic single-agent baseline (a0 flags), Cortex model of Platform Default.",
+  "ablation": {
+    "use_multi_agent": false,
+    "use_sequential_execution": false,
+    "use_post_validation": false,
+    "use_deterministic_text": false,
+    "use_vision": false,
+    "use_meta_reasoning": false,
+    "use_scratchpad": false,
+    "use_video_recording": false,
+    "use_data_fidelity_prompts": false,
+    "use_loop_detector": false,
+    "use_text_match_check": false
+  }
+}

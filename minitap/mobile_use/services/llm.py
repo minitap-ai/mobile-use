@@ -9,6 +9,8 @@ from langchain_google_vertexai import ChatVertexAI
 from langchain_openai import ChatOpenAI
 from pydantic import SecretStr
 
+from minitap.mobile_use.benchmark.llm_callback import BenchmarkLLMCallback
+from minitap.mobile_use.benchmark.runtime import get_runtime
 from minitap.mobile_use.config import (
     AgentNode,
     AgentNodeWithFallback,
@@ -133,13 +135,53 @@ def get_openai_llm(
     return client
 
 
-def get_openrouter_llm(model_name: str, temperature: float = 1):
+class ChatOpenRouter(ChatOpenAI):
+    """ChatOpenAI pointed at OpenRouter that also surfaces OpenRouter-specific response fields.
+
+    OpenRouter adds `provider` (the upstream that actually served the call) to the response
+    body and `cost` to the usage object; langchain-openai drops the former, so we copy it into
+    `llm_output` for the benchmark recorder.
+    """
+
+    def _create_chat_result(self, response, generation_info=None):  # type: ignore[override]
+        result = super()._create_chat_result(response, generation_info)
+        response_dict = response if isinstance(response, dict) else response.model_dump()
+        if result.llm_output is not None:
+            result.llm_output["provider"] = response_dict.get("provider")
+        return result
+
+
+def get_openrouter_llm(
+    model_name: str,
+    temperature: float = 1,
+    provider_routing: dict | None = None,
+    callbacks: list | None = None,
+):
     assert settings.OPEN_ROUTER_API_KEY is not None
-    client = ChatOpenAI(
+    runtime = get_runtime()
+    kwargs: dict[str, Any] = {}
+    extra_body: dict[str, Any] = {}
+    if runtime is not None:
+        policy = runtime.llm_policy
+        kwargs["max_retries"] = policy.max_retries
+        kwargs["timeout"] = policy.timeout_s
+        kwargs["default_headers"] = {"X-Title": policy.openrouter_app_title}
+        # Ask OpenRouter to return the charged cost in `usage.cost`.
+        extra_body["usage"] = {"include": True}
+        merged_routing = {**policy.openrouter_provider, **(provider_routing or {})}
+        if merged_routing:
+            extra_body["provider"] = merged_routing
+    elif provider_routing:
+        extra_body["provider"] = provider_routing
+    if extra_body:
+        kwargs["extra_body"] = extra_body
+    client = ChatOpenRouter(
         model=model_name,
         temperature=temperature,
         api_key=settings.OPEN_ROUTER_API_KEY,
         base_url="https://openrouter.ai/api/v1",
+        callbacks=callbacks,
+        **kwargs,
     )
     return client
 
@@ -203,21 +245,40 @@ def get_llm(
             llm = llm.fallback
         else:
             raise ValueError("LLM has no fallback!")
+    runtime = get_runtime()
+    callbacks = None
+    if runtime is not None:
+        callbacks = [
+            BenchmarkLLMCallback(
+                runtime,
+                agent=str(name),
+                requested_model=llm.model,
+                provider_kind=llm.provider,
+                is_fallback=use_fallback,
+            )
+        ]
+
+    client: BaseChatModel
     if llm.provider == "openai":
-        return get_openai_llm(llm.model, temperature)
+        client = get_openai_llm(llm.model, temperature)
     elif llm.provider == "google":
-        return get_google_llm(llm.model, temperature)
+        client = get_google_llm(llm.model, temperature)
     elif llm.provider == "vertexai":
-        return get_vertex_llm(llm.model, temperature)
+        client = get_vertex_llm(llm.model, temperature)
     elif llm.provider == "openrouter":
-        return get_openrouter_llm(llm.model, temperature)
+        return get_openrouter_llm(
+            llm.model,
+            temperature,
+            provider_routing=llm.openrouter_provider,
+            callbacks=callbacks,
+        )
     elif llm.provider == "xai":
-        return get_grok_llm(llm.model, temperature)
+        client = get_grok_llm(llm.model, temperature)
     elif llm.provider == "minitap":
         remote_tracing = False
         if ctx.execution_setup:
             remote_tracing = ctx.execution_setup.enable_remote_tracing
-        return get_minitap_llm(
+        client = get_minitap_llm(
             trace_id=ctx.trace_id,
             remote_tracing=remote_tracing,
             model=llm.model,
@@ -226,6 +287,10 @@ def get_llm(
         )
     else:
         raise ValueError(f"Unsupported provider: {llm.provider}")
+    if callbacks:
+        # Constructor-level callbacks propagate through with_structured_output()/bind_tools().
+        client.callbacks = callbacks
+    return client
 
 
 T = TypeVar("T")
@@ -236,12 +301,33 @@ async def with_fallback(
     fallback_call: Callable[[], Awaitable[T]],
     none_should_fallback: bool = True,
 ) -> T:
+    runtime = get_runtime()
+    allow_fallback = runtime is None or runtime.llm_policy.allow_fallback
     try:
         result = await main_call()
         if result is None and none_should_fallback:
             llm_logger.warning("Main LLM inference returned None. Falling back...")
+            if runtime is not None:
+                runtime.record_fallback(
+                    reason="main call returned None", blocked=not allow_fallback
+                )
+            if not allow_fallback:
+                raise LLMFallbackDisabledError("Main LLM inference returned None")
             return await fallback_call()
         return result
+    except LLMFallbackDisabledError:
+        raise
     except Exception as e:
+        if runtime is not None:
+            runtime.record_fallback(
+                reason=f"{type(e).__name__}: {e}", blocked=not allow_fallback
+            )
+        if not allow_fallback:
+            # Benchmark mode: a fallback would silently change the model under test.
+            raise LLMFallbackDisabledError(f"Main LLM inference failed: {e}") from e
         llm_logger.warning(f"❗ Main LLM inference failed: {e}. Falling back...")
         return await fallback_call()
+
+
+class LLMFallbackDisabledError(RuntimeError):
+    """Raised in benchmark mode when the main model fails and fallbacks are disabled."""

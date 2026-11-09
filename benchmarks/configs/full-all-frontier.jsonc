@@ -1,0 +1,19 @@
+{
+  // P3 #3: "All Frontier" = the frontier model on all seven agents (paper Table 4 row 2).
+  // PENDING: paper model google/gemini-3-pro-preview is gone; same replacement as the Cortex
+  // of _base.jsonc. video_analyzer keeps the Platform Default model (not part of the table).
+  "extends": "full.jsonc",
+  "name": "full-all-frontier",
+  "description": "Full system, frontier model on all seven agents.",
+  "llm": {
+    "cortex": { "provider": "openrouter", "model": "google/gemini-3.1-pro-preview" },
+    "planner": { "provider": "openrouter", "model": "google/gemini-3.1-pro-preview" },
+    "orchestrator": { "provider": "openrouter", "model": "google/gemini-3.1-pro-preview" },
+    "executor": { "provider": "openrouter", "model": "google/gemini-3.1-pro-preview" },
+    "contextor": { "provider": "openrouter", "model": "google/gemini-3.1-pro-preview" },
+    "utils": {
+      "hopper": { "provider": "openrouter", "model": "google/gemini-3.1-pro-preview" },
+      "outputter": { "provider": "openrouter", "model": "google/gemini-3.1-pro-preview" }
+    }
+  }
+}

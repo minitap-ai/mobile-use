@@ -1,5 +1,6 @@
 import asyncio
 import copy
+import time
 from typing import Any, override
 
 from langchain_core.messages import AnyMessage, ToolCall, ToolMessage
@@ -9,6 +10,7 @@ from langgraph.store.base import BaseStore
 from langgraph.types import Command
 from pydantic import BaseModel
 
+from minitap.mobile_use.benchmark.runtime import get_runtime
 from minitap.mobile_use.services.telemetry import telemetry
 from minitap.mobile_use.utils.logger import get_logger
 
@@ -34,6 +36,7 @@ class ExecutorToolNode(ToolNode):
         super().__init__(tools=tools, messages_key=messages_key)
         self._trace_id = trace_id
         self._sequential_execution = sequential_execution
+        self._latencies: dict[str, float] = {}
 
     @override
     async def _afunc(
@@ -94,10 +97,12 @@ class ExecutorToolNode(ToolNode):
                     message="Aborted: a previous tool call failed!",
                 )
             else:
+                started = time.perf_counter()
                 if is_async:
                     output = await self._arun_one(call, input_type, config)
                 else:
                     output = self._run_one(call, input_type, config)
+                self._latencies[call["id"]] = time.perf_counter() - started
                 failed = self._has_tool_call_failed(call, output)
                 if failed is None:
                     output = self._get_erroneous_command(
@@ -127,7 +132,14 @@ class ExecutorToolNode(ToolNode):
         
         if is_async:
             # Run all tools concurrently
-            tasks = [self._arun_one(call, input_type, config) for call in tool_calls]
+            async def _timed(call):
+                started = time.perf_counter()
+                try:
+                    return await self._arun_one(call, input_type, config)
+                finally:
+                    self._latencies[call["id"]] = time.perf_counter() - started
+
+            tasks = [_timed(call) for call in tool_calls]
             results = await asyncio.gather(*tasks, return_exceptions=True)
             
             for call, result in zip(tool_calls, results):
@@ -153,7 +165,9 @@ class ExecutorToolNode(ToolNode):
             # Sync fallback - still run sequentially but don't abort
             for call in tool_calls:
                 try:
+                    started = time.perf_counter()
                     output = self._run_one(call, input_type, config)
+                    self._latencies[call["id"]] = time.perf_counter() - started
                     failed = self._has_tool_call_failed(call, output)
                     if failed is None:
                         output = self._get_erroneous_command(
@@ -183,7 +197,25 @@ class ExecutorToolNode(ToolNode):
         call_without_state = copy.deepcopy(call)
         if "args" in call_without_state and "state" in call_without_state["args"]:
             del call_without_state["args"]["state"]
-        
+
+        runtime = get_runtime()
+        if runtime is not None:
+            content = None
+            try:
+                if isinstance(output, ToolMessage):
+                    content = output.content
+                elif isinstance(output, Command):
+                    content = self._get_tool_message(output).content
+            except Exception:
+                content = None
+            runtime.record_tool_call(
+                tool=call["name"],
+                args=dict(call_without_state.get("args") or {}),
+                status="error" if failed else "success",
+                latency_s=self._latencies.pop(call.get("id") or "", 0.0),
+                output=str(content) if content is not None else None,
+            )
+
         if failed:
             error_msg = ""
             try:

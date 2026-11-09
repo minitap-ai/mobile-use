@@ -1,0 +1,10 @@
+{
+  // P2 headline / P3 #2: full system, Platform Default routing, WITH the two mechanisms the
+  // paper describes but the January 2026 code did not implement (04 - Audit A2, A3):
+  // the deterministic loop detector and the deterministic text MATCH/MISMATCH check.
+  // Use full-jan2026.jsonc for the exact January 2026 behaviour.
+  "extends": "_base.jsonc",
+  "name": "full",
+  "description": "Full system + loop detector + text match check, Platform Default routing.",
+  "ablation": { "use_loop_detector": true, "use_text_match_check": true }
+}

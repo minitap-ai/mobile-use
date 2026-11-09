@@ -27,18 +27,23 @@ async def record_interaction(ctx: MobileUseContext, response: BaseMessage):
     except Exception as e:
         logger.error(f"Error compressing screenshot: {e}")
         return "Could not record this interaction"
-    timestamp = time.time()
     folder = ctx.execution_setup.traces_path.joinpath(ctx.execution_setup.trace_name).resolve()
     folder.mkdir(parents=True, exist_ok=True)
+    # Nanosecond, collision-checked stem. The old int(time.time()) stem made every interaction
+    # recorded within the same second overwrite the previous one (04 - Audit A7 follow-up).
+    # Stems stay integers, so the trace compilers that sort on int(stem) keep working.
+    stem = time.time_ns()
+    while folder.joinpath(f"{stem}.jpeg").exists() or folder.joinpath(f"{stem}.json").exists():
+        stem += 1
     try:
         with open(
-            folder.joinpath(f"{int(timestamp)}.jpeg").resolve(),
+            folder.joinpath(f"{stem}.jpeg").resolve(),
             "wb",
         ) as f:
             f.write(base64.b64decode(compressed_screenshot_base64))
 
         with open(
-            folder.joinpath(f"{int(timestamp)}.json").resolve(),
+            folder.joinpath(f"{stem}.json").resolve(),
             "w",
             encoding="utf-8",
         ) as f:

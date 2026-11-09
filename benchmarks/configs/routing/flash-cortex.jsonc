@@ -1,0 +1,15 @@
+{
+  // Paper Table 4 'Flash Cortex': Cortex Gemini 2.5 Flash, others Qwen3-VL-8B.
+  // Hopper/outputter are not in the paper table: Qwen3-VL-8B like the other budget agents (UNVERIFIED).
+  "extends": "../full.jsonc",
+  "name": "routing-flash-cortex",
+  "description": "Paper Table 4 'Flash Cortex': Cortex Gemini 2.5 Flash, others Qwen3-VL-8B.",
+  "llm": {
+    "cortex": { "provider": "openrouter", "model": "google/gemini-2.5-flash" },
+    "planner": { "provider": "openrouter", "model": "qwen/qwen3-vl-8b-instruct" },
+    "orchestrator": { "provider": "openrouter", "model": "qwen/qwen3-vl-8b-instruct" },
+    "executor": { "provider": "openrouter", "model": "qwen/qwen3-vl-8b-instruct" },
+    "contextor": { "provider": "openrouter", "model": "qwen/qwen3-vl-8b-instruct" },
+    "utils": { "hopper": { "provider": "openrouter", "model": "qwen/qwen3-vl-8b-instruct" }, "outputter": { "provider": "openrouter", "model": "qwen/qwen3-vl-8b-instruct" } }
+  }
+}

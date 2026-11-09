@@ -1,0 +1,7 @@
+{
+  // Stretch: full minus the video recording tools (start/stop_video_recording + analyzer).
+  "extends": "full.jsonc",
+  "name": "no-video",
+  "description": "Full system without video recording tools.",
+  "ablation": { "use_video_recording": false }
+}

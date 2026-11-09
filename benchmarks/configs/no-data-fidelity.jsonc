@@ -1,0 +1,7 @@
+{
+  // Stretch: full minus the data-fidelity section of the Cortex prompt.
+  "extends": "full.jsonc",
+  "name": "no-data-fidelity",
+  "description": "Full system without the data-fidelity prompt section.",
+  "ablation": { "use_data_fidelity_prompts": false }
+}

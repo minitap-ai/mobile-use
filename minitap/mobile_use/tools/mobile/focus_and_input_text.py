@@ -9,6 +9,12 @@ from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 from pydantic import BaseModel
 
+from minitap.mobile_use.benchmark.runtime import get_runtime
+from minitap.mobile_use.benchmark.text_check import (
+    TextCheckConfig,
+    compare_text,
+    find_focused_text_element,
+)
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.controller_factory import create_device_controller
@@ -116,17 +122,21 @@ def get_focus_and_input_text_tool(ctx: MobileUseContext) -> BaseTool:
         status: Literal["success", "error"] = "success" if result.ok else "error"
 
         text_input_content = ""
+        readback_element: dict | None = None
+        readback_hierarchy: list[dict] | None = None
         if use_validation and status == "success" and target.resource_id:
             # PRODUCTION MODE: Post-validation - verify text was entered
             controller = create_device_controller(ctx)
             screen_data = await controller.get_screen_data()
             state.latest_ui_hierarchy = screen_data.elements
+            readback_hierarchy = screen_data.elements
             element = find_element_by_resource_id(
                 ui_hierarchy=state.latest_ui_hierarchy,
                 resource_id=target.resource_id,
                 index=target.resource_id_index,
             )
             if element:
+                readback_element = element
                 text_input_content = get_element_text(element)
         elif not use_validation:
             # ABLATION BASELINE MODE: No validation, just report success
@@ -143,6 +153,20 @@ def get_focus_and_input_text_tool(ctx: MobileUseContext) -> BaseTool:
             if result.ok
             else focus_and_input_text_wrapper.on_failure_fn(text_to_type=text, error=result.error)
         )
+
+        # paper/androidworld-rework: deterministic MATCH/MISMATCH verdict (flag-gated, audit A3)
+        if ablation_config.use_text_match_check and result.ok:
+            check_feedback, check_failed = await _run_text_match_check(
+                ctx=ctx,
+                text=text,
+                target=target,
+                focus_method=focus_method,
+                readback_element=readback_element,
+                readback_hierarchy=readback_hierarchy,
+            )
+            agent_outcome = f"{agent_outcome}\n{check_feedback}"
+            if check_failed:
+                status = "error"
 
         tool_message = ToolMessage(
             tool_call_id=tool_call_id,
@@ -163,6 +187,55 @@ def get_focus_and_input_text_tool(ctx: MobileUseContext) -> BaseTool:
         )
 
     return focus_and_input_text
+
+
+async def _run_text_match_check(
+    ctx: MobileUseContext,
+    text: str,
+    target: Target,
+    focus_method: str | None,
+    readback_element: dict | None,
+    readback_hierarchy: list[dict] | None,
+) -> tuple[str, bool]:
+    """Compare the read-back field value with the intended text. Returns (feedback, failed)."""
+    method = "resource_id"
+    element = readback_element
+    if element is None:
+        # Read the screen (again) and look for the target, else for the focused text field.
+        controller = create_device_controller(ctx)
+        screen_data = await controller.get_screen_data()
+        readback_hierarchy = screen_data.elements
+        if target.resource_id:
+            element = find_element_by_resource_id(
+                ui_hierarchy=readback_hierarchy,
+                resource_id=target.resource_id,
+                index=target.resource_id_index,
+            )
+        if element is None:
+            method = "focused_element"
+            element = find_focused_text_element(readback_hierarchy)
+    actual = get_element_text(element) if element is not None else None
+    is_password = element is not None and str(element.get("password", "")).lower() == "true"
+    check = compare_text(text, actual, is_password=is_password)
+
+    cfg = ctx.text_check_config or TextCheckConfig()
+    failed = cfg.mismatch_as_error and check.verdict in ("MISMATCH", "CASE_ONLY")
+    runtime = get_runtime()
+    if runtime is not None:
+        runtime.record_text_check(
+            verdict=check.verdict,
+            expected=check.expected,
+            actual=check.actual,
+            expected_normalized=check.expected_normalized,
+            actual_normalized=check.actual_normalized,
+            match=check.verdict == "MATCH",
+            readback_method=method if element is not None else "none",
+            focus_method=focus_method,
+            target_resource_id=target.resource_id,
+            marked_as_error=failed,
+        )
+    logger.info(f"Text match check: {check.verdict} (expected={text!r}, actual={actual!r})")
+    return check.as_feedback(), failed
 
 
 def _on_input_success(text_to_type, text_from_resource_id, target_resource_id, focus_method):

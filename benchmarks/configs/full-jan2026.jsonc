@@ -1,0 +1,7 @@
+{
+  // Exactly the ablation/a9-final feature set (January 2026): no loop detector, no
+  // deterministic text verdict. Platform Default routing.
+  "extends": "_base.jsonc",
+  "name": "full-jan2026",
+  "description": "January 2026 full system (a9-final flags), Platform Default routing."
+}

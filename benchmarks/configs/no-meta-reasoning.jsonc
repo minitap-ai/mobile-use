@@ -1,0 +1,8 @@
+{
+  // P3 #5: full minus meta-reasoning = no agent-thought history in the Cortex context, no
+  // self-monitoring prompt rules, and no loop detector.
+  "extends": "full.jsonc",
+  "name": "no-meta-reasoning",
+  "description": "Full system without meta-reasoning (thought history, prompt rules, loop detector).",
+  "ablation": { "use_meta_reasoning": false, "use_loop_detector": false }
+}

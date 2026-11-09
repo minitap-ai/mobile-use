@@ -1,0 +1,17 @@
+{
+  // P3 #7b (resolves R12): every non-Cortex agent downgraded to the budget model; Cortex stays
+  // frontier. Compare with planner-budget.jsonc and full-all-frontier.jsonc.
+  "extends": "full-all-frontier.jsonc",
+  "name": "noncortex-budget",
+  "description": "Frontier Cortex, Qwen3-VL-8B on every other agent.",
+  "llm": {
+    "planner": { "provider": "openrouter", "model": "qwen/qwen3-vl-8b-instruct" },
+    "orchestrator": { "provider": "openrouter", "model": "qwen/qwen3-vl-8b-instruct" },
+    "executor": { "provider": "openrouter", "model": "qwen/qwen3-vl-8b-instruct" },
+    "contextor": { "provider": "openrouter", "model": "qwen/qwen3-vl-8b-instruct" },
+    "utils": {
+      "hopper": { "provider": "openrouter", "model": "qwen/qwen3-vl-8b-instruct" },
+      "outputter": { "provider": "openrouter", "model": "qwen/qwen3-vl-8b-instruct" }
+    }
+  }
+}

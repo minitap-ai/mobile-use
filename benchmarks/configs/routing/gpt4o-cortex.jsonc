@@ -1,0 +1,15 @@
+{
+  // Paper Table 4 'GPT-4o Cortex': Cortex GPT-4o, others Qwen3-VL-8B (GPT-4o snapshot not stated in the paper; openai/gpt-4o is the 2024-05-13 alias on OpenRouter).
+  // Hopper/outputter are not in the paper table: Qwen3-VL-8B like the other budget agents (UNVERIFIED).
+  "extends": "../full.jsonc",
+  "name": "routing-gpt4o-cortex",
+  "description": "Paper Table 4 'GPT-4o Cortex': Cortex GPT-4o, others Qwen3-VL-8B (GPT-4o snapshot not stated in the paper; openai/gpt-4o is the 2024-05-13 alias on OpenRouter).",
+  "llm": {
+    "cortex": { "provider": "openrouter", "model": "openai/gpt-4o" },
+    "planner": { "provider": "openrouter", "model": "qwen/qwen3-vl-8b-instruct" },
+    "orchestrator": { "provider": "openrouter", "model": "qwen/qwen3-vl-8b-instruct" },
+    "executor": { "provider": "openrouter", "model": "qwen/qwen3-vl-8b-instruct" },
+    "contextor": { "provider": "openrouter", "model": "qwen/qwen3-vl-8b-instruct" },
+    "utils": { "hopper": { "provider": "openrouter", "model": "qwen/qwen3-vl-8b-instruct" }, "outputter": { "provider": "openrouter", "model": "qwen/qwen3-vl-8b-instruct" } }
+  }
+}

@@ -70,6 +70,11 @@ def post_cortex_gate(
     logger.info("Starting post_cortex_gate")
     node_sequence = []
 
+    # paper/androidworld-rework: only the loop detector (use_loop_detector) can fail a subgoal
+    # from the Cortex; in that case go straight to the Planner for a replan.
+    if one_of_them_is_failure(state.subgoal_plan):
+        return ["force_replan"]
+
     if len(state.complete_subgoals_by_ids) > 0 or not state.structured_decisions:
         # If subgoals need to be marked as complete, add the path to the orchestrator.
         # The 'or not state.structured_decisions' ensures we don't get stuck if Cortex does nothing.
@@ -239,6 +244,7 @@ async def get_multi_agent_graph(ctx: MobileUseContext) -> CompiledStateGraph:
         {
             "review_subgoals": "orchestrator",
             "execute_decisions": "executor",
+            "force_replan": "planner",
         },
     )
     graph_builder.add_conditional_edges(

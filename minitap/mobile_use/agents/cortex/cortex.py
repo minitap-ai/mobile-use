@@ -12,7 +12,8 @@ from langchain_core.messages import (
 from langgraph.graph.message import REMOVE_ALL_MESSAGES
 
 from minitap.mobile_use.agents.cortex.types import CortexOutput
-from minitap.mobile_use.agents.planner.utils import get_current_subgoal
+from minitap.mobile_use.agents.planner.utils import fail_current_subgoal, get_current_subgoal
+from minitap.mobile_use.benchmark.runtime import get_runtime
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.controller_factory import create_device_controller
@@ -87,6 +88,14 @@ class CortexNode:
             use_meta_reasoning=use_meta_reasoning,
             use_data_fidelity=use_data_fidelity,
         )
+        # KNOWN ISSUE (04 - Audit A9), deliberately NOT fixed on paper/androidworld-rework so
+        # that every run of the study sees the same Cortex input as the January 2026 system:
+        # because of operator precedence the expression below parses as
+        #   ("device info" + device_date) if state.device_date
+        #   else ("focused app info" if state.focused_app_info else "")
+        # i.e. device info is sent only when device_date is set, and the focused-app line only
+        # when it is not. The Contextor sets device_date on every turn (output of adb `date`),
+        # so in practice the Cortex gets device info + date but never the focused-app line.
         messages = [
             SystemMessage(content=system_message),
             HumanMessage(
@@ -121,6 +130,34 @@ class CortexNode:
             messages.append(get_screenshot_message_for_llm(compressed_image_base64))
         elif not use_vision:
             logger.warning("Vision DISABLED (ablation mode) - TEXT-ONLY mode")
+
+        # paper/androidworld-rework: deterministic loop detector (flag: use_loop_detector)
+        loop_note: str | None = None
+        if self.ctx.loop_detector is not None:
+            trigger = self.ctx.loop_detector.observe(
+                ui_hierarchy=state.latest_ui_hierarchy,
+                focused_app=state.focused_app_info,
+                executed_tool_calls=get_executed_tool_calls(state),
+            )
+            if trigger is not None:
+                current = get_current_subgoal(state.subgoal_plan)
+                can_replan = trigger.escalate and current is not None
+                trigger.escalate = can_replan
+                runtime = get_runtime()
+                if runtime is not None:
+                    runtime.record_loop_trigger(
+                        kind=trigger.kind,
+                        action="replan" if can_replan else "inject",
+                        evidence=trigger.evidence,
+                        turn=trigger.turn,
+                        subgoal=current.description if current else None,
+                        **trigger.details,
+                    )
+                logger.warning(f"Loop detector triggered ({trigger.kind}): {trigger.evidence}")
+                loop_note = f"Loop detector ({trigger.kind}): {trigger.evidence}"
+                if can_replan and current is not None:
+                    return await self._force_replan(state, loop_note)
+                messages.append(HumanMessage(content=trigger.cortex_message()))
 
         llm = get_llm(ctx=self.ctx, name="cortex", temperature=1).with_structured_output(
             CortexOutput
@@ -159,7 +196,7 @@ class CortexNode:
         return await state.asanitize_update(
             ctx=self.ctx,
             update={
-                "agents_thoughts": [agent_thought],
+                "agents_thoughts": [loop_note, agent_thought] if loop_note else [agent_thought],
                 "structured_decisions": response.decisions,
                 "complete_subgoals_by_ids": response.complete_subgoals_by_ids,
                 "latest_ui_hierarchy": None,
@@ -172,6 +209,50 @@ class CortexNode:
             },
             agent="cortex",
         )
+
+
+    async def _force_replan(self, state: State, loop_note: str):
+        """Mark the current subgoal as failed (loop evidence as reason) and skip the LLM call.
+
+        post_cortex_gate routes a plan containing a FAILURE straight to the Planner.
+        """
+        assert self.ctx.loop_detector is not None
+        self.ctx.loop_detector.reset_history()
+        plan = [s.model_copy() for s in state.subgoal_plan]
+        current = get_current_subgoal(plan)
+        if current is not None:
+            current.completion_reason = (
+                f"{loop_note}. Marked as failed by the deterministic loop detector; replanning."
+            )
+        plan = fail_current_subgoal(plan)
+        if self.ctx.on_plan_changes:
+            await self.ctx.on_plan_changes(plan, False)
+        return await state.asanitize_update(
+            ctx=self.ctx,
+            update={
+                "agents_thoughts": [loop_note, "==== LOOP DETECTED, FORCING A REPLAN ===="],
+                "subgoal_plan": plan,
+                "structured_decisions": None,
+                "complete_subgoals_by_ids": [],
+                "latest_ui_hierarchy": None,
+                "latest_screenshot": None,
+                "focused_app_info": None,
+                "device_date": None,
+                EXECUTOR_MESSAGES_KEY: [RemoveMessage(id=REMOVE_ALL_MESSAGES)],
+                "cortex_last_thought": loop_note,
+            },
+            agent="cortex",
+        )
+
+
+def get_executed_tool_calls(state: State) -> list[dict]:
+    """Tool calls the Executor actually ran since the previous Cortex turn."""
+    calls: list[dict] = []
+    for message in state.executor_messages:
+        if isinstance(message, AIMessage):
+            for call in getattr(message, "tool_calls", None) or []:
+                calls.append({"name": call.get("name"), "args": call.get("args") or {}})
+    return calls
 
 
 def get_executor_agent_feedback(state: State) -> str:

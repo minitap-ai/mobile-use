@@ -14,6 +14,8 @@ from openai import BaseModel
 from pydantic import ConfigDict
 
 from minitap.mobile_use.agents.planner.types import Subgoal
+from minitap.mobile_use.benchmark.loop_detector import LoopDetector
+from minitap.mobile_use.benchmark.text_check import TextCheckConfig
 from minitap.mobile_use.clients.ios_client import IosClientWrapper
 from minitap.mobile_use.clients.ui_automator_client import UIAutomatorClient
 from minitap.mobile_use.config import AblationConfig, AgentNode, LLMConfig
@@ -89,6 +91,9 @@ class MobileUseContext(BaseModel):
     minitap_api_key: str | None = None
     video_recording_enabled: bool = False
     ablation_config: AblationConfig | None = None
+    # paper/androidworld-rework: per-task loop detector (only when use_loop_detector is on)
+    loop_detector: LoopDetector | None = None
+    text_check_config: TextCheckConfig | None = None
 
     def get_adb_client(self) -> AdbClient:
         if self.adb_client is None:
