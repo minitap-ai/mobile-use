@@ -151,7 +151,7 @@ class CortexNode:
                         evidence=trigger.evidence,
                         turn=trigger.turn,
                         subgoal=current.description if current else None,
-                        **trigger.details,
+                        details=trigger.details,
                     )
                 logger.warning(f"Loop detector triggered ({trigger.kind}): {trigger.evidence}")
                 loop_note = f"Loop detector ({trigger.kind}): {trigger.evidence}"

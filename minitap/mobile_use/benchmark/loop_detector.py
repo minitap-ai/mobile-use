@@ -272,8 +272,8 @@ class LoopDetector:
                 escalate=False,
                 turn=self.turn,
                 details={
-                    "state": last.state,
-                    "action": last.action,
+                    "state_hash": last.state,
+                    "action_hash": last.action,
                     "count": len(same),
                     "window": len(recent),
                 },
@@ -291,7 +291,7 @@ class LoopDetector:
                 ),
                 escalate=False,
                 turn=self.turn,
-                details={"state": last.next_state, "steps": len(tail)},
+                details={"state_hash": last.next_state, "steps": len(tail)},
             )
 
         cyc = trans[-cfg.cycle_window :]
@@ -306,6 +306,6 @@ class LoopDetector:
                     ),
                     escalate=False,
                     turn=self.turn,
-                    details={"states": sorted(states), "steps": len(cyc)},
+                    details={"state_hashes": sorted(states), "steps": len(cyc)},
                 )
         return None

@@ -133,3 +133,32 @@ def test_reset_history_after_replan():
     det.reset_history()
     assert len(det.transitions) == 0
     assert feed(det, [(ui, None), (ui, tap("c"))]) == [None, None]
+
+
+def test_trigger_details_can_be_recorded(tmp_path):
+    """Regression: details used to be splatted into record_loop_trigger(action=...) and a
+    `repeat` trigger crashed the task (TypeError: multiple values for 'action')."""
+    import json
+
+    from minitap.mobile_use.benchmark import runtime as rt
+
+    cfg = LoopDetectorConfig(repeat_threshold=3, no_change_threshold=10, cycle_window=20)
+    det = LoopDetector(cfg)
+    a, b = screen("A"), screen("B")
+    steps = [(a, None)]
+    for _ in range(3):
+        steps += [(b, tap("X")), (a, [{"name": "back", "args": {}}])]
+    triggers = [t for t in feed(det, steps) if t]
+    r = rt.BenchmarkRuntime(tmp_path / "e.jsonl", "r", rt.LLMPolicy())
+    for t in triggers:
+        r.record_loop_trigger(
+            kind=t.kind,
+            action="inject",
+            evidence=t.evidence,
+            turn=t.turn,
+            subgoal=None,
+            details=t.details,
+        )
+    r.close()
+    ev = [json.loads(x) for x in (tmp_path / "e.jsonl").read_text().splitlines()]
+    assert ev and ev[0]["kind"] == "repeat" and "action_hash" in ev[0]["details"]

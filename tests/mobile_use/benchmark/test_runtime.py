@@ -88,7 +88,14 @@ def test_events_and_summary(runtime, tmp_path):
         error="boom",
     )
     r.record_tool_call(tool="tap", args={"x": "y" * 5000}, status="success", latency_s=0.2)
-    r.record_loop_trigger(kind="repeat", action="replan", evidence="e")
+    r.record_loop_trigger(
+        kind="repeat",
+        action="replan",
+        evidence="e",
+        turn=3,
+        subgoal="s",
+        details={"state_hash": "a", "action_hash": "b", "action": "collision-safe"},
+    )
     r.record_text_check(verdict="MATCH", expected="a", actual="a")
     s = r.summary()
     assert s["llm"]["calls_by_agent"] == {"cortex": 2}

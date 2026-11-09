@@ -196,11 +196,28 @@ class BenchmarkRuntime:
         self.node_runs[node] += 1
         self.event("node", node=node)
 
-    def record_loop_trigger(self, *, kind: str, action: str, **details: Any) -> None:
+    def record_loop_trigger(
+        self,
+        *,
+        kind: str,
+        action: str,
+        evidence: str,
+        turn: int,
+        subgoal: str | None,
+        details: dict[str, Any],
+    ) -> None:
         self.loop_triggers[kind] += 1
         if action == "replan":
             self.loop_replans += 1
-        self.event("loop_detector", kind=kind, action=action, **details)
+        self.event(
+            "loop_detector",
+            kind=kind,
+            action=action,
+            evidence=evidence,
+            turn=turn,
+            subgoal=subgoal,
+            details=details,
+        )
 
     def record_text_check(self, *, verdict: str, **details: Any) -> None:
         self.text_checks[verdict] += 1
