@@ -252,6 +252,12 @@ class Spec:
                 raise ValueError(
                     f"plan entry {item} uses configs not in the spec's configs: {unknown}"
                 )
+        protocol = {"seeding": SEEDING, "score_def": SCORE_DEF, **(d.get("protocol") or {})}
+        if protocol != {"seeding": SEEDING, "score_def": SCORE_DEF}:
+            raise ValueError(
+                f"{path}: protocol must be seeding={SEEDING!r}, score_def={SCORE_DEF!r} "
+                f"(got {protocol})"
+            )
         budget = d.get("budget") or {}
         mu = d["mobile_use"]
         return cls(
@@ -348,18 +354,55 @@ def cost_from_events(out_dir: Path) -> float | None:
 # graph ended on its own (status completed / ended_incomplete); max_steps, timeout and errors are
 # not done, so they score 0 even if the device state happens to satisfy the evaluator.
 EPISODE_DONE_STATUSES = {"completed", "ended_incomplete"}
-SCORE_RULE = "aw_suite_utils_done_gate"
+
+# Study protocol (decided 2026-11-09), enforced on every scored row:
+SEEDING = "upstream_suite"  # task params exactly as upstream create_suite/_instantiate_task
+SCORE_DEF = "official_done_gated"  # success = is_successful AND the agent ended the episode
+LEGACY_SCORE_RULES = {"aw_suite_utils_done_gate"}  # tooling c6a5924, same definition
+SEEDING_ACCEPTED = {None, "official", "upstream_suite"}  # names used by the harnesses
+SEEDING_REJECTED = {"legacy", "random", "direct"}
+
+
+def expected_instance_seed(seed: int, task: str) -> int:
+    """upstream suite_utils._get_instance_seed(name, 0) for n_task_combinations=1."""
+    return int(hashlib.sha256(f"{seed}_{task}_0".encode()).hexdigest(), 16) % (2**32)
 
 
 def official_score(h: dict) -> tuple[float | None, float | None, bool]:
-    """-> (official score, raw is_successful score, episode done)."""
+    """-> (official score, raw is_successful score, episode done). Always computed here from the
+    agent status and the raw evaluator score; a harness-side official score is only cross-checked
+    (check_protocol), so there is one definition for every environment."""
     raw = _num(h.get("score_raw", h.get("score")))
     done = h.get("status") in EPISODE_DONE_STATUSES
-    if h.get("official_score") is not None:  # harness applied the gate itself (P1-P)
-        return _num(h["official_score"]), raw, done
     if raw is None:
         return None, None, done
     return (raw if done else 0.0), raw, done
+
+
+def check_protocol(h: dict, task: str, seed: int) -> str | None:
+    """Reason why a scored harness row violates the study protocol, or None."""
+    seeding = h.get("seeding")
+    if seeding in SEEDING_REJECTED:
+        return f"seeding_{seeding}"
+    if seeding not in SEEDING_ACCEPTED:
+        return f"seeding_unknown:{seeding}"
+    inst = h.get("instance_seed")
+    if inst is None:
+        return "instance_seed_missing"
+    try:
+        if int(inst) != expected_instance_seed(seed, task):
+            return "instance_seed_mismatch"
+    except (TypeError, ValueError):
+        return "instance_seed_invalid"
+    harness_official = h.get("official_score", h.get("score_official"))
+    mine = official_score(h)[0]
+    if (
+        harness_official is not None
+        and mine is not None
+        and abs(float(harness_official) - mine) > 1e-9
+    ):
+        return "score_def_mismatch"
+    return None
 
 
 def classify(h: dict) -> tuple[str, str | None]:
@@ -383,7 +426,8 @@ def classify(h: dict) -> tuple[str, str | None]:
 
 def official_outcome(row: dict) -> str:
     """Outcome under the official gate, also for rows written before the gate existed."""
-    if row.get("score_rule") == SCORE_RULE or row.get("outcome") not in (
+    gated = row.get("score_def") == SCORE_DEF or row.get("score_rule") in LEGACY_SCORE_RULES
+    if gated or row.get("outcome") not in (
         "success",
         "agent_failure",
     ):
@@ -407,6 +451,11 @@ def build_row(
     h = dict(h)
     h["_expected_sha"] = spec.mobile_use_sha
     outcome, infra_reason = classify(h)
+    protocol_reason = None
+    if outcome in ("success", "agent_failure"):
+        protocol_reason = check_protocol(h, cell.task, cell.seed)
+        if protocol_reason:
+            outcome = "protocol_rejected"
     m = h.get("metrics") or {}
     llm = m.get("llm") or {}
     # Accepts the harness row shape (agent `metrics` nested, P0-A run_agent.py) and flat rows that
@@ -436,7 +485,13 @@ def build_row(
         "score": official_score(h)[0],
         "score_raw": official_score(h)[1],
         "episode_done": official_score(h)[2],
-        "score_rule": SCORE_RULE,
+        "score_def": SCORE_DEF,
+        "seeding": SEEDING
+        if outcome != "protocol_rejected" and h.get("instance_seed") is not None
+        else h.get("seeding"),
+        "instance_seed": h.get("instance_seed"),
+        "expected_instance_seed": expected_instance_seed(cell.seed, cell.task),
+        "protocol_reason": protocol_reason,
         "error": h.get("error") or h.get("score_error"),
         "error_kind": h.get("error_kind"),
         "final_answer": h.get("final_answer"),
@@ -592,6 +647,7 @@ class Runner:
         self.last_device: dict[str, str] = {}
         self.launched = 0
         self.stop_reason: str | None = None
+        self.halted_envs: dict[str, str] = {}  # env -> protocol violation that halted it
         self._last_key_check = 0.0
         self.threads: list[threading.Thread] = []
 
@@ -670,6 +726,8 @@ class Runner:
             if can_launch:
                 for cell in pend:
                     env = self.spec.envs[cell.env]
+                    if env.name in self.halted_envs:
+                        continue
                     with self.lock:
                         if self.running[env.name] >= env.max_concurrency:
                             continue
@@ -698,7 +756,7 @@ class Runner:
         return summary
 
     def _any_device_available(self, pend: list[Cell]) -> bool:
-        for env_name in {c.env for c in pend}:
+        for env_name in {c.env for c in pend} - set(self.halted_envs):
             env = self.spec.envs[env_name]
             if any((env_name, d["serial"]) not in self.quarantined for d in env.devices()):
                 return True
@@ -808,6 +866,23 @@ class Runner:
             else:
                 self.infra_streak[dkey] = 0
             attempts = self.ledger.attempts[cell.key]
+            if row["outcome"] == "protocol_rejected":
+                # Not a result and not retryable: the harness does not follow the protocol. Halt
+                # the env for this session (no more spend there); the cell stays pending, so it
+                # runs again once the harness is fixed.
+                if env.name not in self.halted_envs:
+                    self.halted_envs[env.name] = row["protocol_reason"]
+                    self.stop_reason = (
+                        f"protocol violation on env {env.name}: {row['protocol_reason']}"
+                    )
+                    self.ledger.event(
+                        "env_halted_protocol",
+                        env=env.name,
+                        reason=row["protocol_reason"],
+                        cell=cell.key,
+                    )
+                self.inflight_keys.discard(cell.key)
+                return
             if row["outcome"] != "infra_failure" or len(attempts) >= self.spec.max_infra_attempts:
                 final = dict(row)
                 if row["outcome"] == "infra_failure":
@@ -868,6 +943,15 @@ def summarize(spec: Spec, ledger: Ledger, stop_reason: str | None = None) -> dic
 
 
 # --------------------------------------------------------------------------- CLI
+def _harness_row(out_dir: Path, task: str) -> dict | None:
+    path = out_dir / "results.jsonl"
+    if not path.exists():
+        return None
+    rows = [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines() if x.strip()]
+    rows = [r for r in rows if r.get("task") in (None, task)]
+    return rows[-1] if rows else None
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("command", choices=["plan", "run", "status", "rescore"])
@@ -916,27 +1000,47 @@ def main(argv: list[str] | None = None) -> int:
         # itself is never rewritten).
         ledger = Ledger(spec.out_dir)
         out_path = spec.out_dir / "results.official.jsonl"
-        changed = 0
+        changed, rejected = 0, 0
         with open(out_path, "w", encoding="utf-8") as f:
             for row in ledger.final.values():
                 r = dict(row)
-                if r.get("score_rule") != SCORE_RULE and r.get("outcome") in (
+                if r.get("score_def") != SCORE_DEF and r.get("outcome") in (
                     "success",
                     "agent_failure",
                 ):
-                    score, raw, done = official_score(r)
+                    # Old row: take seeding facts from the harness's own row in the cell dir.
+                    h = _harness_row(Path(r.get("out_dir", "")), r["task"]) or {}
+                    h = {
+                        **h,
+                        "status": r.get("status"),
+                        "score": r.get("score_raw", r.get("score")),
+                    }
+                    score, raw, done = official_score(h)
+                    reason = check_protocol(h, r["task"], int(r["seed"]))
                     r.update(
                         score=score,
                         score_raw=raw,
                         episode_done=done,
-                        score_rule=SCORE_RULE,
-                        outcome=official_outcome(row),
+                        score_def=SCORE_DEF,
+                        seeding=SEEDING if not reason else h.get("seeding"),
+                        instance_seed=h.get("instance_seed"),
+                        expected_instance_seed=expected_instance_seed(int(r["seed"]), r["task"]),
+                        protocol_reason=reason,
+                        outcome="protocol_rejected"
+                        if reason
+                        else ("success" if (score or 0.0) >= 1.0 else "agent_failure"),
                     )
                     changed += r["outcome"] != row["outcome"]
+                    rejected += r["outcome"] == "protocol_rejected"
                 f.write(json.dumps(r, ensure_ascii=False, default=str) + "\n")
         print(
             json.dumps(
-                {"rows": len(ledger.final), "outcome_changed": changed, "written": str(out_path)},
+                {
+                    "rows": len(ledger.final),
+                    "outcome_changed": changed,
+                    "protocol_rejected": rejected,
+                    "written": str(out_path),
+                },
                 indent=2,
             )
         )

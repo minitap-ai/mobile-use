@@ -58,7 +58,8 @@ The live specs, env hooks, device lists and task sets are in the umbrella's `loc
 - `cells/<env>/<config>/s<seed>/<task>-<hash>/a<n>/`: the harness output of each attempt
   (`command.json`, `harness.log`, the harness's results file, agent `events.jsonl`/`result.json`).
 
-Row fields: `key env task_set subset_label phase task config config_path seed attempt outcome infra_reason status
+Row fields: `key env task_set subset_label phase task config score score_raw episode_done
+score_def seeding instance_seed expected_instance_seed protocol_reason config_path seed attempt outcome infra_reason status
 score error error_kind final_answer cost_usd cost_source prompt_tokens completion_tokens llm_calls
 agent_wall_s init_s cell_wall_s git_sha git_dirty expected_sha config_resolved_sha256 aw_sha
 device harness_run_id harness_exit_code workarounds out_dir started_at ended_at`, and in
@@ -69,10 +70,22 @@ the episode itself: `agent_successful = task_successful if interaction_results.d
 (`suite_utils._run_task`, upstream @55ddaf5). The matrix applies the same rule to every row,
 whatever the harness: `score` = official score, `score_raw` = the harness's `is_successful`,
 `episode_done` = agent status `completed` or `ended_incomplete` (max_steps, timeout and errors
-are not done), `score_rule = "aw_suite_utils_done_gate"`. A harness `official_score` field, if
-present, is used as is. Rows written by c3f77e7 (before the gate) stored the raw score as
+are not done), `score_def = "official_done_gated"`. A harness `official_score` field, if present,
+is cross-checked (must agree). Rows written by c3f77e7 (before the gate) stored the raw score as
 `score`; `status` and `rescore` re-apply the gate to them (`matrix.py rescore <spec>` writes
 `results.official.jsonl`; the ledger is never rewritten).
+
+**Study protocol (enforced).** Spec `protocol` = `{"seeding": "upstream_suite", "score_def":
+"official_done_gated"}` (the only accepted values, also the default). Every scored harness row
+must prove upstream suite seeding: `instance_seed` must equal `sha256(f"{seed}_{task}_0") %
+2**32` (upstream `suite_utils._get_instance_seed`, i=0), and `seeding` must be absent,
+`"official"` or `"upstream_suite"` (`"legacy"`/`"random"`/`"direct"` = direct `random.seed(seed)`,
+P0-A's pilot). A harness-side official score (`official_score` or `score_official`) must agree with
+the matrix's own done-gate. A violating row is `outcome = "protocol_rejected"` (with
+`protocol_reason`): it is not a result, it is not retried, and it **halts its environment** for
+the session (event `env_halted_protocol`); the cell stays pending and runs again once the harness
+is fixed. Row fields: `seeding` (`"upstream_suite"` when verified), `instance_seed`,
+`expected_instance_seed`, `score_def` (`"official_done_gated"`), `protocol_reason`.
 
 **Several processes, one ledger.** Two matrix processes may share an `out_dir` (e.g. one per
 environment, with disjoint cells): appends are flock-ed single lines and every read picks up the

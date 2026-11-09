@@ -22,7 +22,7 @@ SHA = "a" * 40
 FAKE_HARNESS = textwrap.dedent(
     '''
     """Fake harness: same CLI and result row shape as P0-A's tools/run_agent.py."""
-    import argparse, json, os, sys, time
+    import argparse, hashlib, json, os, sys, time
     ap = argparse.ArgumentParser()
     ap.add_argument("serial"); ap.add_argument("out_dir")
     ap.add_argument("--tasks"); ap.add_argument("--config"); ap.add_argument("--mobile-use")
@@ -49,10 +49,12 @@ FAKE_HARNESS = textwrap.dedent(
     os.remove(marker)
     if outcome == "crash":
         sys.exit(3)
+    inst = int(hashlib.sha256(f"{a.seed}_{task}_0".encode()).hexdigest(), 16) % (2**32)
     os.makedirs(a.out_dir, exist_ok=True)
     rec = {"run_id": a.run_id, "task": task, "seed": a.seed, "mobile_use_sha": a.expect_sha,
            "config": a.config, "serial": a.serial, "init_s": 1.5, "status": "completed",
            "git_sha": a.expect_sha, "git_dirty": False, "config_resolved_sha256": "c" * 64,
+           "seeding": "official", "instance_seed": inst,
            "metrics": {"wall_clock_s": 12.0, "llm": {
                "total_cost_usd": float(os.environ.get("FAKE_COST", "0.5")),
                "total_prompt_tokens": 1000, "total_completion_tokens": 50, "total_calls": 7}}}
@@ -62,6 +64,14 @@ FAKE_HARNESS = textwrap.dedent(
         rec["score"] = 0.0
     elif outcome == "infra":
         rec.update(status="error", error_kind="llm_api", infra_suspect=True, score=0.0)
+    elif outcome == "legacy":
+        rec.update(seeding="legacy", instance_seed=None, score=1.0)
+    elif outcome == "badseed":
+        rec.update(instance_seed=inst + 1, score=1.0)
+    elif outcome == "p1p":
+        rec.pop("seeding"); rec.update(score=1.0, official_score=1.0, done=True)
+    elif outcome == "scoremismatch":
+        rec.update(status="timeout", score=1.0, score_official=1.0)
     elif outcome == "timeout_success":
         rec.update(status="timeout", score=1.0)
     elif outcome == "badsha":
@@ -486,6 +496,7 @@ def test_flat_rows_with_matrix_fields_are_accepted(world):
     spec = make(tasks=("T1",))
     cell = spec.cells()[0]
     flat = {
+        "instance_seed": matrix.expected_instance_seed(30, "T1"),
         "task": "T1",
         "status": "completed",
         "score": 1.0,
@@ -521,7 +532,7 @@ def test_flat_rows_with_matrix_fields_are_accepted(world):
         ({"status": "timeout", "score": 1.0}, ("agent_failure", 0.0, 1.0, False)),
         ({"status": "max_steps", "score": 1.0}, ("agent_failure", 0.0, 1.0, False)),
         ({"status": "completed", "score": 0.0}, ("agent_failure", 0.0, 0.0, True)),
-        # a harness that already applied the gate (P1-P official_score) is trusted
+        # a harness-side official score is cross-checked and must agree
         (
             {"status": "timeout", "score": 1.0, "official_score": 0.0},
             ("agent_failure", 0.0, 1.0, False),
@@ -531,7 +542,14 @@ def test_flat_rows_with_matrix_fields_are_accepted(world):
 def test_official_done_gate(world, harness, expected):
     make, tmp = world
     spec = make(tasks=("T1",))
-    h = {"task": "T1", "git_sha": SHA, "git_dirty": False, **harness}
+    h = {
+        "task": "T1",
+        "git_sha": SHA,
+        "git_dirty": False,
+        "seeding": "official",
+        "instance_seed": matrix.expected_instance_seed(30, "T1"),
+        **harness,
+    }
     row = matrix.build_row(
         spec.cells()[0],
         spec,
@@ -544,7 +562,7 @@ def test_official_done_gate(world, harness, expected):
         started="t",
     )
     assert (row["outcome"], row["score"], row["score_raw"], row["episode_done"]) == expected
-    assert row["score_rule"] == matrix.SCORE_RULE
+    assert row["score_def"] == "official_done_gated" and row["seeding"] == "upstream_suite"
 
 
 def test_timeout_with_satisfied_state_is_not_a_success_end_to_end(world):
@@ -563,7 +581,16 @@ def test_rescore_rows_written_before_the_gate(world):
     res = rows(spec.out_dir / "results.jsonl")
     old = []
     for r in res:
-        r = {k: v for k, v in r.items() if k not in ("score_raw", "episode_done", "score_rule")}
+        drop = (
+            "score_raw",
+            "episode_done",
+            "score_def",
+            "seeding",
+            "instance_seed",
+            "expected_instance_seed",
+            "protocol_reason",
+        )
+        r = {k: v for k, v in r.items() if k not in drop}
         if r["task"] == "T2":
             r["status"] = "timeout"  # raw score 1.0 kept, outcome "success" as the old code wrote
         old.append(r)
@@ -595,3 +622,75 @@ def test_two_processes_share_spend_and_final_rows(tmp_path):
     with open(tmp_path / "attempts.jsonl", "a") as f:
         f.write(".0}\n")
     assert a.spent_usd() == 3.0
+
+
+def test_expected_instance_seed_matches_upstream_formula():
+    import hashlib
+
+    assert matrix.expected_instance_seed(30, "ExpenseDeleteSingle") == (
+        int(hashlib.sha256(b"30_ExpenseDeleteSingle_0").hexdigest(), 16) % 2**32
+    )
+    # value P0-A verified against upstream create_suite(seed=30)
+    assert matrix.expected_instance_seed(30, "ExpenseDeleteSingle") == 3877511133
+
+
+@pytest.mark.parametrize(
+    "bad,reason",
+    [
+        ("legacy", "seeding_legacy"),
+        ("badseed", "instance_seed_mismatch"),
+        ("scoremismatch", "score_def_mismatch"),
+    ],
+)
+def test_protocol_violation_rejects_row_and_halts_env(world, bad, reason):
+    make, _ = world
+    spec = make(tasks=("T0", "T1", "T2", "T3"), plan={"T1": [bad]})
+    summary = run(spec)
+    att = rows(spec.out_dir / "attempts.jsonl")
+    rej = [a for a in att if a["outcome"] == "protocol_rejected"]
+    assert len(rej) == 1 and rej[0]["protocol_reason"] == reason and rej[0]["task"] == "T1"
+    final = rows(spec.out_dir / "results.jsonl")
+    assert [r["task"] for r in final] == ["T0"]  # T1 is not a result; T2, T3 never launched
+    assert summary["stop_reason"] == f"protocol violation on env fake: {reason}"
+    events = [e["type"] for e in rows(spec.out_dir / "matrix_events.jsonl")]
+    assert "env_halted_protocol" in events
+
+
+def test_both_harness_shapes_pass_the_protocol(world):
+    make, _ = world
+    spec = make(tasks=("A", "B"), plan={"B": ["p1p"]})  # A = P0-A shape (seeding official)
+    run(spec)
+    final = {r["task"]: r for r in rows(spec.out_dir / "results.jsonl")}
+    for r in final.values():
+        assert r["outcome"] == "success" and r["seeding"] == "upstream_suite"
+        assert r["instance_seed"] == r["expected_instance_seed"]
+        assert r["score_def"] == "official_done_gated"
+
+
+def test_spec_protocol_values_are_enforced(world):
+    make, tmp = world
+    spec = make(tasks=("T1",))
+    d = matrix.load_jsonc(spec.path)
+    d["protocol"] = {"seeding": "upstream_suite", "score_def": "official_done_gated"}
+    (tmp / "ok.jsonc").write_text(json.dumps(d))
+    matrix.Spec.load(tmp / "ok.jsonc")
+    d["protocol"] = {"seeding": "legacy"}
+    (tmp / "bad.jsonc").write_text(json.dumps(d))
+    with pytest.raises(ValueError, match="protocol"):
+        matrix.Spec.load(tmp / "bad.jsonc")
+
+
+def test_rescore_rejects_old_rows_whose_harness_used_legacy_seeding(world):
+    make, _ = world
+    spec = make(tasks=("T1",))
+    run(spec)
+    r = rows(spec.out_dir / "results.jsonl")[0]
+    harness = Path(r["out_dir"]) / "results.jsonl"
+    hrow = rows(harness)[0]
+    hrow.update(seeding="legacy", instance_seed=None)
+    harness.write_text(json.dumps(hrow) + "\n")
+    old = {k: v for k, v in r.items() if k not in ("score_def", "seeding", "instance_seed")}
+    (spec.out_dir / "results.jsonl").write_text(json.dumps(old) + "\n")
+    matrix.main(["rescore", str(spec.path)])
+    off = rows(spec.out_dir / "results.official.jsonl")[0]
+    assert off["outcome"] == "protocol_rejected" and off["protocol_reason"] == "seeding_legacy"

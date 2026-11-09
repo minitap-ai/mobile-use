@@ -34,6 +34,10 @@
       ] }
   ],
   "envs": { "limrun": "../envs/limrun.jsonc", "emulator": "../envs/emulator.jsonc", "pixel": "../envs/pixel.jsonc" },
+  // Study protocol (decided 2026-11-09), enforced on every scored row: task params exactly as
+  // upstream create_suite (instance seed sha256(f"{seed}_{task}_0") % 2**32), and success =
+  // upstream's done-gated score. Rows that violate it are rejected and halt their environment.
+  "protocol": { "seeding": "upstream_suite", "score_def": "official_done_gated" },
   "timeout_s": 1800,            // 30-min agent cap (P0-A pilot protocol)
   "max_infra_attempts": 3,
   "order": ["phase", "seed", "config", "task"],
