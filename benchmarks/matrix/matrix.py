@@ -695,6 +695,29 @@ def openrouter_key_remaining() -> float | None:
     return float(rem) if rem is not None else None
 
 
+def harness_version(env: EnvHook) -> dict[str, Any]:
+    """Git commit + dirty flag of the repo holding the harness script (command[1], else cwd).
+    Recorded on every attempt: harness fixes (e.g. P0-A's W17) change scores, so every row must
+    say which harness produced it."""
+    script = env.command[1] if len(env.command) > 1 else ""
+    target = (env.cwd / script).resolve() if script and "{" not in script else env.cwd
+    where = target.parent if target.is_file() else target
+
+    def git(*args):
+        r = subprocess.run(["git", "-C", str(where), *args], capture_output=True, text=True)
+        return r.stdout.strip() if r.returncode == 0 else None
+
+    top = git("rev-parse", "--show-toplevel")
+    if not top:
+        return {"harness_repo": None, "harness_sha": None, "harness_dirty": None}
+    status = git("status", "--porcelain", "--untracked-files=no")
+    return {
+        "harness_repo": top,
+        "harness_sha": git("rev-parse", "HEAD"),
+        "harness_dirty": bool(status),
+    }
+
+
 def check_checkout(spec: Spec) -> None:
     def git(*a):
         return subprocess.run(
@@ -802,6 +825,10 @@ class Runner:
             )
         else:
             self.ledger.event("matrix_resume", done=len(self.ledger.final))
+        self.ledger.event(
+            "harness_versions",
+            versions={name: harness_version(env) for name, env in self.spec.envs.items()},
+        )
         while True:
             pend = self.pending()
             if not pend and not self.inflight_keys:
@@ -889,6 +916,7 @@ class Runner:
             / f"a{attempt}"
         )
         out_dir.mkdir(parents=True, exist_ok=True)
+        hv = harness_version(env)
         exit_code, harness_row = None, None
         try:
             cmd = self._command(cell, env, dev, out_dir, attempt)
@@ -930,6 +958,7 @@ class Runner:
             cell_wall_s=time.monotonic() - t0,
             started=started,
         )
+        row.update(hv)
         self.ledger.add_attempt(row)
         with self.lock:
             dkey = (env.name, dev["serial"])

@@ -816,3 +816,30 @@ def test_inconsistent_protocol_is_rejected(world, protocol):
     spec = make(tasks=("A",))
     with pytest.raises(ValueError, match="protocol"):
         _with_protocol(spec, tmp, "x.jsonc", protocol)
+
+
+def test_rows_record_the_harness_version(world):
+    make, tmp = world
+    spec = make(tasks=("A",))
+    h = tmp / "harness"
+    subprocess.run(["git", "init", "-q", str(h)], check=True)
+    subprocess.run(["git", "-C", str(h), "add", "run_agent.py"], check=True)
+    subprocess.run(
+        ["git", "-C", str(h), "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "h"],
+        check=True,
+    )
+    sha = subprocess.run(
+        ["git", "-C", str(h), "rev-parse", "HEAD"], capture_output=True, text=True
+    ).stdout.strip()
+    run(spec)
+    r = rows(spec.out_dir / "results.jsonl")[0]
+    assert r["harness_sha"] == sha and r["harness_dirty"] is False
+    assert Path(r["harness_repo"]).resolve() == h.resolve()
+
+
+def test_harness_version_without_git_is_null(world):
+    make, _ = world
+    spec = make(tasks=("A",))
+    run(spec)
+    r = rows(spec.out_dir / "results.jsonl")[0]
+    assert r["harness_sha"] is None and r["harness_dirty"] is None
