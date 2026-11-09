@@ -13,6 +13,7 @@ from minitap.mobile_use.benchmark.runtime import get_runtime
 from minitap.mobile_use.benchmark.text_check import (
     TextCheckConfig,
     compare_text,
+    find_by_resource_id,
     find_focused_text_element,
 )
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
@@ -201,15 +202,15 @@ async def _run_text_match_check(
     method = "resource_id"
     element = readback_element
     if element is None:
-        # Read the screen (again) and look for the target, else for the focused text field.
-        controller = create_device_controller(ctx)
-        screen_data = await controller.get_screen_data()
-        readback_hierarchy = screen_data.elements
+        if readback_hierarchy is None:
+            controller = create_device_controller(ctx)
+            screen_data = await controller.get_screen_data()
+            readback_hierarchy = screen_data.elements
+        # Look for the target by resource-id (both hierarchy key formats, see A10), else for
+        # the focused text field.
         if target.resource_id:
-            element = find_element_by_resource_id(
-                ui_hierarchy=readback_hierarchy,
-                resource_id=target.resource_id,
-                index=target.resource_id_index,
+            element = find_by_resource_id(
+                readback_hierarchy, target.resource_id, target.resource_id_index
             )
         if element is None:
             method = "focused_element"

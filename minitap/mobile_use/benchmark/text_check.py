@@ -116,6 +116,28 @@ def compare_text(
     )
 
 
+def find_by_resource_id(
+    ui_hierarchy: list[dict] | None, resource_id: str, index: int | None = None
+) -> dict | None:
+    """Resource-id lookup that accepts both hierarchy formats.
+
+    The shared helper utils.ui_hierarchy.find_element_by_resource_id only matches the Maestro
+    key `resourceId`, while the UIAutomator2 client used on Android emits `resource-id`, so it
+    never matches on Android (04 - Audit A10). That helper is left untouched on purpose (it drives
+    paper-era focus and post-validation behaviour); this check uses its own lookup.
+    """
+    wanted = index or 0
+    for element in ui_hierarchy or []:
+        if not isinstance(element, dict):
+            continue
+        rid = element.get("resource-id", element.get("resourceId"))
+        if rid == resource_id:
+            if wanted == 0:
+                return element
+            wanted -= 1
+    return None
+
+
 def find_focused_text_element(ui_hierarchy: list[dict] | None) -> dict | None:
     """Fallback read-back target when the Cortex gave no resource-id."""
     candidates = [

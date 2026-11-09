@@ -70,7 +70,13 @@
       // OpenRouter endpoint (Amazon Bedrock) supports no tool calling, and the Executor is a
       // tool-calling agent. Closest available: meta-llama/llama-3.3-70b-instruct (also the
       // Executor of the hardcoded Minitap profile, config.py get_default_minitap_llm_config).
-      "model": "meta-llama/llama-3.3-70b-instruct"
+      "model": "meta-llama/llama-3.3-70b-instruct",
+      // The Executor binds its tools with parallel_tool_calls=true (executor.py). No OpenRouter
+      // endpoint of any model used here declares `parallel_tool_calls` (checked 2026-11-09), so
+      // require_parameters=true would 404. OpenRouter still filters on tool support ("Filter by
+      // Tool Compatibility") when require_parameters is false; only parallel_tool_calls may be
+      // dropped. Kept for every Executor model (deep-merged into the configs that change it).
+      "openrouter_provider": { "require_parameters": false }
     },
     "contextor": { "provider": "openrouter", "model": "meta-llama/llama-3.1-8b-instruct" },
     "utils": {

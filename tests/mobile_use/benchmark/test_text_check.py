@@ -81,3 +81,18 @@ async def test_tool_side_check_records_event(tmp_path, mismatch_as_error, expect
     ev = json.loads((tmp_path / "e.jsonl").read_text().splitlines()[-1])
     assert ev["type"] == "text_check" and ev["verdict"] == "MISMATCH"
     assert ev["expected"] == "Paris" and ev["actual"] == "Pari" and ev["match"] is False
+
+
+def test_find_by_resource_id_accepts_both_hierarchy_formats():
+    from minitap.mobile_use.benchmark.text_check import find_by_resource_id
+    from minitap.mobile_use.utils.ui_hierarchy import find_element_by_resource_id
+
+    ui = [
+        {"resource-id": "android:id/search_src_text", "text": "first"},
+        {"resource-id": "android:id/search_src_text", "text": "second"},
+    ]
+    assert find_by_resource_id(ui, "android:id/search_src_text")["text"] == "first"
+    assert find_by_resource_id(ui, "android:id/search_src_text", 1)["text"] == "second"
+    assert find_by_resource_id([{"resourceId": "x", "text": "m"}], "x")["text"] == "m"
+    # Documents audit A10: the shared paper-era helper does not match UIAutomator2 elements.
+    assert find_element_by_resource_id(ui, "android:id/search_src_text") is None

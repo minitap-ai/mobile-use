@@ -6,6 +6,9 @@
   "extends": "_base.jsonc",
   "name": "a0-single-agent",
   "description": "Monolithic single-agent baseline (a0 flags), Cortex model of Platform Default.",
+  // The monolithic agent binds tools with parallel_tool_calls=true on the Cortex model: same
+  // reason as the Executor in _base.jsonc for require_parameters=false.
+  "llm": { "cortex": { "openrouter_provider": { "require_parameters": false } } },
   "ablation": {
     "use_multi_agent": false,
     "use_sequential_execution": false,

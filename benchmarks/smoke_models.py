@@ -105,7 +105,8 @@ async def smoke_one(
             )
             detail = f"structured={out!r}"
         elif capability == "tools":
-            msg = await llm.bind_tools([tap], tool_choice="auto").ainvoke(
+            # Same bind kwargs as executor.py (parallel_tool_calls=True).
+            msg = await llm.bind_tools([tap], parallel_tool_calls=True).ainvoke(
                 [HumanMessage(content="Use the tap tool to tap the element labelled 'Settings'.")]
             )
             detail = f"tool_calls={[c['name'] for c in msg.tool_calls]}"
@@ -153,7 +154,7 @@ async def main() -> int:
     settings.OPEN_ROUTER_API_KEY = SecretStr(key)
 
     wanted: dict[tuple[str, str], set[str]] = {}
-    routing: dict[str, dict | None] = {}
+    routing: dict[tuple[str, str], dict | None] = {}
     for f in sorted((HERE / "configs").rglob("*.jsonc")):
         if f.name.startswith("_"):
             continue
@@ -162,10 +163,11 @@ async def main() -> int:
         for role, provider, model in iter_model_ids(cfg):
             if provider != "openrouter" or role.endswith(".fallback"):
                 continue
-            wanted.setdefault((model, capability_for(role, mono)), set()).add(cfg.name)
+            cap = capability_for(role, mono)
+            wanted.setdefault((model, cap), set()).add(cfg.name)
             entry = _entry(cfg, role)
             if entry is not None and entry.openrouter_provider:
-                routing[model] = entry.openrouter_provider
+                routing[(model, cap)] = entry.openrouter_provider
     for spec in args.extra_model:
         model, _, cap = spec.partition(":")
         wanted.setdefault((model, cap or "structured"), set()).add("(extra)")
@@ -178,7 +180,7 @@ async def main() -> int:
     video_b64 = make_video() if any(c == "video" for _, c in wanted) else None
     results = []
     for (model, cap), configs in sorted(wanted.items()):
-        res = await smoke_one(runtime, model, cap, video_b64, routing.get(model))
+        res = await smoke_one(runtime, model, cap, video_b64, routing.get((model, cap)))
         results.append({"model": model, "capability": cap, "configs": sorted(configs), **res})
     rt.deactivate()
 

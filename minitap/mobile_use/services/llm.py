@@ -166,6 +166,10 @@ def get_openrouter_llm(
         kwargs["max_retries"] = policy.max_retries
         kwargs["timeout"] = policy.timeout_s
         kwargs["default_headers"] = {"X-Title": policy.openrouter_app_title}
+        # LangGraph's "messages" stream mode makes chat models stream, and streamed chunks carry
+        # no OpenRouter usage/cost/provider. Outputs are identical either way, so benchmark runs
+        # use plain (non-streamed) calls to get complete per-call accounting.
+        kwargs["disable_streaming"] = True
         # Ask OpenRouter to return the charged cost in `usage.cost`.
         extra_body["usage"] = {"include": True}
         merged_routing = {**policy.openrouter_provider, **(provider_routing or {})}
