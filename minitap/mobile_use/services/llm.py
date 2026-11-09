@@ -293,7 +293,7 @@ def get_llm(
         raise ValueError(f"Unsupported provider: {llm.provider}")
     if callbacks:
         # Constructor-level callbacks propagate through with_structured_output()/bind_tools().
-        client.callbacks = callbacks
+        client.callbacks = callbacks  # pyright: ignore[reportAttributeAccessIssue]
     return client
 
 
