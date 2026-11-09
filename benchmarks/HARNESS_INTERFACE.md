@@ -13,7 +13,8 @@ the experimental condition is selected **only** by the config file.
 - Since the first pin: paper-era bugs A10 (resource-id lookup / bounds / missing await: the
   text read-back now works on Android) and A11 (swipe default duration) are fixed for every
   condition; each model is pinned to one OpenRouter endpoint with no provider fallback
-  (`benchmarks/README.md`, "Models and pinned providers").
+  (`benchmarks/README.md`, "Models and pinned providers"). `v1-as-shipped.jsonc` restores the
+  A10/A11 bugs through the opt-in flag `legacy_v1_android_bugs` (one extra row).
 
 ## Entry point
 

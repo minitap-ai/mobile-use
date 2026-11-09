@@ -542,6 +542,21 @@ class AblationConfig(BaseModel):
         ),
     ]
 
+    # Opt-in reproduction of the v1 (January 2026, as shipped) Android behaviour. Not an ablated
+    # "feature": it restores bugs A10/A11 for the `v1-as-shipped` reference row only.
+    legacy_v1_android_bugs: Annotated[
+        bool,
+        Field(
+            default=False,
+            description=(
+                "Restore the v1 Android bugs fixed on paper/androidworld-rework: resource-id "
+                "lookup and bounds parsing that never match UIAutomator2 elements (inert "
+                "post-validation, focus-by-id always falls back), the never-awaited focus tap, "
+                "and swipes failing when the model omits `duration` (A10, A11)."
+            ),
+        ),
+    ]
+
     def __str__(self):
         return f"""
 Ablation Configuration:
@@ -556,6 +571,7 @@ Ablation Configuration:
   Data fidelity prompts: {self.use_data_fidelity_prompts}
   Loop detector: {self.use_loop_detector}
   Text match check: {self.use_text_match_check}
+  Legacy v1 Android bugs: {self.legacy_v1_android_bugs}
 """
 
     def get_enabled_features(self) -> list[str]:

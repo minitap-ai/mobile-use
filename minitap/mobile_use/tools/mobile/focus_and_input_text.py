@@ -22,7 +22,11 @@ from minitap.mobile_use.controllers.controller_factory import create_device_cont
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 from minitap.mobile_use.tools.types import Target
-from minitap.mobile_use.tools.utils import focus_element_if_needed, move_cursor_to_end_if_bounds
+from minitap.mobile_use.tools.utils import (
+    focus_element_if_needed,
+    legacy_v1,
+    move_cursor_to_end_if_bounds,
+)
 from minitap.mobile_use.utils.logger import get_logger
 from minitap.mobile_use.utils.ui_hierarchy import find_element_by_resource_id, get_element_text
 
@@ -135,6 +139,7 @@ def get_focus_and_input_text_tool(ctx: MobileUseContext) -> BaseTool:
                 ui_hierarchy=state.latest_ui_hierarchy,
                 resource_id=target.resource_id,
                 index=target.resource_id_index,
+                legacy_v1=legacy_v1(ctx),
             )
             if element:
                 readback_element = element

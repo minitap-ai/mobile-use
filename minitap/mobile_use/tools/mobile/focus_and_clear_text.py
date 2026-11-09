@@ -14,7 +14,11 @@ from minitap.mobile_use.controllers.unified_controller import UnifiedMobileContr
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 from minitap.mobile_use.tools.types import Target
-from minitap.mobile_use.tools.utils import focus_element_if_needed, move_cursor_to_end_if_bounds
+from minitap.mobile_use.tools.utils import (
+    focus_element_if_needed,
+    legacy_v1,
+    move_cursor_to_end_if_bounds,
+)
 from minitap.mobile_use.utils.logger import get_logger
 from minitap.mobile_use.utils.ui_hierarchy import (
     find_element_by_resource_id,
@@ -57,7 +61,9 @@ class TextClearer:
         element = None
         if resource_id:
             element = find_element_by_resource_id(
-                ui_hierarchy=self.state.latest_ui_hierarchy, resource_id=resource_id
+                ui_hierarchy=self.state.latest_ui_hierarchy,
+                resource_id=resource_id,
+                legacy_v1=legacy_v1(self.ctx),
             )
 
         if not element:
@@ -137,6 +143,7 @@ class TextClearer:
                 elt = find_element_by_resource_id(
                     ui_hierarchy=self.state.latest_ui_hierarchy or [],
                     resource_id=target.resource_id,
+                    legacy_v1=legacy_v1(self.ctx),
                 )
                 if elt:
                     current_text = get_element_text(elt)

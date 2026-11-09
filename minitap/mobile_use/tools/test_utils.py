@@ -108,6 +108,7 @@ class TestMoveCursorToEndIfBounds:
             ui_hierarchy=[sample_element],
             resource_id="com.example:id/text_input",
             index=0,
+            legacy_v1=False,
         )
         mock_tap.assert_called_once()
         call_args = mock_tap.call_args[1]

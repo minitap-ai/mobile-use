@@ -24,7 +24,8 @@ same commit; a condition is a file in `benchmarks/configs/`.
 | Telemetry forced off | benchmark only | `benchmark/runner.py` |
 
 Paper-era bugs **fixed** on this branch (decided 2026-11-09; they apply to every condition,
-including `full-jan2026.jsonc`, which is therefore "January feature set + these fixes"):
+including `full-jan2026.jsonc`, which is therefore "January feature set + these fixes"; the
+opt-in flag `legacy_v1_android_bugs` restores them, used only by `v1-as-shipped.jsonc`):
 - **A10, post-validation was inert on Android.** Since the UIAutomator2 client became the
   Android screen source (730e4d7, 2025-11-26, i.e. in every paper run), the resource-id path
   could not work:
@@ -67,13 +68,15 @@ Unchanged on purpose (kept identical to January for comparability, documented):
 | `use_data_fidelity_prompts` | no data-fidelity section in the Cortex prompt |
 | `use_loop_detector` | (new) no deterministic loop detector |
 | `use_text_match_check` | (new) no MATCH/MISMATCH verdict after text input |
+| `legacy_v1_android_bugs` | (new, opt-in, default **false**) when **true**, restores the v1 Android bugs A10 (resource-id lookup and bounds parsing that never match UIAutomator2 elements, never-awaited focus tap) and A11 (swipe fails when `duration` is omitted). The tool schemas the LLM sees are identical either way. |
 
 ## Conditions (`benchmarks/configs/`)
 
 | File | Plan item | Flags off | Routing |
 |---|---|---|---|
 | `full.jsonc` | P2 headline, P3 #2 | none | Platform Default |
-| `full-jan2026.jsonc` | parity with Jan 2026 | loop_detector, text_match_check | Platform Default |
+| `full-jan2026.jsonc` | reference row: January features + A10/A11 fixes | loop_detector, text_match_check | Platform Default |
+| `v1-as-shipped.jsonc` | extra row: what v1 actually did | as full-jan2026, plus `legacy_v1_android_bugs: true` | Platform Default (January models unavailable) |
 | `full-all-frontier.jsonc` | P3 #3 | none | frontier model on all 7 agents |
 | `a0-single-agent.jsonc` | P3 #1 | all (a0 flags) | Cortex model of Platform Default |
 | `no-post-validation.jsonc` | P3 #4 | post_validation, text_match_check | Platform Default |

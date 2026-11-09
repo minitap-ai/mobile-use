@@ -1,0 +1,15 @@
+{
+  // Extra reference row: what v1 (the January 2026 system, as shipped) actually did on Android.
+  // = full-jan2026.jsonc (January feature set) + legacy_v1_android_bugs, which restores:
+  //   A10  resource-id lookup / bounds parsing that never match UIAutomator2 elements, so the
+  //        post-validation read-back is always empty and focus-by-id always falls back to
+  //        coordinates; the never-awaited focus tap;
+  //   A11  swipes fail when the model omits `duration`.
+  // Not restorable: the January models (google/gemini-3-pro-preview and the tool-less
+  // meta-llama/llama-3.1-70b-instruct are unavailable), so the routing is the same as
+  // full-jan2026.jsonc. The only difference with full-jan2026.jsonc is the legacy flag.
+  "extends": "full-jan2026.jsonc",
+  "name": "v1-as-shipped",
+  "description": "January 2026 feature set with the v1 Android bugs restored (A10, A11).",
+  "ablation": { "legacy_v1_android_bugs": true }
+}

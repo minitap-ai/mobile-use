@@ -106,3 +106,14 @@ def test_every_model_has_a_single_pinned_provider_without_fallback():
             pin = pins[model]
             assert pin.get("allow_fallbacks") is False, (model, pin)
             assert len(pin.get("order", [])) == 1, (model, pin)
+
+
+def test_legacy_v1_flag_only_in_v1_as_shipped():
+    for path in RUNNABLE:
+        cfg = load_benchmark_config(path).config
+        assert cfg.ablation.legacy_v1_android_bugs is (cfg.name == "v1-as-shipped"), path.name
+    v1 = load_benchmark_config(CONFIG_DIR / "v1-as-shipped.jsonc").resolved
+    jan = load_benchmark_config(CONFIG_DIR / "full-jan2026.jsonc").resolved
+    diff = {k for k in v1["ablation"] if v1["ablation"][k] != jan["ablation"][k]}
+    assert diff == {"legacy_v1_android_bugs"}
+    assert v1["llm"] == jan["llm"] and v1["llm_policy"] == jan["llm_policy"]

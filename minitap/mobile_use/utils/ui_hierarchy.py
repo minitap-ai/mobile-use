@@ -45,6 +45,7 @@ def find_element_by_resource_id(
     resource_id: str,
     index: int | None = None,
     is_rich_hierarchy: bool = False,
+    legacy_v1: bool = False,
 ) -> dict | None:
     """
     Find a UI element by its resource-id in the UI hierarchy.
@@ -59,6 +60,9 @@ def find_element_by_resource_id(
     """
     if is_rich_hierarchy:
         return __find_element_by_ressource_id_in_rich_hierarchy(ui_hierarchy, resource_id)
+
+    if legacy_v1:
+        return _find_element_by_resource_id_v1(ui_hierarchy, resource_id, index)
 
     # Matches still to skip before returning one. paper/androidworld-rework, audit A10: this
     # counter used to be re-initialised at every match, so any index >= 1 never matched.
@@ -75,6 +79,32 @@ def find_element_by_resource_id(
                     if remaining[0] == 0:
                         return element
                     remaining[0] -= 1
+                    continue
+
+                children = element.get("children", [])
+                if children:
+                    result = search_recursive(children)
+                    if result:
+                        return result
+        return None
+
+    return search_recursive(ui_hierarchy)
+
+
+def _find_element_by_resource_id_v1(
+    ui_hierarchy: list[dict], resource_id: str, index: int | None = None
+) -> dict | None:
+    """v1 (January 2026) lookup, kept verbatim for `legacy_v1_android_bugs`: Maestro key only,
+    index counter reset at every match."""
+
+    def search_recursive(elements: list[dict]) -> dict | None:
+        for element in elements:
+            if isinstance(element, dict):
+                if element.get("resourceId") == resource_id:
+                    idx = index or 0
+                    if idx == 0:
+                        return element
+                    idx -= 1
                     continue
 
                 children = element.get("children", [])
@@ -132,9 +162,14 @@ class ElementBounds(BaseModel):
 _BOUNDS_STR_RE = re.compile(r"^\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]$")
 
 
-def get_bounds_for_element(element: dict) -> ElementBounds | None:
+def get_bounds_for_element(element: dict, legacy_v1: bool = False) -> ElementBounds | None:
     bounds = element.get("bounds", None)
     if isinstance(bounds, str):
+        if legacy_v1:
+            # v1 behaviour (`legacy_v1_android_bugs`): ElementBounds(**"<str>") raised and the
+            # error was logged, so UIAutomator2 bounds were never usable.
+            logger.error(f"Failed to validate bounds: {bounds!r} is not a mapping")
+            return None
         # paper/androidworld-rework, audit A10: UIAutomator2 gives "[x1,y1][x2,y2]"; only the
         # Maestro dict format {x, y, width, height} used to be parsed.
         match = _BOUNDS_STR_RE.match(bounds.strip())

@@ -19,6 +19,7 @@ from minitap.mobile_use.controllers.types import (
 from minitap.mobile_use.controllers.unified_controller import UnifiedMobileController
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import CompositeToolWrapper
+from minitap.mobile_use.tools.utils import legacy_v1
 
 
 def get_swipe_tool(ctx: MobileUseContext) -> BaseTool:
@@ -60,6 +61,23 @@ def get_swipe_tool(ctx: MobileUseContext) -> BaseTool:
         )
 
     return swipe
+
+
+class _DefaultDuration(int):
+    """int subclass marking "the model omitted `duration`" (the schema still shows 400)."""
+
+
+DEFAULT_SWIPE_DURATION_MS = _DefaultDuration(400)
+
+
+def _v1_duration_if_legacy(ctx: MobileUseContext, duration):
+    """With `legacy_v1_android_bugs`, an omitted duration becomes the v1 FieldInfo again, so
+    SwipeRequest validation fails exactly as in v1 (A11). Otherwise a plain int."""
+    if type(duration) is _DefaultDuration:
+        if legacy_v1(ctx):
+            return Field(description="Duration in ms", ge=1, le=10000, default=400)
+        return int(duration)
+    return duration
 
 
 def get_composite_swipe_tools(ctx: MobileUseContext) -> list[BaseTool]:
@@ -110,11 +128,14 @@ def get_composite_swipe_tools(ctx: MobileUseContext) -> list[BaseTool]:
         end_y: int = Field(description="End Y coordinate in pixels"),
         # paper/androidworld-rework, audit A11: a `= Field(default=400)` default in a tool
         # signature reached the function as a FieldInfo when the model omitted `duration`.
-        duration: Annotated[int, Field(description="Duration in ms", ge=1, le=10000)] = 400,
+        duration: Annotated[
+            int, Field(description="Duration in ms", ge=1, le=10000)
+        ] = DEFAULT_SWIPE_DURATION_MS,
         tool_call_id: Annotated[str, InjectedToolCallId] = None,  # type: ignore
         state: Annotated[State, InjectedState] = None,  # type: ignore
     ) -> Command:
         """Swipe using pixel coordinates from start position to end position."""
+        duration = _v1_duration_if_legacy(ctx, duration)
         swipe_request = SwipeRequest(
             swipe_mode=SwipeStartEndCoordinatesRequest(
                 start=CoordinatesSelectorRequest(x=start_x, y=start_y),
@@ -133,11 +154,14 @@ def get_composite_swipe_tools(ctx: MobileUseContext) -> list[BaseTool]:
         end_y_percent: int = Field(description="End Y percent (0-100)", ge=0, le=100),
         # paper/androidworld-rework, audit A11: a `= Field(default=400)` default in a tool
         # signature reached the function as a FieldInfo when the model omitted `duration`.
-        duration: Annotated[int, Field(description="Duration in ms", ge=1, le=10000)] = 400,
+        duration: Annotated[
+            int, Field(description="Duration in ms", ge=1, le=10000)
+        ] = DEFAULT_SWIPE_DURATION_MS,
         tool_call_id: Annotated[str, InjectedToolCallId] = None,  # type: ignore
         state: Annotated[State, InjectedState] = None,  # type: ignore
     ) -> Command:
         """Swipe using percentage coordinates from start position to end position."""
+        duration = _v1_duration_if_legacy(ctx, duration)
         swipe_request = SwipeRequest(
             swipe_mode=SwipeStartEndPercentagesRequest(
                 start=PercentagesSelectorRequest(

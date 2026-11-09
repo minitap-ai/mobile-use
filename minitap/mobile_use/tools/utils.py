@@ -25,6 +25,14 @@ from minitap.mobile_use.utils.ui_hierarchy import (
 logger = get_logger(__name__)
 
 
+def legacy_v1(ctx: MobileUseContext) -> bool:
+    """True when the task runs with `legacy_v1_android_bugs` (v1-as-shipped reference row)."""
+    try:
+        return ctx.get_ablation_config().legacy_v1_android_bugs is True
+    except Exception:
+        return False
+
+
 def find_element_by_text(
     ui_hierarchy: list[dict], text: str, index: int | None = None
 ) -> dict | None:
@@ -93,11 +101,12 @@ async def move_cursor_to_end_if_bounds(
                 ui_hierarchy=state.latest_ui_hierarchy or [],
                 resource_id=target.resource_id,
                 index=target.resource_id_index,
+                legacy_v1=legacy_v1(ctx),
             )
         if not elt:
             return None
 
-        bounds = get_bounds_for_element(elt)
+        bounds = get_bounds_for_element(elt, legacy_v1=legacy_v1(ctx))
         if not bounds:
             return elt
 
@@ -116,7 +125,7 @@ async def move_cursor_to_end_if_bounds(
             state.latest_ui_hierarchy or [], target.text, index=target.text_index
         )
         if text_elt:
-            bounds = get_bounds_for_element(text_elt)
+            bounds = get_bounds_for_element(text_elt, legacy_v1=legacy_v1(ctx))
             if bounds:
                 await tap_bottom_right_of_element(bounds=bounds, ctx=ctx)
                 logger.debug(f"Tapped end of input that had text'{target.text}'")
@@ -141,6 +150,7 @@ async def focus_element_if_needed(
             resource_id=target.resource_id,
             index=target.resource_id_index,
             is_rich_hierarchy=False,
+            legacy_v1=legacy_v1(ctx),
         )
 
     if elt_from_id and target.text:
@@ -156,11 +166,13 @@ async def focus_element_if_needed(
         if not is_element_focused(elt_from_id):
             # paper/androidworld-rework, audit A10: this coroutine was never awaited, so the tap
             # never happened (unreachable on Android until the resource-id lookup was fixed).
-            await tap(
-                ctx=ctx,
-                selector_request=IdSelectorRequest(id=target.resource_id),  # type: ignore
-                index=target.resource_id_index,
-            )
+            # legacy_v1_android_bugs reproduces v1: no tap.
+            if not legacy_v1(ctx):
+                await tap(
+                    ctx=ctx,
+                    selector_request=IdSelectorRequest(id=target.resource_id),  # type: ignore
+                    index=target.resource_id_index,
+                )
             logger.debug(f"Focused (tap) on resource_id={target.resource_id}")
             rich_hierarchy = await controller.get_ui_elements()
             elt_from_id = find_element_by_resource_id(
@@ -168,6 +180,7 @@ async def focus_element_if_needed(
                 resource_id=target.resource_id,  # type: ignore
                 index=target.resource_id_index,
                 is_rich_hierarchy=False,
+                legacy_v1=legacy_v1(ctx),
             )
         if elt_from_id and is_element_focused(elt_from_id):
             logger.debug(f"Text input is focused: {target.resource_id}")
@@ -188,7 +201,7 @@ async def focus_element_if_needed(
     if target.text:
         text_elt = find_element_by_text(rich_hierarchy, target.text, index=target.text_index)
         if text_elt:
-            bounds = get_bounds_for_element(text_elt)
+            bounds = get_bounds_for_element(text_elt, legacy_v1=legacy_v1(ctx))
             if bounds:
                 relative_point = bounds.get_center()
                 await tap(

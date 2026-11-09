@@ -25,7 +25,9 @@
     "use_data_fidelity_prompts": true,
     // Added on paper/androidworld-rework (not in the January 2026 system): off in the base.
     "use_loop_detector": false,
-    "use_text_match_check": false
+    "use_text_match_check": false,
+    // Off everywhere except v1-as-shipped.jsonc: restores the v1 Android bugs A10/A11.
+    "legacy_v1_android_bugs": false
   },
 
   "loop_detector": {
