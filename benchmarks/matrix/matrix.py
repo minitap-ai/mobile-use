@@ -739,6 +739,32 @@ def harness_version(env: EnvHook) -> dict[str, Any]:
     }
 
 
+def quarantine_file(env: EnvHook) -> Path:
+    """devices/<env>.quarantined.jsonl next to the env's devices file (read by the pool owner)."""
+    return env.devices_file.with_name(f"{env.devices_file.stem}.quarantined.jsonl")
+
+
+def signal_quarantine(env: EnvHook, dev: dict, reason: str, matrix_name: str) -> None:
+    """Tell the device owner (P0-A's watcher) that the matrix stopped using this device, so it can
+    drop it from the devices file, stop its keep-alive and free its slot under the live cap."""
+    line = {
+        "serial": dev.get("serial"),
+        "instance_id": dev.get("instance_id"),
+        "reason": reason,
+        "ts": now(),
+        "env": env.name,
+        "matrix": matrix_name,
+    }
+    path = quarantine_file(env)
+    with open(path, "a", encoding="utf-8") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            f.write(json.dumps(line) + "\n")
+            f.flush()
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
+
+
 def check_checkout(spec: Spec) -> None:
     def git(*a):
         return subprocess.run(
@@ -1043,6 +1069,9 @@ class Runner:
                         env=env.name,
                         serial=dev["serial"],
                         infra_streak=self.infra_streak[dkey],
+                    )
+                    signal_quarantine(
+                        env, dev, f"infra_streak={self.infra_streak[dkey]}", self.spec.name
                     )
             else:
                 self.infra_streak[dkey] = 0

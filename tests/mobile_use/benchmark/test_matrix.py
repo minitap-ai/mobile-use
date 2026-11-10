@@ -976,3 +976,15 @@ def test_usage_reports_live_or_failed_instances_as_unresolved(world, monkeypatch
     matrix.main(["usage", str(spec.path)])
     rep = json.loads((spec.out_dir / "limrun_usage.json").read_text())
     assert rep["complete"] is False and rep["unresolved_instances"] == ["android_x1"]
+
+
+def test_quarantined_device_is_signalled_to_its_owner(world):
+    make, tmp = world
+    spec = make(tasks=("A", "B", "C"), devices=("d1",), plan={"A": ["crash"], "B": ["crash"]})
+    (tmp / "devices.txt").write_text('{"serial": "d1", "instance_id": "android_q1"}\n')
+    s2 = matrix.Spec.load(spec.path)
+    s2.envs["fake"].quarantine_after_infra = 2
+    run(s2)
+    q = rows(tmp / "devices.quarantined.jsonl")
+    assert len(q) == 1 and q[0]["serial"] == "d1" and q[0]["instance_id"] == "android_q1"
+    assert q[0]["reason"] == "infra_streak=2" and q[0]["env"] == "fake"
