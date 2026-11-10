@@ -1,3 +1,5 @@
+import json
+
 from pydantic import BaseModel, Field, model_validator
 
 from minitap.mobile_use.utils.ui_hierarchy import ElementBounds
@@ -22,6 +24,19 @@ class Target(BaseModel):
     bounds: ElementBounds | None = Field(
         None, description="The x, y, width, and height of the element."
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_json_string(cls, data):
+        """Fix round: the model sometimes passed the target as a JSON string (4 pilot tool
+        errors); parse it instead of failing."""
+        if isinstance(data, str):
+            try:
+                parsed = json.loads(data)
+            except json.JSONDecodeError:
+                return data
+            return parsed if isinstance(parsed, dict) else data
+        return data
 
     @model_validator(mode="after")
     def _default_indices(self):

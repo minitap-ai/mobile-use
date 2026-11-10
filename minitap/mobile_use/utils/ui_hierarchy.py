@@ -1,5 +1,5 @@
 import re
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from minitap.mobile_use.utils.logger import get_logger
 
@@ -137,6 +137,32 @@ class ElementBounds(BaseModel):
     y: int = Field(description="The y coordinate of the top-left corner of the element.")
     width: int = Field(description="The width of the element.")
     height: int = Field(description="The height of the element.")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_common_bounds_formats(cls, data):
+        """Fix round: the model often wrote bounds as {left, top, right, bottom}, as the
+        UI hierarchy's "[x1,y1][x2,y2]" string, or as a bare point {x, y}; each made the tool
+        call fail validation (10 pilot tool errors). All are unambiguous, so accept them."""
+        if isinstance(data, str):
+            m = _BOUNDS_STR_RE.match(data.strip())
+            if m:
+                x1, y1, x2, y2 = (int(v) for v in m.groups())
+                return {"x": x1, "y": y1, "width": x2 - x1, "height": y2 - y1}
+            return data
+        if isinstance(data, dict):
+            keys = set(data)
+            if {"left", "top", "right", "bottom"} <= keys and not ({"x", "y"} & keys):
+                left, top = int(data["left"]), int(data["top"])
+                return {
+                    "x": left,
+                    "y": top,
+                    "width": int(data["right"]) - left,
+                    "height": int(data["bottom"]) - top,
+                }
+            if {"x", "y"} <= keys and not ({"width", "height"} & keys):
+                return {"x": data["x"], "y": data["y"], "width": 0, "height": 0}  # a point
+        return data
 
     def get_center(self) -> Point:
         return Point(x=self.x + self.width // 2, y=self.y + self.height // 2)
