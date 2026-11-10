@@ -49,6 +49,9 @@ FAKE_HARNESS = textwrap.dedent(
     os.remove(marker)
     if outcome == "crash":
         sys.exit(3)
+    if outcome == "unreachable":
+        print(f"adb: device '{a.serial}' not found")
+        sys.exit(1)
     inst = int(hashlib.sha256(f"{a.seed}_{task}_0".encode()).hexdigest(), 16) % (2**32)
     os.makedirs(a.out_dir, exist_ok=True)
     rec = {"run_id": a.run_id, "task": task, "seed": a.seed, "mobile_use_sha": a.expect_sha,
@@ -988,3 +991,33 @@ def test_quarantined_device_is_signalled_to_its_owner(world):
     q = rows(tmp / "devices.quarantined.jsonl")
     assert len(q) == 1 and q[0]["serial"] == "d1" and q[0]["instance_id"] == "android_q1"
     assert q[0]["reason"] == "infra_streak=2" and q[0]["env"] == "fake"
+
+
+def test_unreachable_device_is_not_an_attempt_and_not_quarantined(world, monkeypatch):
+    make, tmp = world
+    monkeypatch.setattr(matrix, "UNREACHABLE_COOLDOWN_S", 0)
+    spec = make(
+        tasks=("A",),
+        devices=("d1",),
+        plan={"A": ["unreachable", "unreachable", "unreachable", "success"]},
+        max_infra_attempts=2,
+    )
+    s2 = matrix.Spec.load(spec.path)
+    s2.envs["fake"].quarantine_after_infra = 1
+    run(s2)
+    att = rows(s2.out_dir / "attempts.jsonl")
+    assert [a["infra_reason"] for a in att[:3]] == ["device_unreachable"] * 3
+    assert all(a["counted_attempt"] is False for a in att[:3])
+    final = rows(s2.out_dir / "results.jsonl")
+    assert final[0]["outcome"] == "success"
+    assert not (tmp / "devices.quarantined.jsonl").exists()
+
+
+def test_persistently_unreachable_device_is_quarantined_eventually(world, monkeypatch):
+    make, tmp = world
+    monkeypatch.setattr(matrix, "UNREACHABLE_COOLDOWN_S", 0)
+    spec = make(tasks=("A",), devices=("d1",), plan={"A": ["unreachable"]})
+    summary = run(matrix.Spec.load(spec.path))
+    q = rows(tmp / "devices.quarantined.jsonl")
+    assert len(q) == 1 and q[0]["reason"] == f"unreachable x{matrix.UNREACHABLE_QUARANTINE}"
+    assert summary["totals"]["done"] == 0

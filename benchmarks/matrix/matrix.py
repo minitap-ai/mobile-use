@@ -739,6 +739,23 @@ def harness_version(env: EnvHook) -> dict[str, Any]:
     }
 
 
+UNREACHABLE_COOLDOWN_S = 120
+UNREACHABLE_QUARANTINE = 5  # consecutive unreachable attempts before quarantining anyway
+_UNREACHABLE_PATTERNS = ("' not found", "device offline", "no devices/emulators found")
+
+
+def device_unreachable(out_dir: Path, row: dict) -> bool:
+    """adb failed to reach the device and no model call was made (nothing spent)."""
+    if (row.get("cost_usd") or 0) > 0 or (row.get("llm_calls") or 0) > 0:
+        return False
+    log = out_dir / "harness.log"
+    try:
+        text = log.read_text(errors="replace")[-20000:]
+    except OSError:
+        return False
+    return "adb" in text and any(p in text for p in _UNREACHABLE_PATTERNS)
+
+
 def quarantine_file(env: EnvHook) -> Path:
     """devices/<env>.quarantined.jsonl next to the env's devices file (read by the pool owner)."""
     return env.devices_file.with_name(f"{env.devices_file.stem}.quarantined.jsonl")
@@ -800,6 +817,8 @@ class Runner:
         self.inflight_keys: set[str] = set()
         self.infra_streak: Counter[tuple[str, str]] = Counter()
         self.quarantined: set[tuple[str, str]] = set()
+        self.cooldown_until: dict[tuple[str, str], float] = {}  # unreachable devices
+        self.unreachable_streak: Counter[tuple[str, str]] = Counter()
         self.last_device: dict[str, str] = {}
         self.launched = 0
         self.stop_reason: str | None = None
@@ -887,6 +906,7 @@ class Runner:
             for d in env.devices()
             if (env.name, d["serial"]) not in self.busy
             and (env.name, d["serial"]) not in self.quarantined
+            and self.cooldown_until.get((env.name, d["serial"]), 0) <= time.monotonic()
             and all(d.get(flag) is True for flag in required)
         ]
         if not devs:
@@ -1047,12 +1067,44 @@ class Runner:
             started=started,
         )
         row.update(hv)
+        if row["outcome"] == "infra_failure" and device_unreachable(out_dir, row):
+            # adb could not reach the device before the agent ran (e.g. its tunnel restarted):
+            # nothing was spent and it says nothing about the cell, so it is not counted as an
+            # attempt and does not quarantine; the device cools down and the list is re-read.
+            row["infra_reason"] = "device_unreachable"
+            row["counted_attempt"] = False
         self.ledger.add_attempt(row)
         with self.lock:
             dkey = (env.name, dev["serial"])
             self.busy.discard(dkey)
             self.running[env.name] -= 1
             self.last_device[cell.key] = dev["serial"]
+            if row.get("infra_reason") == "device_unreachable":
+                self.unreachable_streak[dkey] += 1
+                self.cooldown_until[dkey] = time.monotonic() + UNREACHABLE_COOLDOWN_S
+                self.ledger.event(
+                    "device_unreachable",
+                    env=env.name,
+                    serial=dev["serial"],
+                    streak=self.unreachable_streak[dkey],
+                )
+                if (
+                    self.unreachable_streak[dkey] >= UNREACHABLE_QUARANTINE
+                    and dkey not in self.quarantined
+                ):
+                    self.quarantined.add(dkey)
+                    self.ledger.event(
+                        "device_quarantined",
+                        env=env.name,
+                        serial=dev["serial"],
+                        reason="unreachable",
+                    )
+                    signal_quarantine(
+                        env, dev, f"unreachable x{self.unreachable_streak[dkey]}", self.spec.name
+                    )
+                self.inflight_keys.discard(cell.key)
+                return
+            self.unreachable_streak[dkey] = 0
             if row["outcome"] == "infra_failure" and row.get("error_kind") == "llm_api":
                 # An OpenRouter error (429/5xx after retries) is not a device fault: never let it
                 # quarantine the device (P1-P, 2026-11-10: two 429s took emulator-5554 out).
@@ -1075,7 +1127,7 @@ class Runner:
                     )
             else:
                 self.infra_streak[dkey] = 0
-            attempts = self.ledger.attempts[cell.key]
+            attempts = [a for a in self.ledger.attempts[cell.key] if a.get("counted_attempt", True)]
             if row["outcome"] == "protocol_rejected":
                 # Not a result and not retryable: the harness does not follow the protocol. Halt
                 # the env for this session (no more spend there); the cell stays pending, so it
