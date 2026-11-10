@@ -954,8 +954,25 @@ def test_usage_command_splits_instance_time_by_config(world, monkeypatch):
     )
     assert matrix.main(["usage", str(spec.path)]) == 0
     rep = json.loads((spec.out_dir / "limrun_usage.json").read_text())
+    assert rep["complete"] is True and rep["unresolved_instances"] == []
+    assert rep["busy_minutes_from_wall_clock"] == 0
     total = sum(x["instance_hours"] for x in rep["instance_hours_by_config"])
     assert abs(total - 1.0) < 0.02 and {x["config"] for x in rep["instance_hours_by_config"]} == {
         "full",
         "no-scratchpad",
     }
+
+
+def test_usage_reports_live_or_failed_instances_as_unresolved(world, monkeypatch):
+    make, tmp = world
+    spec = make(tasks=("A",), devices=("d1",))
+    (tmp / "devices.txt").write_text('{"serial": "d1", "instance_id": "android_x1"}\n')
+    run(matrix.Spec.load(spec.path))
+    monkeypatch.setattr(
+        matrix.limrun_cap,
+        "instance_lifetime",
+        lambda iid: {"instance_id": iid, "created_at": "t0", "terminated_at": None, "minutes": 5.0},
+    )
+    matrix.main(["usage", str(spec.path)])
+    rep = json.loads((spec.out_dir / "limrun_usage.json").read_text())
+    assert rep["complete"] is False and rep["unresolved_instances"] == ["android_x1"]

@@ -1261,11 +1261,15 @@ def main(argv: list[str] | None = None) -> int:
             lambda: defaultdict(float)
         )
         cells_on: Counter[str] = Counter()
+        from_wall = 0.0  # busy minutes taken from cell_wall_s (attempts without device_minutes)
         for rows in ledger.attempts.values():
             for r in rows:
                 iid = r.get("device_instance_id")
                 if iid:
-                    m = r.get("device_minutes") or (r.get("cell_wall_s") or 0) / 60
+                    m = r.get("device_minutes")
+                    if m is None:
+                        m = (r.get("cell_wall_s") or 0) / 60
+                        from_wall += m
                     busy[iid] += m
                     busy_by_cfg[iid][(r.get("config"), r.get("env"))] += m
                     cells_on[iid] += 1
@@ -1286,8 +1290,17 @@ def main(argv: list[str] | None = None) -> int:
                 continue
             for key, m in busy_by_cfg[iid].items():
                 inst_by_cfg[key] += total * m / busy[iid]
+        unresolved = [
+            i["instance_id"]
+            for i in instances
+            if i.get("error") or i.get("minutes") is None or not i.get("terminated_at")
+        ]
         report = {
             "matrix": spec.name,
+            # complete = every instance is terminated and resolved: only then are the lifetimes final
+            "complete": not unresolved,
+            "unresolved_instances": unresolved,
+            "busy_minutes_from_wall_clock": round(from_wall, 1),
             "note": "busy = cells' own device time; instance = create->delete lifetime (setup and "
             "idle included), split by busy share; instances still live count up to now",
             "instance_hours_by_config": [
