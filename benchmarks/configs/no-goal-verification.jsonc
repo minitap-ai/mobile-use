@@ -1,0 +1,8 @@
+{
+  // Fix round: full system minus the goal verifier (the only fix-round change that is a new
+  // agent component rather than a bug fix), so its effect is measured separately.
+  "extends": "full.jsonc",
+  "name": "no-goal-verification",
+  "description": "Full system without the pre-end goal verification.",
+  "ablation": { "use_goal_verification": false }
+}

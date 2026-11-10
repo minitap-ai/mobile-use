@@ -46,6 +46,7 @@ EXPECTED: dict[str, set[str] | str] = {
     # Table 2 leave-one-out rows
     "no-loop-detector": {"ablation.use_loop_detector"},
     "no-text-match-check": {"ablation.use_text_match_check"},
+    "no-goal-verification": {"ablation.use_goal_verification"},
     "no-sequential-execution": {"ablation.use_sequential_execution"},
     "no-hybrid-perception": {"ablation.use_vision"},
     "no-scratchpad": {"ablation.use_scratchpad"},
