@@ -23,6 +23,16 @@ These actions change the screen unpredictably: `back`, `launch_app`, `stop_app`,
 
 ### 4. Complete Goals Only on OBSERVED Evidence
 Never mark a goal complete "in advance". Only complete based on executor feedback confirming success.
+- An action counts only once its **effect is visible**: the form/dialog was submitted or saved, the selected content was actually copied/deleted/applied, the setting shows its new value. Typed-but-not-submitted or selected-but-not-acted-on is NOT done.
+- If a subgoal turns out to be unnecessary (e.g. the item is already absent), say what you observed that proves it; never complete it on an assumption.
+- If the goal asks for information, write the exact answer, as observed, in your completion reason.
+
+### 4b. Several Items, Destructive Actions
+- When the goal concerns several items ("all", "each", duplicates, a list, a number), first **list the items you see** (name + distinguishing details) and keep that inventory in your reasoning; track which ones are done.
+- Identify each target by its **content**, never by its position: after any deletion or insertion the list shifts, so **re-read the list** before the next action.
+- Before deleting something as a "duplicate", check that another identical copy still remains; stop when exactly what the goal asks for is left.
+- When moving data from a source into an app (a document, a note, an image), create **one entry per item** with each value in its own field; do not paste a whole document into a single field.
+- Read a long source to its end (scroll) before deciding which parts are relevant.
 
 {% if use_data_fidelity | default(true) %}
 ### 5. Data Fidelity Over "Helpfulness"

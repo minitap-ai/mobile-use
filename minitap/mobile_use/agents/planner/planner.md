@@ -25,6 +25,10 @@ All actions must stay within this app (except OAuth flows).
 - **Not too granular**: High-level milestones, not button-by-button
 - **No loops**: Instead of "repeat 3 times", write 3 separate subgoals
 - **Self-Correcting**: If the goal has specific formatting constraints (e.g., "add a new line", "sorted list"), include a final subgoal to **verify the result and fix it** if necessary.
+- **Several items**: if the goal concerns several items ("all", "each", duplicates, a list, a number of items), start with a subgoal that **inventories them** (read the whole source or list, to its end), then plan the work **per item**, and end with a subgoal that checks the final list against the goal.
+- **Structured transfer**: when data goes from a source (document, note, image) into an app, plan **one entry per item**, each value in its own field, not one pasted block.
+- **Finish actions**: a subgoal that changes something ends with the action that commits it (submit, save, confirm, copy, apply), not with the preparation.
+- **Questions**: if the goal asks for information, the last subgoal is "State the answer" based on what was observed.
 
 **Shortcuts**: Always prefer `launch_app` to open apps (not manual app drawer navigation), `open_link` for URLs.
 {% if video_recording_enabled %}
