@@ -50,6 +50,12 @@ def test_planner_rules():
         assert phrase in text, phrase
 
 
-def test_orchestrator_rule():
+def test_orchestrator_has_no_evidence_rule():
+    # Reverted (fix-round smoke, 2026-11-10): with "a skipped step is not completion" and replanning
+    # only on repeated failures, an unnecessary plan step could be neither completed nor replanned,
+    # and the Orchestrator cycled without device actions until the timeout (2 of 41 validation
+    # cells, 0 of 105 pilot runs). The goal verifier checks completion evidence instead.
     text = render("orchestrator/orchestrator.md", platform="android")
-    assert "observed evidence of the effect" in text
+    assert "observed evidence of the effect" not in text
+    assert "skipped step is not completion" not in text
+    assert "Add finished subgoal IDs to `completed_subgoal_ids`\n" in text
