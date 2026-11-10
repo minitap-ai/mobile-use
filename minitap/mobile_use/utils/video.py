@@ -198,8 +198,6 @@ async def compress_video_for_api(
 
     logger.info(f"Compressing video to fit within {target_size_bytes / 1024 / 1024:.1f} MB")
 
-    output_path = input_path.parent / f"compressed_{input_path.name}"
-
     # Get video duration using ffprobe
     duration_cmd = [
         "ffprobe",
@@ -223,59 +221,70 @@ async def compress_video_for_api(
     except Exception:
         duration = 120.0  # Default estimate if probe fails
 
-    # Calculate target bitrate (bits per second)
-    # Leave some margin for container overhead
-    target_bitrate = int((target_size_bytes * 8 * 0.9) / duration)
-    # Ensure minimum quality
-    target_bitrate = max(target_bitrate, 100_000)  # At least 100kbps
-
-    logger.info(f"Target bitrate: {target_bitrate / 1000:.0f} kbps for {duration:.1f}s video")
-
-    # Compress with ffmpeg: reduce resolution to 720p max, use target bitrate
-    compress_cmd = [
-        "ffmpeg",
-        "-y",
-        "-i",
-        str(input_path),
-        "-vf",
-        "scale='min(720,iw)':'-2'",  # Max 720p width, maintain aspect
-        "-c:v",
-        "libx264",
-        "-preset",
-        "fast",
-        "-b:v",
-        str(target_bitrate),
-        "-maxrate",
-        str(int(target_bitrate * 1.5)),
-        "-bufsize",
-        str(int(target_bitrate * 2)),
-        "-c:a",
-        "aac",
-        "-b:a",
-        "64k",
-        str(output_path),
-    ]
-
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            *compress_cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+    # Fix round (M7): the old code returned the ORIGINAL file when ffmpeg failed and never checked
+    # the result's size, so an oversized upload was sent and rejected (413) every time. Now the
+    # result must fit; smaller passes are tried, then an explicit error is raised.
+    attempts = [(720, 1.0), (480, 0.5), (360, 0.25)]  # (max width, share of the bitrate budget)
+    output_path = input_path.parent / f"compressed_{input_path.name}"
+    last_error = ""
+    for max_width, share in attempts:
+        target_bitrate = int((target_size_bytes * 8 * 0.9 * share) / max(duration, 1.0))
+        target_bitrate = max(target_bitrate, 50_000)
+        logger.info(
+            f"Compressing to <= {max_width}px at {target_bitrate / 1000:.0f} kbps "
+            f"for {duration:.1f}s video"
         )
-        _, stderr = await proc.communicate()
-
+        compress_cmd = [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(input_path),
+            "-vf",
+            f"scale='min({max_width},iw)':'-2'",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "fast",
+            "-b:v",
+            str(target_bitrate),
+            "-maxrate",
+            str(int(target_bitrate * 1.5)),
+            "-bufsize",
+            str(int(target_bitrate * 2)),
+            "-c:a",
+            "aac",
+            "-b:a",
+            "32k",
+            str(output_path),
+        ]
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *compress_cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await proc.communicate()
+        except Exception as e:  # ffmpeg missing, ...
+            last_error = f"{type(e).__name__}: {e}"
+            break
         if proc.returncode != 0:
-            logger.error(f"ffmpeg compression failed: {stderr.decode()}")
-            return input_path  # Return original if compression fails
-
+            last_error = stderr.decode(errors="replace")[-300:]
+            logger.error(f"ffmpeg compression failed: {last_error}")
+            continue
         new_size = output_path.stat().st_size
         logger.info(
-            f"Compressed: {current_size / 1024 / 1024:.2f} MB -> "
-            f"{new_size / 1024 / 1024:.2f} MB"
+            f"Compressed: {current_size / 1024 / 1024:.2f} MB -> {new_size / 1024 / 1024:.2f} MB"
         )
+        if new_size <= target_size_bytes:
+            return output_path
+        last_error = f"still {new_size / 1024 / 1024:.1f} MB after compression"
 
-        return output_path
+    raise VideoTooLargeError(
+        f"Video too large to analyze ({current_size / 1024 / 1024:.1f} MB, limit "
+        f"{target_size_bytes / 1024 / 1024:.0f} MB): {last_error}. Record a shorter video "
+        "(only the part that matters) and analyze it again."
+    )
 
-    except Exception as e:
-        logger.error(f"Video compression failed: {e}")
-        return input_path  # Return original if compression fails
+
+class VideoTooLargeError(RuntimeError):
+    """The recording cannot be brought under the analysis upload limit."""
