@@ -104,8 +104,14 @@ def test_every_model_has_a_single_pinned_provider_without_fallback():
         for role, _provider, model in iter_model_ids(cfg):
             assert model in pins, f"{path.name}: {role} model {model} has no provider pin"
             pin = pins[model]
-            assert pin.get("allow_fallbacks") is False, (model, pin)
-            assert len(pin.get("order", [])) == 1, (model, pin)
+            order = pin.get("order", [])
+            if pin.get("allow_fallbacks") is False:
+                assert len(order) == 1, (model, pin)
+            else:
+                # a short ordered list of same-precision endpoints, fallback restricted to it
+                assert pin.get("allow_fallbacks") is True and pin.get("only") == order, (model, pin)
+                assert 2 <= len(order) <= 3, (model, pin)
+                assert len({tag.split("/", 1)[1] for tag in order if "/" in tag}) == 1, (model, pin)
 
 
 def test_legacy_v1_flag_only_in_v1_as_shipped():

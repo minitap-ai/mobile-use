@@ -11,9 +11,15 @@ Two independent proofs:
 
 If an intentional agent change is ever needed, this test must be updated in the same commit, and
 the change disclosed: runs before and after it are not the same system.
+
+Provider routing (2026-11-10, Pilou): the gpt-oss-120b OpenRouter routing moved off DeepInfra
+after the freeze. That is the ONLY allowed difference from FROZEN_AT: the agent code is
+byte-identical, full.jsonc is unchanged, and the resolved full.jsonc system equals the frozen one
+in every field except that one routing entry (test_resolved_full_differs_only_by_routing).
 """
 
 import hashlib
+import json
 import subprocess
 from pathlib import Path
 
@@ -25,7 +31,7 @@ ROOT = Path(__file__).resolve().parents[3]
 FROZEN_AT = "982b10599ab79cf99fe4e5ccf565df8f0bf2a9f1"
 GOLDEN_AGENT_TREE = "e4b0347374146f718769f4b04a44fb261d5fd2b9b24f7a396cb815fb23cc8537"
 GOLDEN_AGENT_FILES = 129
-GOLDEN_FULL_RESOLVED = "5784e85da8d1a381624785f0d78ac1240f0c66acdba07afcb2bf182681929630"
+GOLDEN_FULL_RESOLVED = "5f3e5a9960590bf3b0dd039f3bbe76352cc514cd966e4d1fe4a500acf5862b24"
 TOP_LEVEL = (
     "llm-config.defaults.jsonc",
     "ablation-config.defaults.jsonc",
@@ -77,7 +83,6 @@ def test_git_diff_against_frozen_commit_is_empty():
     paths = [
         "minitap/mobile_use",
         *TOP_LEVEL,
-        "benchmarks/configs/_base.jsonc",
         "benchmarks/configs/full.jsonc",
     ]
     out = subprocess.run(
@@ -93,3 +98,58 @@ def test_git_diff_against_frozen_commit_is_empty():
         if "|" in line and not Path(line.split("|")[0].strip()).name.startswith("test_")
     ]
     assert changed == [], changed
+
+
+ROUTED_MODEL = "openai/gpt-oss-120b"  # the only post-freeze change (provider routing)
+
+
+def _frozen_available() -> bool:
+    probe = subprocess.run(
+        ["git", "-C", str(ROOT), "cat-file", "-e", f"{FROZEN_AT}^{{commit}}"], capture_output=True
+    )
+    return probe.returncode == 0
+
+
+def test_base_config_diff_is_only_the_routing_entry():
+    if not _frozen_available():
+        pytest.skip("frozen commit not in local history (shallow clone)")
+    out = subprocess.run(
+        ["git", "-C", str(ROOT), "diff", "-U0", FROZEN_AT, "--", "benchmarks/configs/_base.jsonc"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    changed = [
+        ln[1:].strip()
+        for ln in out.splitlines()
+        if ln[:1] in "+-" and not ln.startswith(("+++", "---"))
+    ]
+    allowed_tokens = (ROUTED_MODEL, '"order"', '"only"', '"allow_fallbacks"', "}")
+    for line in changed:
+        assert line == "" or line.startswith("//") or any(t in line for t in allowed_tokens), line
+
+
+def _resolve_at(rev: str, tmp_path: Path) -> dict:
+    cfg_dir = tmp_path / rev / "benchmarks" / "configs"
+    cfg_dir.mkdir(parents=True)
+    for name in ("_base.jsonc", "full.jsonc"):
+        blob = subprocess.run(
+            ["git", "-C", str(ROOT), "show", f"{rev}:benchmarks/configs/{name}"],
+            capture_output=True,
+            check=True,
+        ).stdout
+        (cfg_dir / name).write_bytes(blob)
+    return load_benchmark_config(cfg_dir / "full.jsonc").resolved
+
+
+def test_resolved_full_differs_only_by_routing(tmp_path):
+    if not _frozen_available():
+        pytest.skip("frozen commit not in local history (shallow clone)")
+    frozen = _resolve_at(FROZEN_AT, tmp_path)
+    now = load_benchmark_config(ROOT / "benchmarks" / "configs" / "full.jsonc").resolved
+    old_pins = frozen["llm_policy"]["openrouter_provider_by_model"]
+    new_pins = now["llm_policy"]["openrouter_provider_by_model"]
+    assert old_pins[ROUTED_MODEL] != new_pins[ROUTED_MODEL]
+    for d in (frozen, now):
+        d["llm_policy"]["openrouter_provider_by_model"].pop(ROUTED_MODEL)
+    assert json.dumps(frozen, sort_keys=True) == json.dumps(now, sort_keys=True)

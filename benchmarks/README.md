@@ -147,8 +147,10 @@ Substitutions vs. the paper:
 
 Each model is pinned to exactly one OpenRouter endpoint, with no provider fallback
 (`llm_policy.openrouter_provider_by_model` in `_base.jsonc`:
-`{"order": ["<endpoint tag>"], "allow_fallbacks": false}`). A test checks that every model of
-every config is pinned. Selection rule: unquantized (bf16/fp16) or fp8 weights, the endpoint
+`{"order": ["<endpoint tag>"], "allow_fallbacks": false}`), except gpt-oss-120b, which has an
+ordered list of two same-precision endpoints with the fallback restricted to that list
+(`"only"` = `"order"`, `"allow_fallbacks": true`). A test checks that every model of every config
+is pinned this way. Selection rule: unquantized (bf16/fp16) or fp8 weights, the endpoint
 supports what the role sends, best 1-day uptime on the OpenRouter endpoints API (2026-11-09):
 
 | Model | Pinned endpoint | Why |
@@ -156,7 +158,7 @@ supports what the role sends, best 1-day uptime on the OpenRouter endpoints API 
 | google/gemini-3.1-pro-preview | `google-vertex/global` | 99.93 % 1d (AI Studio 98.9 %, flex tier down) |
 | google/gemini-3-flash-preview | `google-vertex/global` | same provider as the Cortex, 100 % 1d |
 | meta-llama/llama-4-scout | `deepinfra/fp8` | fp8, json_schema, 100 % 1d; other endpoint (Vertex) publishes no quantization/uptime |
-| openai/gpt-oss-120b | `deepinfra/bf16` | bf16 (most endpoints serve MXFP4), tools + json_schema, 100 % 1d |
+| openai/gpt-oss-120b | `crusoe/bf16`, then `dekallm/bf16` (fallback restricted to these two with `only`) | bf16 (most endpoints serve MXFP4), tools + json_schema; Crusoe 100 % 1d, DekaLLM 99.79 % 1d (2026-11-10). Was `deepinfra/bf16` until 2026-11-10 (no DeepInfra BYOK key); burst test: 30 concurrent Orchestrator calls x6 on Crusoe, 0 errors, 0 HTTP 429, p50 2-3 s |
 | meta-llama/llama-3.3-70b-instruct | `coreweave/fp16` | no bf16 endpoint exists; unquantized fp16 with tool calling, 100 % 1d |
 | meta-llama/llama-3.1-8b-instruct | `coreweave/bf16` | only bf16 endpoint and only one with json_schema, 100 % 1d |
 | openai/gpt-5-nano, openai/gpt-4o | `openai` | first party (billed via the account's BYOK OpenAI key) |

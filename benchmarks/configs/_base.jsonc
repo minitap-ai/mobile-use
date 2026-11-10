@@ -75,8 +75,16 @@
       // DeepInfra fp8 standard endpoint (json_schema, 100 % 1d); the only other endpoint (Vertex)
       // publishes neither quantization nor uptime.
       "meta-llama/llama-4-scout": { "order": ["deepinfra/fp8"], "allow_fallbacks": false },
-      // bf16 (most endpoints serve the MXFP4 weights); DeepInfra bf16: tools + json_schema, 100 % 1d.
-      "openai/gpt-oss-120b": { "order": ["deepinfra/bf16"], "allow_fallbacks": false },
+      // bf16 (most endpoints serve the MXFP4 weights). 2026-11-10 (Pilou): moved off DeepInfra (no
+      // DeepInfra BYOK key) to an ordered list of the two other bf16 endpoints, both with tools +
+      // json_schema, fallback restricted to that list (`only`): Crusoe (100 % 1d; burst 30
+      // concurrent Orchestrator calls x6, 0 errors, 0 429, p50 2-3 s), then DekaLLM (99.79 % 1d,
+      // p50 12 s). Agent code unchanged; only this routing differs from the first final pin.
+      "openai/gpt-oss-120b": {
+        "order": ["crusoe/bf16", "dekallm/bf16"],
+        "only": ["crusoe/bf16", "dekallm/bf16"],
+        "allow_fallbacks": true
+      },
       // No bf16 endpoint exists; CoreWeave serves unquantized fp16 with tool calling, 100 % 1d
       // (fp8 alternatives with tools: AkashML, DeepInfra turbo).
       "meta-llama/llama-3.3-70b-instruct": { "order": ["coreweave/fp16"], "allow_fallbacks": false },
