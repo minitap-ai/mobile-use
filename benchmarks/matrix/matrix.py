@@ -1297,7 +1297,7 @@ def main(argv: list[str] | None = None) -> int:
         ]
         report = {
             "matrix": spec.name,
-            # complete = every instance is terminated and resolved: only then are the lifetimes final
+            # complete = every instance terminated and resolved: only then are lifetimes final
             "complete": not unresolved,
             "unresolved_instances": unresolved,
             "busy_minutes_from_wall_clock": round(from_wall, 1),
