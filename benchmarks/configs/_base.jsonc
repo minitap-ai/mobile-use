@@ -1,5 +1,5 @@
 {
-  // Shared base for every benchmark condition of the AndroidWorld paper rework.
+  // Shared base for every benchmark condition of the paper rework.
   // Not a runnable condition by itself (files starting with "_" are bases).
   //
   // = the January 2026 full system (branch ablation/a9-final, every paper-era flag on) with the

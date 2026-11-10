@@ -437,7 +437,7 @@ class AblationConfig(BaseModel):
     
     Each feature can be independently enabled/disabled to measure its contribution
     to the overall system performance. When all features are enabled, this represents
-    the full mobile-use system (100% AndroidWorld performance).
+    the full mobile-use system.
     """
 
     # Unknown keys are rejected: a typo in a flag name must fail loudly, never silently

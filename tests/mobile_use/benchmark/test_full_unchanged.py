@@ -23,7 +23,7 @@ from minitap.mobile_use.benchmark.config import load_benchmark_config
 
 ROOT = Path(__file__).resolve().parents[3]
 FROZEN_AT = None  # fix round in progress: set at the freeze
-GOLDEN_AGENT_TREE = "45653b00bf97fc3168277fdd7dc83baa050451115c4dff2059fec3246a9b3561"
+GOLDEN_AGENT_TREE = "41a8d96a1582fd945405245a480c26314cb940c45b536ae60dc43fba8fe0ceda"
 GOLDEN_AGENT_FILES = 129
 GOLDEN_FULL_RESOLVED = "1b435cb11bc8931746998da48a8f8a8046ede699bef48c158b1f42b3530096b3"
 TOP_LEVEL = (
