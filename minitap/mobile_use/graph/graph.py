@@ -19,6 +19,7 @@ from minitap.mobile_use.agents.planner.utils import (
     one_of_them_is_failure,
 )
 from minitap.mobile_use.agents.summarizer.summarizer import SummarizerNode
+from minitap.mobile_use.agents.verifier.verifier import GoalVerifierNode
 from minitap.mobile_use.config import AblationConfig
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
@@ -112,64 +113,65 @@ def post_executor_gate(
 def _get_executor_wrappers(ctx: MobileUseContext, ablation_config: AblationConfig) -> list:
     """Get the list of executor tool wrappers based on ablation config."""
     executor_wrappers = list(EXECUTOR_WRAPPERS_TOOLS)
-    
+
     # Remove scratchpad tools if disabled
     if not ablation_config.use_scratchpad:
         executor_wrappers = [
-            w for w in executor_wrappers
+            w
+            for w in executor_wrappers
             if w not in (save_note_wrapper, read_note_wrapper, list_notes_wrapper)
         ]
-    
+
     # Add video recording tools if enabled
     if ctx.video_recording_enabled and ablation_config.use_video_recording:
         executor_wrappers.extend(VIDEO_RECORDING_WRAPPERS)
-    
+
     return executor_wrappers
 
 
 def post_monolithic_gate(state: State) -> Literal["invoke_tools", "complete", "continue"]:
     """Gate for monolithic agent - check if there are tool calls or if complete."""
     logger.info("Starting post_monolithic_gate")
-    
+
     # Check if agent believes task is complete
     if state.monolithic_is_complete:
         logger.info("[monolithic] Agent believes task is complete")
         return "complete"
-    
+
     messages = state.executor_messages
     if not messages:
         return "continue"
-    
+
     last_message = messages[-1]
     if isinstance(last_message, AIMessage):
         tool_calls = getattr(last_message, "tool_calls", None)
         if tool_calls and len(tool_calls) > 0:
             logger.info(f"[monolithic] Executing {len(tool_calls)} tool calls")
             return "invoke_tools"
-    
+
     return "continue"
 
 
 async def get_monolithic_graph(ctx: MobileUseContext) -> CompiledStateGraph:
     """
     Build a simplified single-agent graph for ablation baseline.
-    
+
     This graph has a simple loop:
     START -> contextor -> monolithic -> tools -> contextor -> ...
-    
+
     No planning, no orchestration, no summarization.
     """
     logger.warning("Building MONOLITHIC graph (ablation baseline mode)")
-    
+
     graph_builder = StateGraph(State)
     ablation_config = ctx.get_ablation_config()
-    
+
     # Simplified contextor
     graph_builder.add_node("contextor", MonolithicContextorNode(ctx))
-    
+
     # Single monolithic agent (combines planning + reasoning + execution)
     graph_builder.add_node("monolithic", MonolithicNode(ctx))
-    
+
     # Tool execution node
     executor_wrappers = _get_executor_wrappers(ctx, ablation_config)
     executor_tool_node = ExecutorToolNode(
@@ -179,11 +181,11 @@ async def get_monolithic_graph(ctx: MobileUseContext) -> CompiledStateGraph:
         sequential_execution=ablation_config.use_sequential_execution,
     )
     graph_builder.add_node("tools", executor_tool_node)
-    
+
     # Simple graph flow
     graph_builder.add_edge(START, "contextor")
     graph_builder.add_edge("contextor", "monolithic")
-    
+
     graph_builder.add_conditional_edges(
         "monolithic",
         post_monolithic_gate,
@@ -193,22 +195,22 @@ async def get_monolithic_graph(ctx: MobileUseContext) -> CompiledStateGraph:
             "continue": "contextor",  # No tools called, get new context
         },
     )
-    
+
     # After tools, go back to contextor for new screen state
     graph_builder.add_edge("tools", "contextor")
-    
+
     return graph_builder.compile()
 
 
 async def get_multi_agent_graph(ctx: MobileUseContext) -> CompiledStateGraph:
     """
     Build the full multi-agent graph with all 6 agents.
-    
+
     This is the production configuration with:
     Planner -> Orchestrator -> Contextor -> Cortex -> Executor -> Summarizer
     """
     logger.info("Building MULTI-AGENT graph (full system)")
-    
+
     graph_builder = StateGraph(State)
     ablation_config = ctx.get_ablation_config()
 
@@ -256,29 +258,45 @@ async def get_multi_agent_graph(ctx: MobileUseContext) -> CompiledStateGraph:
 
     graph_builder.add_edge("summarizer", "convergence")
 
+    end_target = END
+    if ablation_config.use_goal_verification:
+        # fix round (M1): verify the goal against the device before ending
+        graph_builder.add_node("goal_verifier", GoalVerifierNode(ctx))
+        graph_builder.add_conditional_edges(
+            "goal_verifier",
+            post_goal_verifier_gate,
+            {"replan": "planner", "end": END},
+        )
+        end_target = "goal_verifier"
+
     graph_builder.add_conditional_edges(
         source="convergence",
         path=convergence_gate,
         path_map={
             "continue": "contextor",
             "replan": "planner",
-            "end": END,
+            "end": end_target,
         },
     )
 
     return graph_builder.compile()
 
 
+def post_goal_verifier_gate(state: State) -> Literal["replan", "end"]:
+    """A FAILED subgoal added by the verifier means: requirement missing, replan."""
+    return "replan" if one_of_them_is_failure(state.subgoal_plan) else "end"
+
+
 async def get_graph(ctx: MobileUseContext) -> CompiledStateGraph:
     """
     Get the appropriate graph based on ablation configuration.
-    
+
     If use_multi_agent is False, returns the monolithic baseline graph.
     Otherwise, returns the full multi-agent graph.
     """
     ablation_config = ctx.get_ablation_config()
-    
+
     if not ablation_config.use_multi_agent:
         return await get_monolithic_graph(ctx)
-    
+
     return await get_multi_agent_graph(ctx)

@@ -3,5 +3,7 @@
   // deterministic text verdict. Platform Default routing.
   "extends": "_base.jsonc",
   "name": "full-jan2026",
-  "description": "January 2026 full system (a9-final flags), Platform Default routing."
+  "description": "January 2026 full system (a9-final flags), Platform Default routing.",
+  // The fix-round goal verifier is not a January feature.
+  "ablation": { "use_goal_verification": false }
 }

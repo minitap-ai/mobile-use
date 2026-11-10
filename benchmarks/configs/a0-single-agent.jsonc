@@ -21,6 +21,7 @@
     "use_data_fidelity_prompts": false,
     "use_loop_detector": false,
     "use_text_match_check": false,
+    "use_goal_verification": false,
     "legacy_v1_android_bugs": false
   }
 }

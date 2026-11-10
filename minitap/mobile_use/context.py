@@ -94,6 +94,8 @@ class MobileUseContext(BaseModel):
     # paper/androidworld-rework: per-task loop detector (only when use_loop_detector is on)
     loop_detector: LoopDetector | None = None
     text_check_config: TextCheckConfig | None = None
+    # fix round: goal verifications that sent the task back to the Planner (per task)
+    goal_verification_rejections: int = 0
 
     def get_adb_client(self) -> AdbClient:
         if self.adb_client is None:

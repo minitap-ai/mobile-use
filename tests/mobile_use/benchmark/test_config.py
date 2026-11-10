@@ -34,7 +34,7 @@ def test_p3_configs_differ_from_full_only_where_intended():
 
     assert off("no-post-validation.jsonc") == ["post_validation", "text_match_check"]
     assert off("no-meta-reasoning.jsonc") == ["meta_reasoning", "loop_detector"]
-    assert off("full-jan2026.jsonc") == ["loop_detector", "text_match_check"]
+    assert off("full-jan2026.jsonc") == ["loop_detector", "text_match_check", "goal_verification"]
     assert off("no-video.jsonc") == ["video_recording"]
     assert off("no-data-fidelity.jsonc") == ["data_fidelity_prompts"]
     a0 = load_benchmark_config(CONFIG_DIR / "a0-single-agent.jsonc").config

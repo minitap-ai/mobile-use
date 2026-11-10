@@ -542,6 +542,18 @@ class AblationConfig(BaseModel):
         ),
     ]
 
+    use_goal_verification: Annotated[
+        bool,
+        Field(
+            default=False,
+            description=(
+                "Before the task ends, a verifier (Cortex model, fresh screen) checks every "
+                "requirement of the goal; unmet requirements go back to the Planner (max 2 per "
+                "task). Fix round, failure class M1. Multi-agent graph only."
+            ),
+        ),
+    ]
+
     # Opt-in reproduction of the v1 (January 2026, as shipped) Android behaviour. Not an ablated
     # "feature": it restores bugs A10/A11 for the `v1-as-shipped` reference row only.
     legacy_v1_android_bugs: Annotated[
@@ -571,6 +583,7 @@ Ablation Configuration:
   Data fidelity prompts: {self.use_data_fidelity_prompts}
   Loop detector: {self.use_loop_detector}
   Text match check: {self.use_text_match_check}
+  Goal verification: {self.use_goal_verification}
   Legacy v1 Android bugs: {self.legacy_v1_android_bugs}
 """
 
@@ -599,6 +612,8 @@ Ablation Configuration:
             features.append("loop_detector")
         if self.use_text_match_check:
             features.append("text_match_check")
+        if self.use_goal_verification:
+            features.append("goal_verification")
         return features
 
     def get_disabled_features(self) -> list[str]:
@@ -626,6 +641,8 @@ Ablation Configuration:
             features.append("loop_detector")
         if not self.use_text_match_check:
             features.append("text_match_check")
+        if not self.use_goal_verification:
+            features.append("goal_verification")
         return features
 
 

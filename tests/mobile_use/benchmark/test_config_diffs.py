@@ -28,6 +28,7 @@ ALL_FLAGS_OFF = {
         "use_data_fidelity_prompts",
         "use_loop_detector",
         "use_text_match_check",
+        "use_goal_verification",
     )
 }
 # The monolithic agent binds tools with parallel_tool_calls=true on the Cortex model, so its
@@ -58,10 +59,15 @@ EXPECTED: dict[str, set[str] | str] = {
     "decomposition-only": {"ablation.use_multi_agent"} | MONOLITHIC_ROUTING,
     "a0-single-agent": ALL_FLAGS_OFF | MONOLITHIC_ROUTING,
     # reference rows
-    "full-jan2026": {"ablation.use_loop_detector", "ablation.use_text_match_check"},
+    "full-jan2026": {
+        "ablation.use_loop_detector",
+        "ablation.use_text_match_check",
+        "ablation.use_goal_verification",
+    },
     "v1-as-shipped": {
         "ablation.use_loop_detector",
         "ablation.use_text_match_check",
+        "ablation.use_goal_verification",
         "ablation.legacy_v1_android_bugs",
     },
     # routing / model rows
