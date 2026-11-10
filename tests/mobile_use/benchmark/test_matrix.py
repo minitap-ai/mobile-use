@@ -875,3 +875,87 @@ def test_device_requirements_route_tasks_to_capable_devices(world, tmp_path):
     s3 = matrix.Spec.load(tmp / "req2.jsonc")
     summary = run(s3)
     assert summary["totals"]["done"] == 3 and "no usable device" in summary["stop_reason"]
+
+
+def test_rows_record_limrun_device_usage_and_status_sums_device_hours(world):
+    make, tmp = world
+    spec = make(tasks=("A", "B"), devices=("d1", "d2"), sleep=0.2)
+    (tmp / "devices.txt").write_text(
+        '{"serial": "d1", "instance_id": "android_x1"}\n'
+        '{"serial": "d2", "instance_id": "android_x2"}\n'
+    )
+    run(matrix.Spec.load(spec.path))
+    r = rows(spec.out_dir / "results.jsonl")
+    assert {x["device_instance_id"] for x in r} <= {"android_x1", "android_x2"}
+    assert all(x["device_minutes"] > 0 for x in r)
+    s = matrix.summarize(spec, matrix.Ledger(spec.out_dir))
+    assert s["totals"]["device_hours"] > 0
+    assert s["device_hours_by_config"][0]["config"] == "full"
+
+
+def test_limrun_cap_counts_only_our_live_instances():
+    import limrun_cap
+
+    data = {
+        "/v1/android_instances?limit=1000": [
+            {"metadata": {"id": "a1", "labels": {"sandbox": "true"}}, "status": {"state": "ready"}},
+            {
+                "metadata": {"id": "a2", "labels": {"sandbox": "true"}},
+                "status": {"state": "terminated"},
+            },
+            {
+                "metadata": {"id": "a3", "labels": {"sandbox": "true", "tenant_id": "x"}},
+                "status": {"state": "ready"},
+            },
+            {
+                "metadata": {"id": "a4", "labels": {"source": "device-instance"}},
+                "status": {"state": "ready"},
+            },
+            {
+                "metadata": {"id": "a5", "labels": {"local-testing": "true"}},
+                "status": {"state": "creating"},
+            },
+        ],
+        "/v1/ios_instances?limit=1000": [],
+    }
+    live = limrun_cap.live_instances(fetch=lambda path: data[path])
+    assert [i["id"] for i in live] == ["a1", "a5"]
+
+
+def test_matrix_stops_launching_when_limrun_cap_is_exceeded(world, monkeypatch):
+    make, tmp = world
+    spec = make(tasks=("A", "B"))
+    d = matrix.load_jsonc(spec.path)
+    d["limrun_cap"] = {"max_live": 35, "check_every_s": 0}
+    (tmp / "cap.jsonc").write_text(json.dumps(d))
+    monkeypatch.setattr(matrix.limrun_cap, "live_instances", lambda: [{}] * 36)
+    summary = run(matrix.Spec.load(tmp / "cap.jsonc"))
+    assert summary["totals"]["done"] == 0 and summary["stop_reason"].startswith("limrun cap")
+    monkeypatch.setattr(matrix.limrun_cap, "live_instances", lambda: [{}] * 10)
+    assert run(matrix.Spec.load(tmp / "cap.jsonc"))["totals"]["done"] == 2
+
+
+def test_usage_command_splits_instance_time_by_config(world, monkeypatch):
+    make, tmp = world
+    spec = make(tasks=("A", "B"), configs=("full", "no-scratchpad"), devices=("d1",), sleep=0.1)
+    (tmp / "devices.txt").write_text('{"serial": "d1", "instance_id": "android_x1"}\n')
+    run(matrix.Spec.load(spec.path))
+    final = rows(spec.out_dir / "results.jsonl")
+    assert all(r["device_minutes_all_attempts"] >= r["device_minutes"] > 0 for r in final)
+    monkeypatch.setattr(
+        matrix.limrun_cap,
+        "instance_lifetime",
+        lambda iid: {
+            "instance_id": iid,
+            "created_at": "t0",
+            "terminated_at": "t1",
+            "minutes": 60.0,
+        },
+    )
+    assert matrix.main(["usage", str(spec.path)]) == 0
+    rep = json.loads((spec.out_dir / "limrun_usage.json").read_text())
+    total = sum(x["instance_hours"] for x in rep["instance_hours_by_config"])
+    assert abs(total - 1.0) < 0.02 and {x["config"] for x in rep["instance_hours_by_config"]} == {
+        "full",
+        "no-scratchpad",
+    }

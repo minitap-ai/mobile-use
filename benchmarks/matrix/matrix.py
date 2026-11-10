@@ -37,11 +37,15 @@ import sys
 import threading
 import time
 import urllib.request
+
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import limrun_cap  # noqa: E402  (same directory, stdlib only)
 
 ROW_SCHEMA = 1
 INFRA_STATUSES = {
@@ -230,6 +234,8 @@ class Spec:
     # {"osmand": {"task_regex": "^OsmAnd"}}: matching tasks only run on device lines with
     # "osmand": true; other tasks prefer devices without the flag.
     device_requirements: dict = field(default_factory=dict)
+    # {"max_live": 35}: stop launching while more of our Limrun instances are live (all agents)
+    limrun_cap: dict = field(default_factory=dict)
     raw: dict = field(default_factory=dict)
 
     @classmethod
@@ -283,6 +289,7 @@ class Spec:
                 flag: {"task_regex": str(rule["task_regex"])}
                 for flag, rule in (d.get("device_requirements") or {}).items()
             },
+            limrun_cap={k: int(v) for k, v in (d.get("limrun_cap") or {}).items()},
             raw=d,
         )
 
@@ -602,6 +609,10 @@ def build_row(
         "config_resolved_sha256": h.get("config_resolved_sha256"),
         "aw_sha": h.get("aw_sha"),
         "device": device.get("serial"),
+        # Limrun usage (decision 2026-11-10: under contract, not in the $ budget, but recorded):
+        # the instance and the device time this cell used
+        "device_instance_id": device.get("instance_id"),
+        "device_minutes": round(cell_wall_s / 60, 3),
         "harness_run_id": h.get("run_id"),
         "harness_exit_code": exit_code,
         "workarounds": h.get("workarounds"),
@@ -676,6 +687,9 @@ class Ledger:
             final["attempt_outcomes"] = [a["outcome"] for a in attempts]
             final["total_cost_usd_all_attempts"] = round(
                 sum(a.get("cost_usd") or 0.0 for a in attempts), 6
+            )
+            final["device_minutes_all_attempts"] = round(
+                sum(a.get("device_minutes") or 0.0 for a in attempts), 3
             )
         self._append(self.results_path, final)
         self.refresh()
@@ -765,10 +779,31 @@ class Runner:
         self.stop_reason: str | None = None
         self.halted_envs: dict[str, str] = {}  # env -> protocol violation that halted it
         self._last_key_check = 0.0
+        self._last_cap_check = 0.0
         self.threads: list[threading.Thread] = []
 
     # ---------------------------------------------------------------- guards
+    def _limrun_cap_ok(self) -> bool:
+        cap = self.spec.limrun_cap.get("max_live")
+        every = self.spec.limrun_cap.get("check_every_s", 120)
+        if not cap or time.monotonic() - self._last_cap_check < every:
+            return True
+        self._last_cap_check = time.monotonic()
+        try:
+            live = len(limrun_cap.live_instances())
+        except Exception as e:  # noqa: BLE001
+            self.ledger.event("limrun_cap_check_error", error=str(e)[:200])
+            return True  # the create path (limrun_cap.py check) is the hard gate
+        self.ledger.event("limrun_cap_check", live=live, cap=cap)
+        if live > cap:
+            self.stop_reason = f"limrun cap: {live} live instances > {cap}"
+            self.ledger.event("limrun_cap_exceeded", live=live, cap=cap)
+            return False
+        return True
+
     def _budget_ok(self) -> bool:
+        if not self._limrun_cap_ok():
+            return False
         spec = self.spec
         if spec.budget_max_usd > 0:
             spent = self.ledger.spent_usd()
@@ -1053,6 +1088,11 @@ def summarize(spec: Spec, ledger: Ledger, stop_reason: str | None = None) -> dic
     cells = spec.cells()
     groups: dict[tuple[str, str, int], Counter] = defaultdict(Counter)
     cost: dict[tuple[str, str, int], float] = defaultdict(float)
+    device_min: dict[tuple[str, str, int], float] = defaultdict(float)
+    for rows in ledger.attempts.values():
+        for a in rows:  # every attempt used device time, retries included
+            g = (a.get("config"), a.get("env"), a.get("seed"))
+            device_min[g] += a.get("device_minutes") or (a.get("cell_wall_s") or 0.0) / 60
     for c in cells:
         g = (c.config, c.env, c.seed)
         row = ledger.final.get(c.key)
@@ -1077,15 +1117,30 @@ def summarize(spec: Spec, ledger: Ledger, stop_reason: str | None = None) -> dic
                 "infra_exhausted": cnt["infra_exhausted"],
                 "success_rate": round(cnt["success"] / scored, 4) if scored else None,
                 "cost_usd": round(cost[(config, env, seed)], 4),
+                "device_hours": round(device_min[(config, env, seed)] / 60, 4),
             }
         )
+    by_config: dict[tuple[str, str], float] = defaultdict(float)
+    for (config, env, _seed), minutes in device_min.items():
+        by_config[(config, env)] += minutes
     totals = {
         "cells": len(cells),
         "done": sum(1 for c in cells if c.key in ledger.final),
         "attempts": sum(len(v) for v in ledger.attempts.values()),
         "spent_usd": round(ledger.spent_usd(), 4),
+        "device_hours": round(sum(device_min.values()) / 60, 4),
     }
-    return {"totals": totals, "by_group": by_group, "stop_reason": stop_reason}
+    return {
+        "totals": totals,
+        "by_group": by_group,
+        "device_hours_by_config": [
+            {"config": c, "env": e, "device_hours": round(m / 60, 4)}
+            for (c, e), m in sorted(
+                by_config.items(), key=lambda kv: (str(kv[0][0]), str(kv[0][1]))
+            )
+        ],
+        "stop_reason": stop_reason,
+    }
 
 
 # --------------------------------------------------------------------------- CLI
@@ -1100,7 +1155,7 @@ def _harness_row(out_dir: Path, task: str) -> dict | None:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("command", choices=["plan", "run", "status", "rescore"])
+    ap.add_argument("command", choices=["plan", "run", "status", "rescore", "usage"])
     ap.add_argument("spec")
     ap.add_argument("--out", help="output directory (default: spec out_dir)")
     ap.add_argument("--max-cells", type=int, help="launch at most N cells in this session")
@@ -1196,6 +1251,61 @@ def main(argv: list[str] | None = None) -> int:
                 indent=2,
             )
         )
+        return 0
+    if a.command == "usage":
+        # Limrun usage: busy device-minutes per instance from the ledger, lifetime (create ->
+        # delete, or now if still live) from the Limrun API. Written to <out_dir>/limrun_usage.json.
+        ledger = Ledger(spec.out_dir)
+        busy: dict[str, float] = defaultdict(float)
+        busy_by_cfg: dict[str, dict[tuple[str, str], float]] = defaultdict(
+            lambda: defaultdict(float)
+        )
+        cells_on: Counter[str] = Counter()
+        for rows in ledger.attempts.values():
+            for r in rows:
+                iid = r.get("device_instance_id")
+                if iid:
+                    m = r.get("device_minutes") or (r.get("cell_wall_s") or 0) / 60
+                    busy[iid] += m
+                    busy_by_cfg[iid][(r.get("config"), r.get("env"))] += m
+                    cells_on[iid] += 1
+        instances = []
+        for iid in sorted(busy):
+            try:
+                life = limrun_cap.instance_lifetime(iid)
+            except Exception as e:  # noqa: BLE001
+                life = {"instance_id": iid, "error": str(e)[:200], "minutes": None}
+            life.update(busy_minutes=round(busy[iid], 1), attempts=cells_on[iid])
+            instances.append(life)
+        # Instance time (create -> delete, includes setup and idle) split across configs in
+        # proportion to the busy time each config used on that instance.
+        inst_by_cfg: dict[tuple[str, str], float] = defaultdict(float)
+        for life in instances:
+            iid, total = life["instance_id"], life.get("minutes")
+            if not total or not busy[iid]:
+                continue
+            for key, m in busy_by_cfg[iid].items():
+                inst_by_cfg[key] += total * m / busy[iid]
+        report = {
+            "matrix": spec.name,
+            "note": "busy = cells' own device time; instance = create->delete lifetime (setup and "
+            "idle included), split by busy share; instances still live count up to now",
+            "instance_hours_by_config": [
+                {"config": c, "env": e, "instance_hours": round(m / 60, 2)}
+                for (c, e), m in sorted(
+                    inst_by_cfg.items(), key=lambda kv: (str(kv[0][0]), str(kv[0][1]))
+                )
+            ],
+            "instances": instances,
+            "total_busy_device_hours": round(sum(busy.values()) / 60, 2),
+            "total_lifetime_device_hours": round(
+                sum(i.get("minutes") or 0 for i in instances) / 60, 2
+            ),
+            "device_hours_by_config": summarize(spec, ledger)["device_hours_by_config"],
+            "generated_at": now(),
+        }
+        (spec.out_dir / "limrun_usage.json").write_text(json.dumps(report, indent=2))
+        print(json.dumps({k: v for k, v in report.items() if k != "instances"}, indent=2))
         return 0
     if a.command == "status":
         ledger = Ledger(spec.out_dir)
