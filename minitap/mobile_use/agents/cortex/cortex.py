@@ -160,6 +160,23 @@ class CortexNode:
                     return await self._force_replan(state, loop_note)
                 messages.append(HumanMessage(content=trigger.cortex_message()))
 
+            # fix round: stall detector (same flag), Cortex -> Orchestrator rounds w/o the Executor
+            stall = self.ctx.loop_detector.check_stall()
+            current = get_current_subgoal(state.subgoal_plan)
+            if stall is not None and current is not None:
+                runtime = get_runtime()
+                if runtime is not None:
+                    runtime.record_loop_trigger(
+                        kind=stall.kind,
+                        action="replan",
+                        evidence=stall.evidence,
+                        turn=stall.turn,
+                        subgoal=current.description,
+                        details=stall.details,
+                    )
+                logger.warning(f"Stall detector triggered: {stall.evidence}")
+                return await self._force_replan(state, f"Loop detector (stall): {stall.evidence}")
+
         llm = get_llm(ctx=self.ctx, name="cortex", temperature=1).with_structured_output(
             CortexOutput
         )
@@ -180,6 +197,8 @@ class CortexNode:
         response.decisions = canonical_decisions(response.decisions)
         if response.goals_completion_reason in EMPTY_STRING_TOKENS:
             response.goals_completion_reason = None
+        if self.ctx.loop_detector is not None:
+            self.ctx.loop_detector.note_cortex_turn(decided_action=response.decisions is not None)
 
         thought_parts = []
         if response.decisions_reason:

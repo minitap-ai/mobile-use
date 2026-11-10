@@ -527,7 +527,10 @@ class AblationConfig(BaseModel):
             description=(
                 "Deterministic loop detector: hashes (UI state, executed action) pairs and, "
                 "on repetition / no-progress / oscillation, injects an explicit warning into "
-                "the Cortex context and can force a replan. Multi-agent graph only."
+                "the Cortex context and can force a replan. Also a stall detector: after "
+                "`loop_detector.stall_rounds` (4) consecutive Cortex turns without a device "
+                "action (Orchestrator rounds without the Executor), it forces a replan. "
+                "Multi-agent graph only."
             ),
         ),
     ]

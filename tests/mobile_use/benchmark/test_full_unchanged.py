@@ -23,9 +23,9 @@ from minitap.mobile_use.benchmark.config import load_benchmark_config
 
 ROOT = Path(__file__).resolve().parents[3]
 FROZEN_AT = None  # fix round in progress: set at the freeze
-GOLDEN_AGENT_TREE = "68bd4e3c18500927de2a7a049255fd8c86f9b197dfae1b464ddf4a1e4f4de512"
+GOLDEN_AGENT_TREE = "e4b0347374146f718769f4b04a44fb261d5fd2b9b24f7a396cb815fb23cc8537"
 GOLDEN_AGENT_FILES = 129
-GOLDEN_FULL_RESOLVED = "1b435cb11bc8931746998da48a8f8a8046ede699bef48c158b1f42b3530096b3"
+GOLDEN_FULL_RESOLVED = "5784e85da8d1a381624785f0d78ac1240f0c66acdba07afcb2bf182681929630"
 TOP_LEVEL = (
     "llm-config.defaults.jsonc",
     "ablation-config.defaults.jsonc",

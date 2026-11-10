@@ -98,6 +98,14 @@ class LoopDetectorConfig(BaseModel):
         description="Force a replan after this many triggers without progress (0 = never)",
     )
     include_bounds: bool = False
+    stall_rounds: int = Field(
+        default=4,
+        ge=0,
+        description=(
+            "Force a replan after this many consecutive Cortex turns that decided no device "
+            "action (each one an Orchestrator round without the Executor); 0 = never"
+        ),
+    )
 
 
 @dataclass(frozen=True)
@@ -111,7 +119,7 @@ class Transition:
 
 @dataclass
 class LoopTrigger:
-    kind: Literal["repeat", "no_change", "cycle"]
+    kind: Literal["repeat", "no_change", "cycle", "stall"]
     evidence: str
     escalate: bool
     turn: int
@@ -197,6 +205,7 @@ class LoopDetector:
         self._prev_state: str | None = None
         self._cooldown_left = 0
         self._triggers_without_progress = 0
+        self._turns_without_action = 0
 
     def reset_history(self) -> None:
         """Forget recent transitions (after a forced replan). Seen states are kept."""
@@ -204,6 +213,31 @@ class LoopDetector:
         self._prev_state = None
         self._cooldown_left = 0
         self._triggers_without_progress = 0
+        self._turns_without_action = 0
+
+    # ------------------------------------------------------------------- stall
+    def note_cortex_turn(self, *, decided_action: bool) -> None:
+        """Record whether this Cortex turn sent anything to the Executor."""
+        self._turns_without_action = 0 if decided_action else self._turns_without_action + 1
+
+    def check_stall(self) -> LoopTrigger | None:
+        """Stall: the last `stall_rounds` Cortex turns decided no device action, so the graph
+        cycled Cortex -> Orchestrator without the Executor (e.g. a plan step that can be neither
+        completed nor replanned). Always escalates to a replan."""
+        n, limit = self._turns_without_action, self.config.stall_rounds
+        if limit <= 0 or n < limit:
+            return None
+        self._turns_without_action = 0
+        return LoopTrigger(
+            kind="stall",
+            evidence=(
+                f"the last {n} Cortex turns decided no device action; the plan is not advancing "
+                "(a remaining step may be unnecessary, already satisfied, or blocked)"
+            ),
+            escalate=True,
+            turn=self.turn,
+            details={"turns_without_action": n},
+        )
 
     def observe(
         self,

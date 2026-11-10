@@ -40,7 +40,8 @@
     "cycle_max_distinct": 2,   // ... visiting <= 2 distinct screens -> trigger
     "cooldown": 3,             // transitions before the detector may fire again
     "escalate_after": 2,       // 2 triggers without reaching a new screen -> forced replan
-    "include_bounds": false
+    "include_bounds": false,
+    "stall_rounds": 4          // 4 Cortex turns in a row without a device action -> forced replan
   },
 
   "text_check": {
