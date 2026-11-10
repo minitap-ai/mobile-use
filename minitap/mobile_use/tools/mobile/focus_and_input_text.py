@@ -17,6 +17,7 @@ from minitap.mobile_use.benchmark.text_check import (
     find_focused_text_element,
 )
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
+from minitap.mobile_use.tools.text_fidelity import restore_text
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.controller_factory import create_device_controller
 from minitap.mobile_use.graph.state import State
@@ -121,6 +122,19 @@ def get_focus_and_input_text_tool(ctx: MobileUseContext) -> BaseTool:
                 focus_method = "simple_tap"
             else:
                 focus_method = "none"
+
+        # Fix round (M3): type exactly what was meant (escapes, truncation at a quote, goal quotes)
+        fidelity = restore_text(
+            text, goal=state.initial_goal, decisions=state.structured_decisions
+        )
+        if fidelity.changes:
+            runtime = get_runtime()
+            if runtime is not None:
+                runtime.event(
+                    "text_fidelity", original=text, typed=fidelity.text, changes=fidelity.changes
+                )
+            logger.info(f"Text fidelity {fidelity.changes}: {text!r} -> {fidelity.text!r}")
+            text = fidelity.text
 
         # Step 3: Type the text
         result = await _controller_input_text(ctx=ctx, text=text)

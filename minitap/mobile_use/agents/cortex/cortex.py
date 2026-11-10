@@ -14,6 +14,7 @@ from langgraph.graph.message import REMOVE_ALL_MESSAGES
 from minitap.mobile_use.agents.cortex.types import CortexOutput
 from minitap.mobile_use.agents.planner.utils import fail_current_subgoal, get_current_subgoal
 from minitap.mobile_use.benchmark.runtime import get_runtime
+from minitap.mobile_use.tools.text_fidelity import canonical_decisions
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.controller_factory import create_device_controller
@@ -174,6 +175,9 @@ class CortexNode:
 
         if response.decisions in EMPTY_STRING_TOKENS:
             response.decisions = None
+        # Fix round (M3): strict JSON for the Executor (a Python-style single-quoted literal cut
+        # typed text at the first apostrophe)
+        response.decisions = canonical_decisions(response.decisions)
         if response.goals_completion_reason in EMPTY_STRING_TOKENS:
             response.goals_completion_reason = None
 

@@ -36,6 +36,11 @@ src = re.sub(r'GOLDEN_FULL_RESOLVED = "[0-9a-f]+"', f'GOLDEN_FULL_RESOLVED = "{f
 if a.frozen_at:
     src = re.sub(r"FROZEN_AT = .*", f'FROZEN_AT = "{a.frozen_at}"', src, count=1)
 elif a.no_frozen_at:
-    src = re.sub(r"FROZEN_AT = .*", "FROZEN_AT = None  # fix round in progress: set at the freeze", src, count=1)
+    src = re.sub(
+        r"FROZEN_AT = .*",
+        "FROZEN_AT = None  # fix round in progress: set at the freeze",
+        src,
+        count=1,
+    )
 TEST.write_text(src)
 print(f"tree={tree} files={count} full={full}")
