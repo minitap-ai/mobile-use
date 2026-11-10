@@ -133,7 +133,30 @@ def list_packages(ctx: MobileUseContext) -> str:
                 package_name = line.split("=")[-1].strip()
                 packages.append(package_name)
 
+        # paper/androidworld-rework fix: offer only packages that have a launcher activity. The
+        # full list contains providers/services named like the app (e.g. "<x>.providers.<app>"),
+        # and the package lookup refuses ambiguous matches, so common apps were "not found".
+        launchable = _launchable_packages(device)
+        if launchable:
+            packages = [p for p in packages if p in launchable] or packages
         return "\n".join(sorted(packages))
+
+
+def _launchable_packages(device) -> set[str]:
+    try:
+        out = str(
+            device.shell(
+                "cmd package query-activities --brief -a android.intent.action.MAIN "
+                "-c android.intent.category.LAUNCHER"
+            )
+        )
+    except Exception:
+        return set()
+    return {
+        line.strip().split("/")[0]
+        for line in out.splitlines()
+        if "/" in line and not line.strip().startswith(("priority", "Activity"))
+    }
 
 
 def get_current_foreground_package(ctx: MobileUseContext) -> str | None:

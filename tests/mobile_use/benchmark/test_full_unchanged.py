@@ -1,4 +1,7 @@
-"""The system under test for full.jsonc is frozen since 4fe7ea4 (the SHA of the first agent runs).
+"""The system under test for full.jsonc is frozen at FROZEN_AT (the pin of the runs).
+
+History: frozen at 4fe7ea4 for the P2 pilot and c3f77e7; changed on purpose in the fix round
+(2026-11-10/11, one commit per fix, each disclosed); re-frozen at the fix-round pin.
 
 Two independent proofs:
 1. a fingerprint of every agent source file (minitap/mobile_use, prompts included, tests
@@ -19,8 +22,8 @@ import pytest
 from minitap.mobile_use.benchmark.config import load_benchmark_config
 
 ROOT = Path(__file__).resolve().parents[3]
-FROZEN_AT = "4fe7ea4e76e2d0740b92383529dd0c92ef4bf9b2"
-GOLDEN_AGENT_TREE = "390c2c5a395acb2b84d54beb92b03b1fa4814e6192743f6211c954775b8f1be9"
+FROZEN_AT = None  # fix round in progress: set at the freeze
+GOLDEN_AGENT_TREE = "bc7ec9b293fd97159b7e6934ab2f641383d581eb5436dfe72d8c7dc1ac4b8e72"
 GOLDEN_AGENT_FILES = 125
 GOLDEN_FULL_RESOLVED = "fc5e52ac452afa072eb314412aa3e40edd45597e50b4298c5e696d2cd658b82d"
 TOP_LEVEL = (
@@ -64,6 +67,8 @@ def test_full_config_resolves_to_the_same_system():
 
 
 def test_git_diff_against_frozen_commit_is_empty():
+    if FROZEN_AT is None:
+        pytest.skip("fix round in progress: no frozen commit yet (fingerprint test still applies)")
     probe = subprocess.run(
         ["git", "-C", str(ROOT), "cat-file", "-e", f"{FROZEN_AT}^{{commit}}"], capture_output=True
     )

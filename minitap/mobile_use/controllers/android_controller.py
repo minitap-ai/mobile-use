@@ -33,6 +33,21 @@ from minitap.mobile_use.utils.video import (
 logger = get_logger(__name__)
 
 
+def resolve_launcher_component(device, package: str) -> str | None:
+    """'pkg/.Activity' of the package's launcher activity, or None."""
+    out = str(
+        device.shell(
+            "cmd package resolve-activity --brief -a android.intent.action.MAIN "
+            f"-c android.intent.category.LAUNCHER {package}"
+        )
+    )
+    for line in reversed(out.strip().splitlines()):
+        line = line.strip()
+        if "/" in line and line.split("/")[0] == package:
+            return line
+    return None
+
+
 class AndroidDeviceController(MobileDeviceController):
     def __init__(
         self,
@@ -144,11 +159,33 @@ class AndroidDeviceController(MobileDeviceController):
             return False
 
     async def launch_app(self, package_or_bundle_id: str) -> bool:
+        """Start the package's launcher activity.
+
+        paper/androidworld-rework fix: adbutils' app_start() runs a bare `monkey`, which exits 251
+        ("SYS_KEYS has no physical keys") on devices without hardware keys, and its exit code was
+        ignored, so the launch silently did nothing (80 % of pilot runs). Resolve the launcher
+        activity and start it explicitly; fall back to monkey with system keys disabled.
+        """
+        pkg = package_or_bundle_id
         try:
-            self.device.app_start(package_or_bundle_id)
-            return True
+            component = resolve_launcher_component(self.device, pkg)
+            if component:
+                out = str(self.device.shell(["am", "start", "-n", component]))
+                if "Error" not in out and "Exception" not in out:
+                    return True
+                logger.warning(f"am start {component} failed: {out.strip()[:200]}")
+            out = str(
+                self.device.shell(
+                    "monkey --pct-syskeys 0 -p "
+                    f"{pkg} -c android.intent.category.LAUNCHER 1; echo __exit=$?"
+                )
+            )
+            if "__exit=0" in out:
+                return True
+            logger.error(f"Failed to launch app {pkg}: {out.strip()[-300:]}")
+            return False
         except Exception as e:
-            logger.error(f"Failed to launch app {package_or_bundle_id}: {e}")
+            logger.error(f"Failed to launch app {pkg}: {e}")
             return False
 
     async def terminate_app(self, package_or_bundle_id: str | None) -> bool:
