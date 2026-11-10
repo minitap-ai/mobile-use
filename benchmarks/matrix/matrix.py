@@ -227,6 +227,9 @@ class Spec:
     key_min_remaining_usd: float
     est_cost_per_cell_usd: float
     protocol: dict = field(default_factory=lambda: dict(PROTOCOLS[DEFAULT_BENCHMARK]))
+    # {"osmand": {"task_regex": "^OsmAnd"}}: matching tasks only run on device lines with
+    # "osmand": true; other tasks prefer devices without the flag.
+    device_requirements: dict = field(default_factory=dict)
     raw: dict = field(default_factory=dict)
 
     @classmethod
@@ -276,6 +279,10 @@ class Spec:
             key_min_remaining_usd=float(budget.get("key_min_remaining_usd", 25.0)),
             est_cost_per_cell_usd=float(budget.get("est_cost_per_cell_usd", 1.5)),
             protocol=protocol,
+            device_requirements={
+                flag: {"task_regex": str(rule["task_regex"])}
+                for flag, rule in (d.get("device_requirements") or {}).items()
+            },
             raw=d,
         )
 
@@ -804,18 +811,31 @@ class Runner:
             out.append(c)
         return out
 
+    def _required_flags(self, cell: Cell) -> set[str]:
+        return {
+            flag
+            for flag, rule in self.spec.device_requirements.items()
+            if re.search(rule["task_regex"], cell.task)
+        }
+
     def _free_device(self, env: EnvHook, cell: Cell) -> dict | None:
+        required = self._required_flags(cell)
+        all_flags = set(self.spec.device_requirements)
         devs = [
             d
             for d in env.devices()
             if (env.name, d["serial"]) not in self.busy
             and (env.name, d["serial"]) not in self.quarantined
+            and all(d.get(flag) is True for flag in required)
         ]
         if not devs:
             return None
-        # retry an infra failure on another device when possible
+        # retry an infra failure on another device when possible; keep devices with optional
+        # capabilities (e.g. "osmand": true) free for the tasks that need them
         prev = self.last_device.get(cell.key)
-        devs.sort(key=lambda d: d["serial"] == prev)
+        devs.sort(
+            key=lambda d: (d["serial"] == prev, sum(d.get(f) is True for f in all_flags - required))
+        )
         return devs[0]
 
     def run(self) -> dict:
@@ -869,9 +889,16 @@ class Runner:
         return summary
 
     def _any_device_available(self, pend: list[Cell]) -> bool:
-        for env_name in {c.env for c in pend} - set(self.halted_envs):
-            env = self.spec.envs[env_name]
-            if any((env_name, d["serial"]) not in self.quarantined for d in env.devices()):
+        for cell in pend:
+            if cell.env in self.halted_envs:
+                continue
+            env = self.spec.envs[cell.env]
+            required = self._required_flags(cell)
+            if any(
+                (cell.env, d["serial"]) not in self.quarantined
+                and all(d.get(f) is True for f in required)
+                for d in env.devices()
+            ):
                 return True
         if pend:
             self.stop_reason = self.stop_reason or "no usable device for the remaining cells"
@@ -965,7 +992,11 @@ class Runner:
             self.busy.discard(dkey)
             self.running[env.name] -= 1
             self.last_device[cell.key] = dev["serial"]
-            if row["outcome"] == "infra_failure":
+            if row["outcome"] == "infra_failure" and row.get("error_kind") == "llm_api":
+                # An OpenRouter error (429/5xx after retries) is not a device fault: never let it
+                # quarantine the device (P1-P, 2026-11-10: two 429s took emulator-5554 out).
+                pass
+            elif row["outcome"] == "infra_failure":
                 self.infra_streak[dkey] += 1
                 if (
                     self.infra_streak[dkey] >= env.quarantine_after_infra

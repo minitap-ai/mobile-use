@@ -843,3 +843,35 @@ def test_harness_version_without_git_is_null(world):
     run(spec)
     r = rows(spec.out_dir / "results.jsonl")[0]
     assert r["harness_sha"] is None and r["harness_dirty"] is None
+
+
+def test_llm_api_infra_failures_do_not_quarantine_the_device(world):
+    make, _ = world
+    # "infra" = error_kind llm_api; quarantine_after_infra=99 in the fixture, so lower it
+    spec = make(tasks=("A", "B", "C"), plan={"A": ["infra", "success"], "B": ["infra", "success"]})
+    spec.envs["fake"].quarantine_after_infra = 1
+    run(spec)
+    events = [e["type"] for e in rows(spec.out_dir / "matrix_events.jsonl")]
+    assert "device_quarantined" not in events
+    assert {r["outcome"] for r in rows(spec.out_dir / "results.jsonl")} == {"success"}
+
+
+def test_device_requirements_route_tasks_to_capable_devices(world, tmp_path):
+    make, tmp = world
+    spec = make(tasks=("OsmAndTrack", "Other1", "Other2"), devices=("plain",), sleep=0.0)
+    d = matrix.load_jsonc(spec.path)
+    d["device_requirements"] = {"osmand": {"task_regex": "^OsmAnd"}}
+    (tmp / "req.jsonc").write_text(json.dumps(d))
+    (tmp / "devices.txt").write_text('plain\n{"serial": "big", "osmand": true}\n')
+    s2 = matrix.Spec.load(tmp / "req.jsonc")
+    run(s2)
+    final = {r["task"]: r for r in rows(s2.out_dir / "results.jsonl")}
+    assert final["OsmAndTrack"]["device"] == "big"
+    assert len(final) == 3
+    # with no capable device the task is left pending and the run stops cleanly
+    (tmp / "devices.txt").write_text("plain\n")
+    d["task_sets"]["ts"]["tasks"].append("OsmAndFavorite")
+    (tmp / "req2.jsonc").write_text(json.dumps(d))
+    s3 = matrix.Spec.load(tmp / "req2.jsonc")
+    summary = run(s3)
+    assert summary["totals"]["done"] == 3 and "no usable device" in summary["stop_reason"]
