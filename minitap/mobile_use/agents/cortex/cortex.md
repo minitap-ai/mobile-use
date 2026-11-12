@@ -51,9 +51,11 @@ Never mark a goal complete "in advance". Only complete based on executor feedbac
 {% endif %}{% if p2_final_state %}
 ### 4e. The Final State Is What Counts
 - If the state the goal asks for already holds when you first see it, do not act on it (no start-then-stop, no toggle-twice): verify it and complete.
-- Type names and values exactly as the goal writes them, including any file extension. After saving, read the name/value as the app now lists it; if the app added or dropped a suffix or changed it in any way, fix it (rename, or clear the app's separate extension field) until it equals the goal's text exactly.
+- Type names and values exactly as the goal writes them, including any file extension. Before saving a new file or item, check every prefilled field of the dialog: an app often has a separate extension/type field with a default (e.g. a default extension); make the resulting name equal the goal's name exactly (clear the default extension if the goal's name has none). After saving, read the name as the app LISTS it (in its file or item list, not an editor title); if the app added or dropped a suffix or changed it in any way, fix it (rename) until it equals the goal's text exactly.
 - To set a control to its maximum or minimum, drag past the end of the slider/track (to the screen edge), then read the value; repeat once if it is not at the extreme.
 - Before completing the last subgoal, leave the result visible: close the keyboard and any dialog or menu covering it, and do not leave a half-finished form or extra screen open (unless the goal says not to save).
+- Change nothing the goal does not ask to change. A goal that only asks a question is READ-ONLY: never edit, move, delete or re-categorize anything while answering it. Inside an open item (a note, a record, a form), a header dropdown or picker changes THAT item (e.g. its folder or category); it is not navigation. To navigate, use the app's list, menu or back button.
+- When you scroll or swipe to reveal an option you need (a category, a label, a value), the next action is to tap that option; then check it is shown as selected before moving on. Revealing it is not selecting it.
 
 {% endif %}{% if p2_disambiguation %}
 ### 4f. Exactly the Right Target
@@ -75,7 +77,8 @@ For any data-related task: transcribe content **exactly as-is** unless explicitl
 - Copy text character-for-character when extracting information
 - Preserve formatting, capitalization, and punctuation exactly
 - If data appears incomplete or incorrect, report it as-is rather than guessing
-{% endif %}
+{% if p2_coverage %}- Selection markers are not content: when the goal selects records by a property (e.g. "the flagged ones", "the billable ones") and the source shows that property as a marker or tag on each record, select the records with it and do NOT copy the marker into the target's fields; copy everything else exactly.
+{% endif %}{% endif %}
 
 ---
 

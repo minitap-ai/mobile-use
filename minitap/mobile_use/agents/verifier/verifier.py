@@ -240,6 +240,9 @@ async def _p2_call(self, state: State):
         except Exception:
             calendar = None
 
+    from minitap.mobile_use.robustness.screen_log import render_screen_log
+
+    screen_log = render_screen_log(ctx.p2_screen_log) if ablation.p2_checklist else None
     use_vision = ablation.use_vision
     controller = create_device_controller(ctx)
     screen = await controller.get_screen_data()
@@ -252,6 +255,7 @@ async def _p2_call(self, state: State):
         checklist_text=render_checklist(ctx.p2_goal_checklist) if ablation.p2_checklist else None,
         calendar=calendar,
         has_full_read=bool(full_read),
+        has_screen_log=bool(screen_log),
     )
     thoughts = "\n".join(state.agents_thoughts[-RECENT_THOUGHTS:])
     notes = "\n".join(f"- {k}: {v}" for k, v in (state.scratchpad or {}).items())
@@ -269,6 +273,13 @@ async def _p2_call(self, state: State):
             + json.dumps(screen.elements, indent=1, ensure_ascii=False)
         ),
     ]
+    if screen_log:
+        messages.append(
+            HumanMessage(
+                content="UI text of the recent screens, captured from the device (oldest first; "
+                "this is what the screens actually showed, not what the agents said):\n" + screen_log
+            )
+        )
     if full_read:
         messages.append(
             HumanMessage(

@@ -227,3 +227,16 @@ def test_screenrecord_is_stopped_before_the_local_client():
     assert calls[0].startswith("pkill -2 screenrecord")
     assert calls.index("local_wait") > max(i for i, c in enumerate(calls) if c.startswith("pidof"))
     assert "kill" not in calls
+
+
+def test_screen_log_keeps_recent_distinct_screens():
+    from minitap.mobile_use.robustness.screen_log import MAX_SCREENS, record_screen, render_screen_log
+
+    ctx = SimpleNamespace(p2_screen_log=None)
+    for i in range(MAX_SCREENS + 5):
+        els = [{"text": f"Item {i}", "children": [{"content-desc": "Category Others"}]}]
+        record_screen(ctx, i, "app", els)
+        record_screen(ctx, i, "app", els)  # identical consecutive screen: not duplicated
+    assert len(ctx.p2_screen_log) == MAX_SCREENS
+    text = render_screen_log(ctx.p2_screen_log)
+    assert "Item 18 | Category Others" in text and "Item 0 " not in text

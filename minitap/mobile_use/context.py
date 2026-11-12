@@ -102,6 +102,9 @@ class MobileUseContext(BaseModel):
     p2_last_ui_hash: str | None = None
     # P2 F7: consecutive identical tool failures (tool, error) -> count
     p2_failure_streak: tuple[str, str, int] | None = None
+    # P2 F3: UI text of the recent screens (deterministic evidence for the goal verifier)
+    p2_screen_log: list[dict] | None = None
+    p2_screen_count: int = 0
 
     def get_adb_client(self) -> AdbClient:
         if self.adb_client is None:

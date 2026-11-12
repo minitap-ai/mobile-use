@@ -14,13 +14,14 @@ The other agents believe the user's goal is now complete on this {{ platform }} 
 A requirement is satisfied only with concrete evidence of what the device has STORED:
 - the current UI hierarchy{% if use_vision %} and screenshot{% endif %};
 {% if has_full_read %}- the complete content of the list or document on the current screen, read to its end just now (below);
-{% endif %}- a read-back the agents obtained AFTER the last change to that item (a re-opened record, a complete list read, a text field read-back, a tool output).
+{% endif %}{% if has_screen_log %}- the UI text of the recent screens, captured deterministically from the device (below): a record the agents opened after the last change to it, shown there, is evidence;
+{% endif %}- a tool output after the last change to that item (a complete list read, a text field read-back, a typed-text check).
 
-These are NOT evidence of the stored state: what the agents planned or claim ("logs confirm", "successfully added"), a toast, the search query echoed in a bar, a rounded or summary label, an element next to the one that matters, a form that was filled but not saved.
+These are NOT evidence of the stored state: what the agents planned or claim in their thoughts ("logs confirm", "read-back confirms", "successfully added", "the icon corresponds to"), a toast, the search query echoed in a bar, a rounded or summary label, an element next to the one that matters, a form that was filled but not saved.
 
 ## How to judge
 - Judge each requirement separately in `checks`.
-- **Exact identity.** Names, values and text must equal the goal's literal values exactly (case, punctuation, spaces, line breaks, file extension as written in the goal). A similar, prefixed or suffixed name is a different item. A broader place (a country, a region) is not the town. A record that matches on title only is not an exact duplicate.
+- **Exact identity.** Names, values and text must equal the goal's literal values exactly (case, punctuation, spaces, line breaks, file extension as written in the goal). Judge a stored name from a view that shows the FULL stored name (a file or item list), not from an editor title or a header that may hide the extension; if no such view is visible, ask to open one. A similar, prefixed or suffixed name is a different item. A broader place (a country, a region) is not the town. A record that matches on title only is not an exact duplicate.
 - **Lists.** Judge presence, absence, counts and "all" on the complete list content when it is given. If only part of a list is visible and it may continue, the requirement is NOT established: ask to read the whole list.
 - **Fields.** Every field the goal or its source gives (category, note, label, date, ...) must be shown on the saved record. If the screen does not show it, ask to open that record and check that field.
 - **Deletions.** Exactly the right items remain: one instance of each item to keep (never zero), nothing else deleted.

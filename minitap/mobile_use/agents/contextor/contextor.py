@@ -14,6 +14,7 @@ from minitap.mobile_use.controllers.platform_specific_commands_controller import
 )
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.robustness.reobserve import reobserve_if_unchanged
+from minitap.mobile_use.robustness.screen_log import record_screen
 from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message, with_fallback
 from minitap.mobile_use.utils.app_launch_utils import launch_app_with_retries
 from minitap.mobile_use.utils.decorators import wrap_with_callbacks
@@ -51,6 +52,9 @@ class ContextorNode:
             screenshot_base64 = None
 
         current_app_package = get_current_foreground_package(self.ctx)
+        if ablation_config.p2_checklist:  # P2 F3 (version B only): screen log for the verifier
+            self.ctx.p2_screen_count += 1
+            record_screen(self.ctx, self.ctx.p2_screen_count, current_app_package, device_data.elements)
         device_date = get_device_date(self.ctx)
         agent_outcome: str | None = None
 
