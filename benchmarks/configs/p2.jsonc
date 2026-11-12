@@ -11,6 +11,7 @@
     "p2_final_state": true,
     "p2_disambiguation": true,
     "p2_no_redo": true,
-    "p2_tool_fixes": true
+    "p2_tool_fixes": true,
+    "p2_step_screenshots": true
   }
 }

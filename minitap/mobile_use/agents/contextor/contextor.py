@@ -5,6 +5,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from minitap.mobile_use.agents.contextor.types import AppLockVerificationOutput, ContextorOutput
 from minitap.mobile_use.agents.planner.types import Subgoal
+from minitap.mobile_use.benchmark.step_screenshots import save_step_screenshot
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.controller_factory import create_device_controller
 from minitap.mobile_use.controllers.platform_specific_commands_controller import (
@@ -39,6 +40,7 @@ class ContextorNode:
         device_data = await device_controller.get_screen_data()
         if ablation_config.p2_no_redo:  # P2 F6 (version B only)
             device_data = await reobserve_if_unchanged(self.ctx, state, device_controller, device_data)
+        save_step_screenshot(self.ctx, device_data.base64)  # P2 recordings: no-op unless flagged
         
         # Conditionally include screenshot based on ablation config
         if use_vision:

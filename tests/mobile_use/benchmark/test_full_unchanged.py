@@ -93,6 +93,7 @@ P2_NEW_PREFIXES = (
     "minitap/mobile_use/robustness/",
     "minitap/mobile_use/tools/p2_tools.py",
     "minitap/mobile_use/agents/verifier/verifier_p2.md",
+    "minitap/mobile_use/benchmark/step_screenshots.py",  # P2 recordings (measurement only)
 )
 
 

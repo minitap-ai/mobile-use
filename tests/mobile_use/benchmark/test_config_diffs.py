@@ -80,6 +80,7 @@ EXPECTED: dict[str, set[str] | str] = {
         "ablation.p2_disambiguation",
         "ablation.p2_no_redo",
         "ablation.p2_tool_fixes",
+        "ablation.p2_step_screenshots",
     },
     # routing / model rows
     "full-all-frontier": "llm-only",

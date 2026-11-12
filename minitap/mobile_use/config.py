@@ -629,6 +629,16 @@ class AblationConfig(BaseModel):
             ),
         ),
     ]
+    p2_step_screenshots: Annotated[
+        bool,
+        Field(
+            default=False,
+            description=(
+                "P2 recordings (measurement only): in a benchmark run, save the screenshot each "
+                "Contextor turn captured as steps/NNNN.jpg. Never changes what the agent sees."
+            ),
+        ),
+    ]
 
     # Opt-in reproduction of the v1 (January 2026, as shipped) Android behaviour. Not an ablated
     # "feature": it restores bugs A10/A11 for the `v1-as-shipped` reference row only.
