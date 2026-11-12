@@ -26,6 +26,7 @@ PREDICTABLE = {
     "list_notes",
     "calculate",
     "read_full_list",
+    "inspect_rows",
     "sample_colors",
     "wait_for_delay",
 }

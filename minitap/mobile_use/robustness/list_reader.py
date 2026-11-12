@@ -210,6 +210,8 @@ class Device:
     screen_w: int
     screen_h: int
     settle_s: float = 0.6
+    tap: Callable[[int, int], None] | None = None
+    back: Callable[[], None] | None = None
 
 
 def _swipe_in(dev: Device, rect: Rect, direction: str):
@@ -301,4 +303,6 @@ def android_device(ctx) -> Device:
         swipe=swipe,
         screen_w=ctx.device.device_width,
         screen_h=ctx.device.device_height,
+        tap=lambda x, y: device.shell(f"input tap {x} {y}"),
+        back=lambda: device.shell("input keyevent 4"),
     )

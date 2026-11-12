@@ -216,11 +216,52 @@ sample_colors_wrapper = ToolWrapper(
 )
 
 
+def get_inspect_rows_tool(ctx: MobileUseContext) -> BaseTool:
+    @tool
+    async def inspect_rows(
+        agent_thought: str,
+        match: str,
+        tool_call_id: Annotated[str, InjectedToolCallId],
+        state: Annotated[State, InjectedState],
+    ) -> Command:
+        """Open EVERY row of the current list whose text contains `match`, read all the fields of
+        its detail screen, go back, and return the details of each row, in ONE call (read-only:
+        it never edits or deletes). Use it to compare records whose list cards look alike, e.g. to
+        find exact duplicates (identical on every field) or to check the fields of saved items,
+        instead of opening them one by one. Identical rows are reported separately (#1, #2, ...
+        in list order). It stops if a row does not open or BACK does not return to the list.
+
+        Args:
+            match: text that the rows to inspect contain (e.g. a title shared by look-alike rows).
+        """
+        try:
+            from minitap.mobile_use.robustness.row_inspector import inspect_rows as _inspect
+
+            dev = android_device(ctx)
+            res = await asyncio.to_thread(_inspect, dev, match)
+            outcome, ok = res.render(), res.error is None
+            if ok:
+                ctx.p2_tool_evidence = ((ctx.p2_tool_evidence or []) + [f"[inspect_rows {match!r}] {outcome[:4000]}"])[-6:]
+        except Exception as e:
+            outcome, ok = f"inspect_rows failed: {e}", False
+        return await _command(ctx, state, tool_call_id, agent_thought, outcome, ok)
+
+    return inspect_rows
+
+
+inspect_rows_wrapper = ToolWrapper(
+    tool_fn_getter=get_inspect_rows_tool,
+    on_success_fn=lambda: "inspect_rows done.",
+    on_failure_fn=lambda: "inspect_rows failed.",
+)
+
+
 def p2_tool_wrappers(ablation: AblationConfig) -> list[ToolWrapper]:
     """Extra Executor tools of version B; empty for every version-A config."""
     out: list[ToolWrapper] = []
     if getattr(ablation, "p2_coverage", False):
         out.append(read_full_list_wrapper)
+        out.append(inspect_rows_wrapper)
     if getattr(ablation, "p2_tally", False):
         out.append(calculate_wrapper)
     if getattr(ablation, "p2_disambiguation", False):

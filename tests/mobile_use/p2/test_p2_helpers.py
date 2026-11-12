@@ -373,3 +373,43 @@ def test_sample_colors_point_shapes():
     assert normalize_points([{"x": 1, "y": 2, "label": "ref"}]) == [{"x": 1, "y": 2, "label": "ref"}]
     assert normalize_points({"x": 3, "y": 4}) == [{"x": 3, "y": 4}]
     assert normalize_points("not json") == [] and normalize_points(None) == []
+
+
+class FakeListWithDetails(FakeList):
+    """Rows open a detail screen (all fields) on tap; BACK returns to the list, same offset."""
+
+    def __init__(self, items, details, **kw):
+        super().__init__(items, **kw)
+        self.details, self.open = details, None
+        self.taps = 0
+
+    def dump_xml(self):
+        if self.open is None:
+            return super().dump_xml()
+        fields = "".join(f'<node class="android.widget.TextView" text="{t}" bounds="[0,{200+i*60}][720,{250+i*60}]"/>'
+                         for i, t in enumerate(self.details[self.open]))
+        return f'<hierarchy><node class="android.widget.FrameLayout" bounds="[0,0][720,1280]">{fields}</node></hierarchy>'
+
+    def tap(self, x, y):
+        self.taps += 1
+        idx = (y - self.top + self.offset) // self.row_h
+        if self.open is None and 0 <= idx < len(self.items):
+            self.open = idx
+
+    def back(self):
+        self.open = None
+
+    def device(self):
+        return Device(self.dump_xml, self.swipe, 720, 1280, settle_s=0, tap=self.tap, back=self.back)
+
+
+def test_inspect_rows_reads_every_matching_row_including_identical_cards():
+    from minitap.mobile_use.robustness.row_inspector import inspect_rows
+
+    items = [f"Other {i}" for i in range(6)] + ["Soup | Warm"] * 3 + [f"Tail {i}" for i in range(8)] + ["Soup | Warm"]
+    details = [[f"title {it}", f"servings {i}"] for i, it in enumerate(items)]
+    fake = FakeListWithDetails(items, details)
+    res = inspect_rows(fake.device(), "soup")
+    assert res.error is None and res.stopped is None, res.render()
+    assert [r["details"][1] for r in res.rows] == ["servings 6", "servings 7", "servings 8", "servings 17"]
+    assert fake.open is None  # back on the list
