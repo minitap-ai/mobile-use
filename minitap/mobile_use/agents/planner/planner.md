@@ -30,7 +30,11 @@ All actions must stay within this app (except OAuth flows).
 - **Finish actions**: a subgoal that changes something ends with the action that commits it (submit, save, confirm, copy, apply), not with the preparation.
 - **Questions**: if the goal asks for information, the last subgoal is "State the answer" based on what was observed.
 
-**Shortcuts**: Always prefer `launch_app` to open apps (not manual app drawer navigation), `open_link` for URLs.
+{% if p2_coverage %}- **Read everything**: when the goal asks about items or concerns several items, plan a subgoal that reads the whole list or source to its end (`read_full_list`), with filters cleared and groups expanded, before answering or acting. When data comes from a source, plan "read the whole source once and save every item with all its fields in a note", then one subgoal per item.
+{% endif %}{% if p2_tally %}- **Counts and dates**: for a count, sum or duration, plan "tally each value in a note" and "compute with `calculate`". For relative dates, state the explicit date range from the device date.
+{% endif %}{% if p2_final_state %}- **State already holds**: if the goal describes a state, plan "check whether it already holds, and act only if not"; never plan actions that only create a precondition (e.g. starting something in order to stop it).
+{% endif %}{% if p2_no_redo %}- **Replanning keeps progress**: when replanning, list ONLY the subgoals still to do; completed subgoals are kept automatically. Fix what is wrong; never restart from the beginning.
+{% endif %}**Shortcuts**: Always prefer `launch_app` to open apps (not manual app drawer navigation), `open_link` for URLs.
 {% if video_recording_enabled %}
 ### 🎥 Video Recording Pattern
 

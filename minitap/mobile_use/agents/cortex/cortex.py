@@ -26,6 +26,11 @@ from minitap.mobile_use.tools.index import (
     VIDEO_RECORDING_WRAPPERS,
     format_tools_list,
 )
+from minitap.mobile_use.robustness import p2_flags
+from minitap.mobile_use.robustness.calendar_context import calendar_context
+from minitap.mobile_use.robustness.checklist import render_checklist
+from minitap.mobile_use.robustness.failure_streak import update_streak
+from minitap.mobile_use.tools.p2_tools import p2_tool_wrappers
 from minitap.mobile_use.utils.conversations import get_screenshot_message_for_llm
 from minitap.mobile_use.utils.decorators import wrap_with_callbacks
 from minitap.mobile_use.utils.logger import get_logger
@@ -72,6 +77,7 @@ class CortexNode:
         
         if self.ctx.video_recording_enabled and ablation_config.use_video_recording:
             executor_wrappers.extend(VIDEO_RECORDING_WRAPPERS)
+        executor_wrappers.extend(p2_tool_wrappers(ablation_config))  # P2: empty in version A
 
         # Render system prompt with ablation flags
         system_message = Template(
@@ -88,6 +94,8 @@ class CortexNode:
             use_vision=use_vision,
             use_meta_reasoning=use_meta_reasoning,
             use_data_fidelity=use_data_fidelity,
+            **p2_flags(ablation_config),
+            p2_checklist_text=render_checklist(self.ctx.p2_goal_checklist),
         )
         # KNOWN ISSUE (04 - Audit A9), deliberately NOT fixed on paper/androidworld-rework so
         # that every run of the study sees the same Cortex input as the January 2026 system:
@@ -110,6 +118,21 @@ class CortexNode:
             ),
         ]
         
+        # P2 F7 (version B only): strategy switch after repeated identical tool failures
+        if ablation_config.p2_tool_fixes:
+            streak_note = update_streak(self.ctx, state)
+            if streak_note:
+                messages.append(HumanMessage(content=streak_note))
+                runtime = get_runtime()
+                if runtime is not None:
+                    runtime.event("p2_failure_streak", note=streak_note[:300])
+
+        # P2 F2 (version B only): deterministic calendar facts from the device date
+        if ablation_config.p2_tally:
+            calendar = calendar_context(state.device_date)
+            if calendar:
+                messages.append(HumanMessage(content=calendar))
+
         # Only include agent thoughts if meta-reasoning is enabled
         if use_meta_reasoning:
             for thought in state.agents_thoughts:

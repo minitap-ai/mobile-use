@@ -29,6 +29,7 @@ from minitap.mobile_use.tools.index import (
     VIDEO_RECORDING_WRAPPERS,
     get_tools_from_wrappers,
 )
+from minitap.mobile_use.tools.p2_tools import p2_tool_wrappers
 from minitap.mobile_use.tools.scratchpad import (
     list_notes_wrapper,
     read_note_wrapper,
@@ -125,6 +126,9 @@ def _get_executor_wrappers(ctx: MobileUseContext, ablation_config: AblationConfi
     # Add video recording tools if enabled
     if ctx.video_recording_enabled and ablation_config.use_video_recording:
         executor_wrappers.extend(VIDEO_RECORDING_WRAPPERS)
+
+    # P2 (version B) tools; none for version-A configs
+    executor_wrappers.extend(p2_tool_wrappers(ablation_config))
 
     return executor_wrappers
 

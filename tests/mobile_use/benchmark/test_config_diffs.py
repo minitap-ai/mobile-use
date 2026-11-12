@@ -71,6 +71,16 @@ EXPECTED: dict[str, set[str] | str] = {
         "ablation.use_goal_verification",
         "ablation.legacy_v1_android_bugs",
     },
+    # P2 version B (local only): full + every P2 robustness flag
+    "p2": {
+        "ablation.p2_coverage",
+        "ablation.p2_tally",
+        "ablation.p2_checklist",
+        "ablation.p2_final_state",
+        "ablation.p2_disambiguation",
+        "ablation.p2_no_redo",
+        "ablation.p2_tool_fixes",
+    },
     # routing / model rows
     "full-all-frontier": "llm-only",
     "cortex-budget": "llm-only",

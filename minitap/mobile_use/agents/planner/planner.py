@@ -16,6 +16,10 @@ from minitap.mobile_use.tools.index import (
     VIDEO_RECORDING_WRAPPERS,
     format_tools_list,
 )
+from minitap.mobile_use.robustness import p2_flags
+from minitap.mobile_use.robustness.checklist import ensure_goal_checklist
+from minitap.mobile_use.robustness.planning import keep_completed_subgoals, p2_human_vars
+from minitap.mobile_use.tools.p2_tools import p2_tool_wrappers
 from minitap.mobile_use.utils.decorators import wrap_with_callbacks
 from minitap.mobile_use.utils.logger import get_logger
 
@@ -33,6 +37,7 @@ class PlannerNode:
     )
     async def __call__(self, state: State):
         needs_replan = one_of_them_is_failure(state.subgoal_plan)
+        await ensure_goal_checklist(self.ctx, state.initial_goal)  # P2 F3; no-op in version A
 
         current_locked_app_package = (
             self.ctx.execution_setup.get_locked_app_package() if self.ctx.execution_setup else None
@@ -42,6 +47,7 @@ class PlannerNode:
         executor_wrappers = list(EXECUTOR_WRAPPERS_TOOLS)
         if self.ctx.video_recording_enabled:
             executor_wrappers.extend(VIDEO_RECORDING_WRAPPERS)
+        executor_wrappers.extend(p2_tool_wrappers(self.ctx.get_ablation_config()))  # P2 only
 
         system_message = Template(
             Path(__file__).parent.joinpath("planner.md").read_text(encoding="utf-8")
@@ -51,6 +57,7 @@ class PlannerNode:
             locked_app_package=current_locked_app_package,
             current_foreground_app=current_foreground_app,
             video_recording_enabled=self.ctx.video_recording_enabled,
+            **p2_flags(self.ctx.get_ablation_config()),
         )
         human_message = Template(
             Path(__file__).parent.joinpath("human.md").read_text(encoding="utf-8")
@@ -59,6 +66,7 @@ class PlannerNode:
             initial_goal=state.initial_goal,
             previous_plan="\n".join(str(s) for s in state.subgoal_plan),
             agent_thoughts="\n".join(state.agents_thoughts),
+            **p2_human_vars(self.ctx, state),
         )
         messages = [
             SystemMessage(content=system_message),
@@ -86,6 +94,8 @@ class PlannerNode:
             )
             for subgoal in response.subgoals
         ]
+        if needs_replan and self.ctx.get_ablation_config().p2_no_redo:
+            subgoals_plan = keep_completed_subgoals(state.subgoal_plan, subgoals_plan)  # P2 F6
         logger.info("📜 Generated plan:")
         logger.info("\n".join(str(s) for s in subgoals_plan))
 

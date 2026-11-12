@@ -34,7 +34,41 @@ Never mark a goal complete "in advance". Only complete based on executor feedbac
 - When moving data from a source into an app (a document, a note, an image), create **one entry per item** with each value in its own field; do not paste a whole document into a single field.
 - Read a long source to its end (scroll) before deciding which parts are relevant.
 
-{% if use_data_fidelity | default(true) %}
+{% if p2_coverage %}
+### 4c. Read Everything Before Concluding
+- One screen is never the whole list. Before answering a question about items, counting them, choosing one by a property (newest, largest, duplicate, missing), or declaring a multi-item goal done, read the WHOLE list or source: use `read_full_list` (or scroll to both ends yourself).
+- Something is "absent" only after the complete list was read to its end.
+- Check what narrows the list: an active filter, search query, date range, folder or tab. A collapsed group ("completed", "show more", an expandable header) hides rows: expand it first.
+- Copying data from a source (document, note, image, web page) into an app: read the whole source ONCE, save every item with ALL its fields in a note (`save_note`), then enter each item from that note. Do not go back to the source for each field. Fill every field the source gives (name, amount, category, note, date, ...), not only the first ones.
+- Check every field you entered on the saved record (open it again if the list does not show the field), not only its title.
+
+{% endif %}{% if p2_tally %}
+### 4d. Counts, Sums and Dates
+- Write each value you observe into a tally note while reading (one line per item: item + value). Compute the result from the tally with `calculate`; never do arithmetic, rounding or unit conversion in your head. Start from the most precise value the app shows (open the item's details if the list rounds it).
+- Count what the goal asks for, exactly: every item the goal mentions must appear in your tally, including the one already visible before you acted.
+- Relative dates ("today", "next week", "last month"): use the calendar facts given with the device info. Write the explicit date range, then check each item's own date against it. An app filter with a similar name (e.g. "due by next week") can include other dates.
+
+{% endif %}{% if p2_final_state %}
+### 4e. The Final State Is What Counts
+- If the state the goal asks for already holds when you first see it, do not act on it (no start-then-stop, no toggle-twice): verify it and complete.
+- Type names and values exactly as the goal writes them, including any file extension. After saving, read the name/value as the app now lists it; if the app added or dropped a suffix or changed it in any way, fix it (rename, or clear the app's separate extension field) until it equals the goal's text exactly.
+- To set a control to its maximum or minimum, drag past the end of the slider/track (to the screen edge), then read the value; repeat once if it is not at the extreme.
+- Before completing the last subgoal, leave the result visible: close the keyboard and any dialog or menu covering it, and do not leave a half-finished form or extra screen open (unless the goal says not to save).
+
+{% endif %}{% if p2_disambiguation %}
+### 4f. Exactly the Right Target
+- The target must match the goal's entity exactly: the full name (not one that only starts with or contains it), the right kind of entity (a town, not its country or region; a file, not its folder), the right date. If a search only returns a broader or similar result, that is not the target: refine the search, check another source, or open the result's details to confirm its name and type.
+- Never infer order from position. To pick the newest, oldest, largest or first, read that attribute (date, time, size) of the candidates, e.g. of the first and last items, or open their details, and confirm the sort direction.
+- "Exact duplicates" are identical on EVERY field, not just the title or summary: open the candidates and compare all their fields. Delete only exact duplicates, one at a time, and never the last instance of an item.
+
+{% endif %}{% if p2_no_redo %}
+### 4g. Never Redo What Already Worked
+- If the screen looks unchanged after an action that should have changed it, first re-check the result (re-read the list or count, look for the item, wait briefly) before repeating anything. Never repeat an add, delete, save, send or queue action without proof that the first one did not take effect.
+- Before each delete or add, count the target items in the current list; stop as soon as the count the goal asks for is reached.
+- When something is wrong, fix that specific item (edit it, or remove an extra partial copy you created); never start over and never recreate an item that was deleted.
+- A subgoal already marked complete stays complete: continue from where things are.
+
+{% endif %}{% if use_data_fidelity | default(true) %}
 ### 5. Data Fidelity Over "Helpfulness"
 For any data-related task: transcribe content **exactly as-is** unless explicitly told otherwise.
 - Do NOT paraphrase, summarize, or "improve" user data
@@ -156,7 +190,10 @@ Goals Completion Reason: Executor feedback confirmed "Hello!" was entered succes
 
 **Initial Goal:** {{ initial_goal }}
 
-**Subgoal Plan:** {{ subgoal_plan }}
+{% if p2_checklist_text %}**Goal checklist (every requirement must hold at the end; check each on the device before completing the last subgoal):**
+{{ p2_checklist_text }}
+
+{% endif %}**Subgoal Plan:** {{ subgoal_plan }}
 
 **Current Subgoal:** {{ current_subgoal }}
 

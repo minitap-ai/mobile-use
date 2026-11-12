@@ -10,6 +10,7 @@ from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.unified_controller import UnifiedMobileController
 from minitap.mobile_use.graph.state import State
+from minitap.mobile_use.robustness.target_resolution import p2_resolve_target
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 from minitap.mobile_use.tools.types import Target
 from minitap.mobile_use.tools.utils import has_valid_selectors, validate_coordinates_bounds
@@ -48,6 +49,7 @@ def get_tap_tool(ctx: MobileUseContext) -> BaseTool:
             )
 
         controller = UnifiedMobileController(ctx)
+        correction = await p2_resolve_target(ctx, target, controller)  # P2 F7; None in version A
 
         # 1. Try with COORDINATES FIRST (visual approach)
         if not success and target.bounds:
@@ -122,6 +124,8 @@ def get_tap_tool(ctx: MobileUseContext) -> BaseTool:
         # Build result message
         if success:
             agent_outcome = tap_wrapper.on_success_fn(successful_selector)
+            if correction:
+                agent_outcome += " " + correction
         else:
             # Build detailed failure message with all attempts
             failure_details = "; ".join([f"{a['selector']}: {a['error']}" for a in attempts])

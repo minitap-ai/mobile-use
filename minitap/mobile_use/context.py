@@ -96,6 +96,12 @@ class MobileUseContext(BaseModel):
     text_check_config: TextCheckConfig | None = None
     # fix round: goal verifications that sent the task back to the Planner (per task)
     goal_verification_rejections: int = 0
+    # P2 F3 (version B only): requirement checklist parsed once from the goal
+    p2_goal_checklist: list[str] | None = None
+    # P2 F6: fingerprint of the previous Contextor capture (stale-screen re-observe)
+    p2_last_ui_hash: str | None = None
+    # P2 F7: consecutive identical tool failures (tool, error) -> count
+    p2_failure_streak: tuple[str, str, int] | None = None
 
     def get_adb_client(self) -> AdbClient:
         if self.adb_client is None:

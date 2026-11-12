@@ -34,6 +34,10 @@ AW_APP_NAMES = [
     "pro expense",
     "retro music",
     "activity tracker",
+    # P2 additions
+    "simple draw pro",
+    "simple calendar pro",
+    "broccoli app",
 ]
 AW_PACKAGE_FRAGMENTS = [
     "gsantner",
@@ -47,6 +51,12 @@ AW_PACKAGE_FRAGMENTS = [
     "videolan",
     "zgrs.clipper",
     "net.cozic",
+    # P2 additions: packages of the AndroidWorld apps not covered above
+    "org.tasks",
+    "deskclock",
+    "retromusic",
+    "audiorecorder",
+    "opentracks",
 ]
 BENCHMARK_NAMES = ["androidworld", "android_world", "android world", "miniwob"]
 AW_TASK_NAMES = [

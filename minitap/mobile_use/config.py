@@ -557,6 +557,79 @@ class AblationConfig(BaseModel):
         ),
     ]
 
+    # P2 robustness fixes (version B, local/p2/FIX_PLAN.md). All default to False: every
+    # version-A config (full.jsonc ...) keeps byte-identical prompts, tools and graph behaviour.
+    p2_coverage: Annotated[
+        bool,
+        Field(
+            default=False,
+            description=(
+                "P2 F1: `read_full_list` tool (deterministic scroll-to-end reader), rules to read "
+                "lists/sources to their end and check filters, full read for the goal verifier."
+            ),
+        ),
+    ]
+    p2_tally: Annotated[
+        bool,
+        Field(
+            default=False,
+            description=(
+                "P2 F2: calendar context derived from the device date, `calculate` tool, written "
+                "tally before any count/sum/duration answer."
+            ),
+        ),
+    ]
+    p2_checklist: Annotated[
+        bool,
+        Field(
+            default=False,
+            description=(
+                "P2 F3: goal -> requirement checklist (Cortex model, once), per-requirement "
+                "goal verification on device evidence, 3 rejections max."
+            ),
+        ),
+    ]
+    p2_final_state: Annotated[
+        bool,
+        Field(
+            default=False,
+            description=(
+                "P2 F4: verbatim names checked as stored, controls driven to their extreme, "
+                "no action when the goal state already holds, soft keyboard hidden at the end."
+            ),
+        ),
+    ]
+    p2_disambiguation: Annotated[
+        bool,
+        Field(
+            default=False,
+            description=(
+                "P2 F5: exact target identity (full name, entity type, all fields for duplicates), "
+                "never infer order from position."
+            ),
+        ),
+    ]
+    p2_no_redo: Annotated[
+        bool,
+        Field(
+            default=False,
+            description=(
+                "P2 F6: re-observe an unchanged screen before deciding, never repeat an "
+                "add/delete/save without proof it failed, replans keep completed subgoals."
+            ),
+        ),
+    ]
+    p2_tool_fixes: Annotated[
+        bool,
+        Field(
+            default=False,
+            description=(
+                "P2 F7: live target resolution for taps (stale bounds), Unicode-safe typing, "
+                "video analyzer size limit, strategy switch after repeated identical tool failures."
+            ),
+        ),
+    ]
+
     # Opt-in reproduction of the v1 (January 2026, as shipped) Android behaviour. Not an ablated
     # "feature": it restores bugs A10/A11 for the `v1-as-shipped` reference row only.
     legacy_v1_android_bugs: Annotated[

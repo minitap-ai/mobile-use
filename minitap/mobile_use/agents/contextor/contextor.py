@@ -12,6 +12,7 @@ from minitap.mobile_use.controllers.platform_specific_commands_controller import
     get_device_date,
 )
 from minitap.mobile_use.graph.state import State
+from minitap.mobile_use.robustness.reobserve import reobserve_if_unchanged
 from minitap.mobile_use.services.llm import get_llm, invoke_llm_with_timeout_message, with_fallback
 from minitap.mobile_use.utils.app_launch_utils import launch_app_with_retries
 from minitap.mobile_use.utils.decorators import wrap_with_callbacks
@@ -36,6 +37,8 @@ class ContextorNode:
 
         device_controller = create_device_controller(self.ctx)
         device_data = await device_controller.get_screen_data()
+        if ablation_config.p2_no_redo:  # P2 F6 (version B only)
+            device_data = await reobserve_if_unchanged(self.ctx, state, device_controller, device_data)
         
         # Conditionally include screenshot based on ablation config
         if use_vision:

@@ -29,7 +29,16 @@
     // Fix round (2026-11-10): verify every goal requirement before ending (multi-agent only).
     "use_goal_verification": true,
     // Off everywhere except v1-as-shipped.jsonc: restores the v1 Android bugs A10/A11.
-    "legacy_v1_android_bugs": false
+    "legacy_v1_android_bugs": false,
+    // P2 robustness fixes (version B, p2.jsonc): off in the base, so every version-A config
+    // keeps the frozen 982b105 system (local/p2/FIX_PLAN.md).
+    "p2_coverage": false,
+    "p2_tally": false,
+    "p2_checklist": false,
+    "p2_final_state": false,
+    "p2_disambiguation": false,
+    "p2_no_redo": false,
+    "p2_tool_fixes": false
   },
 
   "loop_detector": {

@@ -9,6 +9,7 @@ from langgraph.types import Command
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.unified_controller import UnifiedMobileController
+from minitap.mobile_use.robustness.target_resolution import p2_resolve_target
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 from minitap.mobile_use.tools.types import Target
@@ -47,6 +48,7 @@ def get_long_press_on_tool(ctx: MobileUseContext) -> BaseTool:
         latest_selector_info: str | None = None
 
         controller = UnifiedMobileController(ctx)
+        await p2_resolve_target(ctx, target, controller)  # P2 F7; no-op in version A
 
         # 1. Try with COORDINATES FIRST (visual approach)
         if target.bounds:

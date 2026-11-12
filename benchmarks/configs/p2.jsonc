@@ -1,0 +1,16 @@
+{
+  // P2 version B: full.jsonc (same models, routing, agents and graph) + every P2 robustness fix
+  // (local/p2/FIX_PLAN.md). Each fix has its own flag; p2-<fix>.jsonc files enable one at a time.
+  "extends": "full.jsonc",
+  "name": "p2",
+  "description": "Version B: full + P2 robustness fixes F1-F7.",
+  "ablation": {
+    "p2_coverage": true,
+    "p2_tally": true,
+    "p2_checklist": true,
+    "p2_final_state": true,
+    "p2_disambiguation": true,
+    "p2_no_redo": true,
+    "p2_tool_fixes": true
+  }
+}
