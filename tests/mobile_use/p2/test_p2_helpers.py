@@ -364,3 +364,12 @@ def test_executor_completion_appends_missing_predictable_actions():
     bad = json.dumps([{"action": "focus_and_input_text", "text": "a"}])
     assert completion_calls(bad, [], tools) == []
     assert get_calculate_tool  # import sanity
+
+
+def test_sample_colors_point_shapes():
+    from minitap.mobile_use.tools.p2_tools import normalize_points
+
+    assert normalize_points("[[250, 260], [300, 261]]") == [{"x": 250, "y": 260}, {"x": 300, "y": 261}]
+    assert normalize_points([{"x": 1, "y": 2, "label": "ref"}]) == [{"x": 1, "y": 2, "label": "ref"}]
+    assert normalize_points({"x": 3, "y": 4}) == [{"x": 3, "y": 4}]
+    assert normalize_points("not json") == [] and normalize_points(None) == []

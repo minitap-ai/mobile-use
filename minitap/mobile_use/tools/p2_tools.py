@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Annotated
+import json
+from typing import Annotated, Any
 
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
@@ -123,6 +124,26 @@ calculate_wrapper = ToolWrapper(
 )
 
 
+def normalize_points(raw) -> list[dict]:
+    """Accept the shapes models send: a JSON string, [[x, y], ...], [{"x":..,"y":..}], {"x","y"}."""
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except json.JSONDecodeError:
+            return []
+    if isinstance(raw, dict):
+        raw = [raw]
+    out = []
+    for p in raw if isinstance(raw, list) else []:
+        if isinstance(p, dict) and "x" in p and "y" in p:
+            out.append({"x": int(p["x"]), "y": int(p["y"]), **({"label": p["label"]} if p.get("label") else {})})
+        elif isinstance(p, list | tuple) and len(p) >= 2:
+            out.append({"x": int(p[0]), "y": int(p[1])})
+    return out
+
+
 def _hex(rgb) -> str:
     return "#%02x%02x%02x" % tuple(int(v) for v in rgb[:3])
 
@@ -156,9 +177,10 @@ def get_sample_colors_tool(ctx: MobileUseContext) -> BaseTool:
     @tool
     async def sample_colors(
         agent_thought: str,
-        points: list[dict],
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
+        points: Any = None,
+        coordinates: Any = None,
     ) -> Command:
         """Read the EXACT colour (hex) of screen pixels from a lossless screenshot.
 
@@ -174,8 +196,11 @@ def get_sample_colors_tool(ctx: MobileUseContext) -> BaseTool:
                 get_adb_device,
             )
 
+            pts = normalize_points(points if points is not None else coordinates)
+            if not pts:
+                raise ValueError("no points given: pass points=[{\"x\": 10, \"y\": 20}, ...]")
             image = await asyncio.to_thread(get_adb_device(ctx).screenshot)
-            lines = sample_colors_at(image, points[:40])
+            lines = sample_colors_at(image, pts[:40])
             outcome, ok = "Exact pixel colours:\n" + "\n".join(lines), True
         except Exception as e:
             outcome, ok = f"sample_colors failed: {e}", False
