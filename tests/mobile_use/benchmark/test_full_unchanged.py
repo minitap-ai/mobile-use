@@ -87,6 +87,7 @@ P2_CHANGED = {
     "minitap/mobile_use/agents/video_analyzer/video_analyzer.py",
     "minitap/mobile_use/clients/ui_automator_client.py",
     "minitap/mobile_use/controllers/android_controller.py",
+    "minitap/mobile_use/controllers/controller_factory.py",
 }
 P2_NEW_PREFIXES = (
     "minitap/mobile_use/robustness/",

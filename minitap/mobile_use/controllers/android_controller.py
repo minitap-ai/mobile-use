@@ -48,6 +48,23 @@ def resolve_launcher_component(device, package: str) -> str | None:
     return None
 
 
+async def p2_stop_screenrecord(device, process, timeout_s: float = 15.0) -> None:
+    """P2 F7: SIGINT the remote screenrecord, wait for it to finish its file, then reap the
+    local adb client (it exits by itself once the remote command ends)."""
+    device.shell("pkill -2 screenrecord || true")
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        if not str(device.shell("pidof screenrecord || true")).strip():
+            break
+        await asyncio.sleep(0.5)
+    if process is not None:
+        try:
+            await asyncio.wait_for(process.wait(), timeout=5.0)
+        except TimeoutError:
+            process.kill()
+            await process.wait()
+
+
 class AndroidDeviceController(MobileDeviceController):
     def __init__(
         self,
@@ -486,7 +503,12 @@ class AndroidDeviceController(MobileDeviceController):
                     pass
 
             process = session.process
-            if process is not None:
+            if getattr(self, "p2_tool_fixes", False):
+                # P2 F7: stop screenrecord with SIGINT FIRST and wait until it has exited, so it
+                # writes the MP4 index (moov atom). Killing the local adb client first killed the
+                # remote screenrecord mid-file: "moov atom not found", then provider 400s.
+                await p2_stop_screenrecord(self.device, process)
+            elif process is not None:
                 try:
                     process.terminate()
                     await asyncio.wait_for(process.wait(), timeout=5.0)
@@ -494,7 +516,8 @@ class AndroidDeviceController(MobileDeviceController):
                     process.kill()
                     await process.wait()
 
-            self.device.shell("pkill -2 screenrecord || true")
+            if not getattr(self, "p2_tool_fixes", False):
+                self.device.shell("pkill -2 screenrecord || true")
             await asyncio.sleep(VIDEO_READY_DELAY_SECONDS)
 
             temp_dir = tempfile.mkdtemp(prefix="mobile_use_video_")

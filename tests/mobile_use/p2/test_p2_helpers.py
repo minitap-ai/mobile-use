@@ -181,3 +181,49 @@ def test_failure_streak_fires_on_second_identical_failure():
     assert note and "STRATEGY SWITCH" in note
     assert update_streak(ctx, SimpleNamespace(executor_messages=[])) is None
     assert ctx.p2_failure_streak is None
+
+
+def test_text_restored_from_cortex_decision():
+    import json
+
+    from minitap.mobile_use.robustness.text_copy import restore_from_decision
+
+    good = "Pulse cauliflower until it resembles rice. Sauté with vegetables and soy sauce."
+    bad = "Pulse cauliflower until it resembles rice. Sã© with vegetables and soy sauce."
+    dec = json.dumps([{"action": "focus_and_input_text", "text": good, "target": {"text": "Directions"}},
+                      {"action": "focus_and_input_text", "text": "Fried Rice", "target": {}}])
+    assert restore_from_decision(bad, dec) == good
+    assert restore_from_decision(good, dec) is None  # exact copy: unchanged
+    assert restore_from_decision("Something unrelated entirely", dec) is None
+    assert restore_from_decision("Fried Rice", dec) is None
+    assert restore_from_decision(bad, None) is None
+
+
+def test_screenrecord_is_stopped_before_the_local_client():
+    import asyncio
+
+    from minitap.mobile_use.controllers.android_controller import p2_stop_screenrecord
+
+    calls = []
+
+    class Dev:
+        alive = 2
+
+        def shell(self, cmd):
+            calls.append(cmd)
+            if cmd.startswith("pidof"):
+                Dev.alive -= 1
+                return "1234" if Dev.alive > 0 else ""
+            return ""
+
+    class Proc:
+        async def wait(self):
+            calls.append("local_wait")
+
+        def kill(self):
+            calls.append("kill")
+
+    asyncio.run(p2_stop_screenrecord(Dev(), Proc(), timeout_s=5))
+    assert calls[0].startswith("pkill -2 screenrecord")
+    assert calls.index("local_wait") > max(i for i, c in enumerate(calls) if c.startswith("pidof"))
+    assert "kill" not in calls

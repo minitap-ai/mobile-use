@@ -17,6 +17,7 @@ from minitap.mobile_use.benchmark.text_check import (
     find_focused_text_element,
 )
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
+from minitap.mobile_use.robustness.text_copy import restore_from_decision
 from minitap.mobile_use.tools.text_fidelity import restore_text
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.controller_factory import create_device_controller
@@ -135,6 +136,14 @@ def get_focus_and_input_text_tool(ctx: MobileUseContext) -> BaseTool:
                 )
             logger.info(f"Text fidelity {fidelity.changes}: {text!r} -> {fidelity.text!r}")
             text = fidelity.text
+
+        if ablation_config.p2_tool_fixes:  # P2 F7: type the Cortex's text, not a corrupted copy
+            restored = restore_from_decision(text, state.structured_decisions)
+            if restored is not None:
+                runtime = get_runtime()
+                if runtime is not None:
+                    runtime.event("p2_text_restored", original=text, typed=restored)
+                text = restored
 
         # Step 3: Type the text
         result = await _controller_input_text(ctx=ctx, text=text)
