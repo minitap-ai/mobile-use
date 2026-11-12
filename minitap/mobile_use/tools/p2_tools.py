@@ -47,7 +47,7 @@ def get_read_full_list_tool(ctx: MobileUseContext) -> BaseTool:
         agent_thought: str,
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
-        container_resource_id: str | None = None,
+        container_resource_id: Any = None,
     ) -> Command:
         """Read the WHOLE scrollable list or document on the current screen, top to bottom.
 
@@ -65,6 +65,7 @@ def get_read_full_list_tool(ctx: MobileUseContext) -> BaseTool:
         try:
             dev = android_device(ctx)
             # NB: the @tool below is also named read_full_list; call the helper explicitly
+            container_resource_id = _resource_id_of(container_resource_id)
             result = await asyncio.to_thread(read_full_list_helper, dev, container_resource_id)
             outcome, ok = result.render(), result.error is None
             if ok:
@@ -259,6 +260,24 @@ inspect_rows_wrapper = ToolWrapper(
     on_success_fn=lambda: "inspect_rows done.",
     on_failure_fn=lambda: "inspect_rows failed.",
 )
+
+
+def _resource_id_of(v) -> str | None:
+    """Models sometimes pass a whole target object ({"resource_id": ..., "bounds": ...}) or a
+    JSON string of one where a resource-id string is expected."""
+    if isinstance(v, str):
+        t = v.strip()
+        if t.startswith("{"):
+            try:
+                v = json.loads(t)
+            except json.JSONDecodeError:
+                return _no_null(t)
+        else:
+            return _no_null(t)
+    if isinstance(v, dict):
+        rid = v.get("resource_id") or v.get("resource-id") or v.get("resourceId")
+        return _no_null(rid) if rid else None
+    return None
 
 
 def _no_null(v):

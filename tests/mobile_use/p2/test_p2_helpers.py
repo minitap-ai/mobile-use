@@ -689,3 +689,23 @@ def test_a_drag_that_moves_nothing_is_not_the_end():
     fake.swipe = flaky
     res = lr.read_full_list(fake.device())
     assert res.rows == items and res.reached_end
+
+
+def test_container_resource_id_accepts_target_objects():
+    from minitap.mobile_use.tools.p2_tools import _resource_id_of
+
+    assert _resource_id_of({"resource_id": "app:id/list", "bounds": {"x": 0}}) == "app:id/list"
+    assert _resource_id_of('{"resource_id": "app:id/list"}') == "app:id/list"
+    assert _resource_id_of("app:id/list") == "app:id/list"
+    assert _resource_id_of("null") is None and _resource_id_of(None) is None and _resource_id_of({}) is None
+
+
+def test_read_full_list_tool_schema_accepts_an_object_container():
+    from types import SimpleNamespace
+
+    from minitap.mobile_use.tools.p2_tools import get_read_full_list_tool
+
+    t = get_read_full_list_tool(SimpleNamespace())
+    t.tool_call_schema.model_validate(
+        {"agent_thought": "x", "container_resource_id": {"resource_id": "app:id/list", "bounds": {"x": 0}}}
+    )
