@@ -126,6 +126,20 @@ def _is_scrollable(n: ET.Element) -> bool:
     return n.attrib.get("scrollable") == "true"
 
 
+def _vertical_stack(node: ET.Element) -> bool:
+    """A generic scrollable View (e.g. a Compose list) counts as a list only if its rows form a
+    vertical stack: >= 3 children, each at least half the container's width, at increasing heights.
+    A filmstrip or pager (one full-size child, or side-by-side pages) does not."""
+    rect = parse_bounds(node.attrib.get("bounds"))
+    if rect is None:
+        return False
+    kids = _row_nodes(node)
+    boxes = [parse_bounds(k.attrib.get("bounds")) for k in kids]
+    boxes = [b for b in boxes if b is not None and (b.x2 - b.x1) >= 0.5 * (rect.x2 - rect.x1)]
+    tops = [b.y1 for b in boxes]
+    return len(boxes) >= 3 and all(a < b for a, b in zip(tops, tops[1:]))
+
+
 def find_main_container(root: ET.Element, screen_area: int, prefer_id: str | None = None):
     best: Container | None = None
     for n in root.iter():
@@ -135,7 +149,10 @@ def find_main_container(root: ET.Element, screen_area: int, prefer_id: str | Non
         if any(h in cls for h in NON_SCROLL_CLASS_HINTS):
             continue
         rid0 = n.attrib.get("resource-id") or ""
-        if not (prefer_id and rid0 == prefer_id) and not any(cls.endswith(c) for c in SAFE_SCROLL_CLASSES):
+        safe = any(cls.endswith(c) for c in SAFE_SCROLL_CLASSES) or (
+            cls == "android.view.view" and _vertical_stack(n)
+        )
+        if not (prefer_id and rid0 == prefer_id) and not safe:
             continue
         rect = parse_bounds(n.attrib.get("bounds"))
         if rect is None or rect.height < 100:
@@ -163,18 +180,37 @@ def _row_nodes(container: ET.Element) -> list[ET.Element]:
     return kids if kids else [node]
 
 
-def page_rows(
-    root: ET.Element, container_rect: Rect, container_id: str | None, text_max: int = ROW_TEXT_MAX
-) -> list[Row]:
-    cont = None
+def _iou(a: Rect, b: Rect) -> float:
+    ix = max(0, min(a.x2, b.x2) - max(a.x1, b.x1))
+    iy = max(0, min(a.y2, b.y2) - max(a.y1, b.y1))
+    inter = ix * iy
+    union = a.area + b.area - inter
+    return inter / union if union else 0.0
+
+
+def locate_container(root: ET.Element, container_rect: Rect, container_id: str | None):
+    """The list container on a new dump: same resource-id or same bounds, else (no id, bounds
+    moved, e.g. a collapsing app bar) the scrollable node overlapping the old area the most."""
+    best, best_iou = None, 0.5
     for n in root.iter():
         if not _is_scrollable(n):
             continue
         r = parse_bounds(n.attrib.get("bounds"))
+        if r is None:
+            continue
         rid = n.attrib.get("resource-id") or ""
-        if r == container_rect or (container_id and rid == container_id and r is not None):
-            cont = n
-            break
+        if r == container_rect or (container_id and rid == container_id):
+            return n, r
+        iou = _iou(r, container_rect)
+        if iou > best_iou:
+            best, best_iou = (n, r), iou
+    return best if best else (None, None)
+
+
+def page_rows(
+    root: ET.Element, container_rect: Rect, container_id: str | None, text_max: int = ROW_TEXT_MAX
+) -> list[Row]:
+    cont, _ = locate_container(root, container_rect, container_id)
     if cont is None:
         return []
     rows: list[Row] = []
@@ -357,7 +393,12 @@ def iter_list(dev: Device, rect: Rect, cid: str | None, state: dict, text_max: i
         yield Visit(r, n)
     for _ in range(MAX_PAGES):
         nominal = _drag_page(dev, rect)
-        cur = page_rows(ET.fromstring(dev.dump_xml()), rect, cid, text_max)
+        root = ET.fromstring(dev.dump_xml())
+        _, new_rect = locate_container(root, rect, cid)
+        if new_rect is not None and new_rect != rect:
+            nominal -= new_rect.y1 - rect.y1  # the list itself moved (collapsing header)
+            rect = new_rect
+        cur = page_rows(root, rect, cid, text_max)
         state["pages"] += 1
         if _signature(cur) == _signature(page):
             state["reached_end"] = True

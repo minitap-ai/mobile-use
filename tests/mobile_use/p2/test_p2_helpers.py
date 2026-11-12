@@ -520,3 +520,15 @@ def test_inspect_rows_detail_contains_and_identical_groups():
     fake2 = NoisyFakeList(items, details, seed=4)
     res2 = inspect_rows(fake2.device(), "", detail_contains="olives")
     assert [r["pos"] for r in res2.rows] == [16] and res2.checked == len(items)
+
+
+def test_compose_vertical_list_is_read_but_a_pager_is_not():
+    from minitap.mobile_use.robustness.list_reader import find_main_container
+    import xml.etree.ElementTree as ET
+
+    rows = "".join(f'<node class="android.view.View" bounds="[0,{400+i*100}][720,{500+i*100}]"><node class="android.widget.TextView" text="App {i}" bounds="[10,{400+i*100}][700,{500+i*100}]"/></node>' for i in range(8))
+    compose = f'<hierarchy><node class="android.view.View" scrollable="true" bounds="[0,400][720,1200]">{rows}</node></hierarchy>'
+    assert find_main_container(ET.fromstring(compose), 720 * 1280) is not None
+    pager = ('<hierarchy><node class="android.view.View" scrollable="true" bounds="[0,0][720,1280]">'
+             '<node class="android.view.View" bounds="[0,0][720,1280]"/></node></hierarchy>')
+    assert find_main_container(ET.fromstring(pager), 720 * 1280) is None
