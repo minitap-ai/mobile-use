@@ -18,6 +18,7 @@ from minitap.mobile_use.tools.index import (
 )
 from minitap.mobile_use.robustness import p2_flags
 from minitap.mobile_use.robustness.checklist import ensure_goal_checklist
+from minitap.mobile_use.robustness.order import insert_order_subgoal
 from minitap.mobile_use.robustness.planning import keep_completed_subgoals, p2_human_vars
 from minitap.mobile_use.tools.p2_tools import p2_tool_wrappers
 from minitap.mobile_use.utils.decorators import wrap_with_callbacks
@@ -94,6 +95,15 @@ class PlannerNode:
             )
             for subgoal in response.subgoals
         ]
+        if not needs_replan and self.ctx.get_ablation_config().p2_disambiguation:
+            subgoals_plan = insert_order_subgoal(  # P2 F5: survives the Planner's paraphrasing
+                state.initial_goal,
+                subgoals_plan,
+                lambda d: Subgoal(
+                    id=generate_id(), description=d, status=SubgoalStatus.NOT_STARTED,
+                    completion_reason=None,
+                ),
+            )
         if needs_replan and self.ctx.get_ablation_config().p2_no_redo:
             subgoals_plan = keep_completed_subgoals(state.subgoal_plan, subgoals_plan)  # P2 F6
         logger.info("📜 Generated plan:")

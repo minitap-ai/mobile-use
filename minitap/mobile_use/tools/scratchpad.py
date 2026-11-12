@@ -9,6 +9,7 @@ from langgraph.types import Command
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.graph.state import State
+from minitap.mobile_use.tools.text_fidelity import unescape_controls
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 from minitap.mobile_use.utils.logger import get_logger
 
@@ -28,6 +29,8 @@ def get_save_note_tool(ctx: MobileUseContext) -> BaseTool:
         Saves a text note to persistent memory with the given key.
         If the key already exists, it will be overwritten.
         """
+        if ctx.get_ablation_config().p2_tool_fixes:  # P2 F7: a literal backslash-n is a newline
+            content = unescape_controls(content)
         updated_scratchpad = {**state.scratchpad, key: content}
 
         agent_outcome = save_note_wrapper.on_success_fn(key)

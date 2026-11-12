@@ -31,6 +31,8 @@ These are NOT evidence of the stored state: what the agents planned or claim in 
 - **Committed.** (Unless the goal asks for a draft or says not to save/send/submit/start: then committing is a violation, and the filled, uncommitted form is the goal.) A value typed into a form whose Submit/Save is still available, with no confirmation or result shown, is NOT submitted. Focus, a pressed look or highlight on a button, or the agents' report are not confirmation; only a visible result is (a message, a new page or state, the form gone or disabled).
 - **Final state.** The checked state must be visible now: no keyboard or dialog left covering it, values at the requested extreme, nothing left half-done.
 - **Questions.** The answer must contain every matching item from the complete content (not only the visible ones), computed from the observed values, in the requested format. Put it in `answer`. If it is not established, the goal is NOT satisfied.
+- Reject only for a requirement that is contradicted by evidence or that no evidence (current screen, recorded screens, tool outputs) can establish. A rejection asks for ONE targeted check or fix; never for work the evidence already shows as done.
+- Colours: judge exact colours from measured values (sample_colors outputs), not from the colour's look or name.
 - Do not reject for things the goal does not ask for. Do not reject only because evidence is not on the current screen when the recorded screens or tool outputs below already show it (e.g. a source read completely earlier): use them.
 
 ## Output

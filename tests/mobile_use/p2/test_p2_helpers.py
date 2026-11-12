@@ -276,3 +276,53 @@ def test_screen_log_keeps_the_last_screen_of_an_app_that_left_the_window():
         record_screen(ctx, i, "target.app", [{"text": f"form {i}"}])
     apps = [e["app"] for e in ctx.p2_screen_log]
     assert apps[0] == "source.app" and len(ctx.p2_screen_log) == MAX_SCREENS + 1
+
+
+def test_read_full_list_tool_end_to_end(monkeypatch):
+    """Regression: the @tool function shadowed the imported helper (every call failed with
+    "argument of type 'Device' is not iterable" in dev rounds 2-5)."""
+    import asyncio
+
+    from minitap.mobile_use.tools import p2_tools
+
+    items = [f"Row {i}" for i in range(20)]
+    fake = FakeList(items)
+    monkeypatch.setattr(p2_tools, "android_device", lambda ctx: fake.device())
+
+    class _State:
+        async def asanitize_update(self, ctx, update, agent=None):
+            return update
+
+    ctx = SimpleNamespace(p2_tool_evidence=None)
+    tool = p2_tools.get_read_full_list_tool(ctx)
+    cmd = asyncio.run(
+        tool.coroutine(agent_thought="read", tool_call_id="c1", state=_State(), container_resource_id=None)
+    )
+    msg = cmd.update["executor_messages"][0]
+    assert msg.status == "success", msg.content
+    assert "Read 20 rows" in msg.content and "END OF LIST REACHED" in msg.content
+    assert ctx.p2_tool_evidence and "Row 19" in ctx.p2_tool_evidence[-1]
+
+
+def test_sample_colors_exact_hex():
+    from PIL import Image
+
+    from minitap.mobile_use.tools.p2_tools import sample_colors_at
+
+    img = Image.new("RGB", (40, 40), (255, 255, 255))
+    for x in range(10, 20):
+        for y in range(10, 20):
+            img.putpixel((x, y), (0xFF, 0x8C, 0x00))  # dark orange, not orange (#ffa500)
+    out = sample_colors_at(img, [{"x": 15, "y": 15, "label": "swatch"}, {"x": 99, "y": 1}])
+    assert out[0].startswith("(15,15) swatch: #ff8c00") and "outside" in out[1]
+
+
+def test_target_exists_checks_id_text_desc_and_hint():
+    from minitap.mobile_use.robustness.target_resolution import target_exists
+
+    live = [{"resource-id": "answer", "text": "", "hint": "Your answer", "children": [
+        {"content-desc": "Go", "bounds": "[0,0][1,1]"}]}]
+    assert target_exists(live, "answer", None)
+    assert target_exists(live, None, "Your answer")
+    assert target_exists(live, None, "Go")
+    assert not target_exists(live, "com.example.calculate:id/field", "Enter expression")

@@ -47,10 +47,33 @@ def executed_screen_actions(state) -> list[str]:
     return names
 
 
+SETTLE_S = 0.4
+MAX_SETTLE_CAPTURES = 3
+
+
+async def settle(controller, data, fp):
+    """Re-capture until two consecutive UI trees are identical (the screen stopped changing);
+    a frame taken mid-transition showed a value that was already gone (dev round 5)."""
+    for _ in range(MAX_SETTLE_CAPTURES):
+        await asyncio.sleep(SETTLE_S)
+        nxt = await controller.get_screen_data()
+        nfp = ui_fingerprint(nxt.elements)
+        if nfp == fp:
+            return nxt, nfp, True
+        data, fp = nxt, nfp
+    return data, fp, False
+
+
 async def reobserve_if_unchanged(ctx, state, controller, data):
     fp = ui_fingerprint(data.elements)
-    previous, ctx.p2_last_ui_hash = ctx.p2_last_ui_hash, fp
     actions = executed_screen_actions(state)
+    if actions:
+        data, fp, stable = await settle(controller, data, fp)
+        if not stable:
+            runtime = get_runtime()
+            if runtime is not None:
+                runtime.event("p2_settle", stable=False, actions=actions)
+    previous, ctx.p2_last_ui_hash = ctx.p2_last_ui_hash, fp
     if previous is None or fp != previous or not actions:
         return data
     await asyncio.sleep(WAIT_S)

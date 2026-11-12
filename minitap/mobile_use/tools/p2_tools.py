@@ -16,7 +16,8 @@ from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.graph.state import State
 from minitap.mobile_use.robustness.calculator import calculate as safe_calculate
-from minitap.mobile_use.robustness.list_reader import android_device, read_full_list
+from minitap.mobile_use.robustness.list_reader import android_device
+from minitap.mobile_use.robustness.list_reader import read_full_list as read_full_list_helper
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 from minitap.mobile_use.utils.logger import get_logger
 
@@ -62,7 +63,8 @@ def get_read_full_list_tool(ctx: MobileUseContext) -> BaseTool:
         """
         try:
             dev = android_device(ctx)
-            result = await asyncio.to_thread(read_full_list, dev, container_resource_id)
+            # NB: the @tool below is also named read_full_list; call the helper explicitly
+            result = await asyncio.to_thread(read_full_list_helper, dev, container_resource_id)
             outcome, ok = result.render(), result.error is None
             if ok:
                 app = ""
@@ -121,6 +123,74 @@ calculate_wrapper = ToolWrapper(
 )
 
 
+def _hex(rgb) -> str:
+    return "#%02x%02x%02x" % tuple(int(v) for v in rgb[:3])
+
+
+def sample_colors_at(image, points: list[dict]) -> list[str]:
+    """Exact colour at each point plus the most common colour in its 5x5 neighbourhood
+    (anti-aliased edges and thin strokes)."""
+    from collections import Counter
+
+    img = image.convert("RGB")
+    w, h = img.size
+    out = []
+    for p in points:
+        x, y = int(p["x"]), int(p["y"])
+        if not (0 <= x < w and 0 <= y < h):
+            out.append(f"({x},{y}): outside the screen ({w}x{h})")
+            continue
+        centre = _hex(img.getpixel((x, y)))
+        hood = Counter(
+            _hex(img.getpixel((min(max(x + dx, 0), w - 1), min(max(y + dy, 0), h - 1))))
+            for dx in range(-2, 3)
+            for dy in range(-2, 3)
+        )
+        mode, n = hood.most_common(1)[0]
+        label = f" {p['label']}" if p.get("label") else ""
+        out.append(f"({x},{y}){label}: {centre} (5x5 most common {mode}, {n}/25)")
+    return out
+
+
+def get_sample_colors_tool(ctx: MobileUseContext) -> BaseTool:
+    @tool
+    async def sample_colors(
+        agent_thought: str,
+        points: list[dict],
+        tool_call_id: Annotated[str, InjectedToolCallId],
+        state: Annotated[State, InjectedState],
+    ) -> Command:
+        """Read the EXACT colour (hex) of screen pixels from a lossless screenshot.
+
+        Use it to compare similar-looking colours (e.g. a target colour shown on screen vs the
+        colour options or swatches): never judge shades by eye or by name.
+
+        Args:
+            points: list of {"x": int, "y": int, "label": optional str} screen coordinates
+                (pixels), e.g. the centre of each swatch and of the reference colours.
+        """
+        try:
+            from minitap.mobile_use.controllers.platform_specific_commands_controller import (
+                get_adb_device,
+            )
+
+            image = await asyncio.to_thread(get_adb_device(ctx).screenshot)
+            lines = sample_colors_at(image, points[:40])
+            outcome, ok = "Exact pixel colours:\n" + "\n".join(lines), True
+        except Exception as e:
+            outcome, ok = f"sample_colors failed: {e}", False
+        return await _command(ctx, state, tool_call_id, agent_thought, outcome, ok)
+
+    return sample_colors
+
+
+sample_colors_wrapper = ToolWrapper(
+    tool_fn_getter=get_sample_colors_tool,
+    on_success_fn=lambda: "sample_colors done.",
+    on_failure_fn=lambda: "sample_colors failed.",
+)
+
+
 def p2_tool_wrappers(ablation: AblationConfig) -> list[ToolWrapper]:
     """Extra Executor tools of version B; empty for every version-A config."""
     out: list[ToolWrapper] = []
@@ -128,4 +198,6 @@ def p2_tool_wrappers(ablation: AblationConfig) -> list[ToolWrapper]:
         out.append(read_full_list_wrapper)
     if getattr(ablation, "p2_tally", False):
         out.append(calculate_wrapper)
+    if getattr(ablation, "p2_disambiguation", False):
+        out.append(sample_colors_wrapper)
     return out

@@ -107,6 +107,10 @@ class MobileUseContext(BaseModel):
     p2_screen_count: int = 0
     # P2 F1/F3: outputs of read_full_list (deterministic tool evidence for the verifier)
     p2_tool_evidence: list[str] | None = None
+    # P2 F5: last sort settings seen on screen (deterministic order fact)
+    p2_sort_fact: str | None = None
+    # P2 F6: the step-budget checkpoint fires once per task
+    p2_budget_checkpoint_done: bool = False
 
     def get_adb_client(self) -> AdbClient:
         if self.adb_client is None:

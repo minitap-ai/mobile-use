@@ -53,7 +53,7 @@ Never mark a goal complete "in advance". Only complete based on executor feedbac
 {% endif %}{% if p2_final_state %}
 ### 4e. The Final State Is What Counts
 - If the state the goal asks for already holds when you first see it, do not act on it (no start-then-stop, no toggle-twice): verify it and complete.
-- Type names and values exactly as the goal writes them, including any file extension. Before saving a new file or item, check every prefilled field of the dialog: an app often has a separate extension/type field with a default (e.g. a default extension); make the resulting name equal the goal's name exactly (clear the default extension if the goal's name has none). After saving, read the name as the app LISTS it (in its file or item list, not an editor title); if the app added or dropped a suffix or changed it in any way, fix it (rename) until it equals the goal's text exactly.
+- Type names and values exactly as the goal writes them, including any file extension. Before saving a new file or item, check every prefilled field of the dialog: an app often has a separate extension/type field with a default (e.g. a default extension); make the resulting name equal the goal's name exactly (clear the default extension if the goal's name has none). If the app cannot open or edit the file without its default extension, keep that extension while you create and edit it, and rename it to the exact name as the LAST step. After saving, read the name as the app LISTS it (in its file or item list, not an editor title); if the app added or dropped a suffix or changed it in any way, fix it (rename) until it equals the goal's text exactly.
 - To set a control to its maximum or minimum, drag past the end of the slider/track (to the screen edge), then read the value; repeat once if it is not at the extreme.
 - Entering data in a form includes submitting it (Submit/OK/Save) and seeing the app's result, UNLESS the goal says otherwise: "draft", "do not save/send/submit/start", "leave it unsaved/unsent", "without saving". Such wording always wins: then fill the fields, read them back, and leave the form open and uncommitted.
 - Before completing the last subgoal, leave the result visible: close the keyboard and any dialog or menu covering it, and do not leave a half-finished form or extra screen open (unless the goal says not to save).
@@ -64,6 +64,7 @@ Never mark a goal complete "in advance". Only complete based on executor feedbac
 ### 4f. Exactly the Right Target
 - The target must match the goal's entity exactly: the full name (not one that only starts with or contains it), the right kind of entity (a town, not its country or region; a file, not its folder), the right date. If a search only returns a broader or similar result, that is not the target: refine the search, check another source, or open the result's details to confirm its name and type.
 - Never infer order from position. To pick the newest, oldest, largest or first, read that attribute (date, time, size) of the candidates, e.g. of the first and last items, or open their details, and confirm the sort direction. A sort with a separate "reverse"/"descending" option is ascending (oldest or smallest FIRST, newest LAST) unless that option is on. If the displayed values are identical (e.g. same minute), rely on that sort direction or on a more precise value in the item's details, never on the top position alone.
+- Similar-looking options (colours, shades, icons): never judge by eye. Measure the reference and the candidates with `sample_colors` (exact pixel colours) and pick the exact match.
 - "Exact duplicates" are identical on EVERY field, not just the title or summary: open the candidates and compare all their fields. Delete only exact duplicates, one at a time, and never the last instance of an item.
 
 {% endif %}{% if p2_no_redo %}
@@ -72,6 +73,7 @@ Never mark a goal complete "in advance". Only complete based on executor feedbac
 - Before each delete or add, count the target items in the current list; stop as soon as the count the goal asks for is reached.
 - When something is wrong, fix that specific item (edit it, or remove an extra partial copy you created); never start over and never recreate an item that was deleted.
 - A subgoal already marked complete stays complete: continue from where things are.
+- Once the last change is committed and ONE read-back confirms it, complete the remaining subgoals: do not keep re-scrolling or re-checking what you already verified (the step budget is limited and an unfinished task fails even if the device is right).
 
 {% endif %}{% if use_data_fidelity | default(true) %}
 ### 5. Data Fidelity Over "Helpfulness"

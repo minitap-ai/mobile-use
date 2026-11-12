@@ -88,6 +88,7 @@ P2_CHANGED = {
     "minitap/mobile_use/clients/ui_automator_client.py",
     "minitap/mobile_use/controllers/android_controller.py",
     "minitap/mobile_use/controllers/controller_factory.py",
+    "minitap/mobile_use/tools/scratchpad.py",
 }
 P2_NEW_PREFIXES = (
     "minitap/mobile_use/robustness/",

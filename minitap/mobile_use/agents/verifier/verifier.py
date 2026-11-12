@@ -273,6 +273,8 @@ async def _p2_call(self, state: State):
             + json.dumps(screen.elements, indent=1, ensure_ascii=False)
         ),
     ]
+    if ablation.p2_disambiguation and ctx.p2_sort_fact:
+        messages.append(HumanMessage(content=ctx.p2_sort_fact))
     if ablation.p2_checklist and ctx.p2_tool_evidence:
         messages.append(
             HumanMessage(

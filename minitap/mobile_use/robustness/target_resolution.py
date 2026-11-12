@@ -49,6 +49,17 @@ def _desc(el: dict) -> str | None:
     return el.get("content-desc") or el.get("accessibilityText") or None
 
 
+def target_exists(elements: list[dict], resource_id: str | None, text: str | None) -> bool:
+    """True if the live screen has an element with that resource-id, or with that text,
+    content description or hint (an empty input field often shows only its hint)."""
+    for el in _iter(elements):
+        if resource_id and _rid(el) == resource_id:
+            return True
+        if text and text in (_text(el), _desc(el), el.get("hint"), el.get("hintText")):
+            return True
+    return False
+
+
 def matching_elements(
     elements: list[dict], resource_id: str | None, text: str | None
 ) -> tuple[list[dict], str]:

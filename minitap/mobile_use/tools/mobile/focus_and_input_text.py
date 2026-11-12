@@ -76,6 +76,38 @@ def get_focus_and_input_text_tool(ctx: MobileUseContext) -> BaseTool:
         """
         # Get ablation config to determine execution mode
         ablation_config = ctx.get_ablation_config()
+
+        # P2 F7 (version B only): never type into a field that is not on the screen (the Executor
+        # invented a target and the text went into another field at guessed coordinates).
+        if ablation_config.p2_tool_fixes and (target.resource_id or target.text):
+            from minitap.mobile_use.controllers.unified_controller import (
+                UnifiedMobileController as _UMC,
+            )
+            from minitap.mobile_use.robustness.target_resolution import target_exists
+
+            live = await _UMC(ctx).get_ui_elements()
+            if live and not target_exists(live, target.resource_id or None, target.text or None):
+                error_message = (
+                    f"No element with resource_id={target.resource_id!r} or text={target.text!r} "
+                    "is on the current screen: nothing was typed. Target a field that is visible "
+                    "in the UI hierarchy."
+                )
+                tool_message = ToolMessage(
+                    tool_call_id=tool_call_id,
+                    content=focus_and_input_text_wrapper.on_failure_fn(text, error_message),
+                    additional_kwargs={"error": error_message},
+                    status="error",
+                )
+                return Command(
+                    update=await state.asanitize_update(
+                        ctx=ctx,
+                        update={
+                            "agents_thoughts": [agent_thought, error_message],
+                            EXECUTOR_MESSAGES_KEY: [tool_message],
+                        },
+                        agent="executor",
+                    ),
+                )
         use_deterministic = ablation_config.use_deterministic_text
         use_validation = ablation_config.use_post_validation
 

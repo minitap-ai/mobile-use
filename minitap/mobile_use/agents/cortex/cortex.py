@@ -27,6 +27,7 @@ from minitap.mobile_use.tools.index import (
     format_tools_list,
 )
 from minitap.mobile_use.robustness import p2_flags
+from minitap.mobile_use.robustness.budget import checkpoint_due, checkpoint_plan, node_runs_used
 from minitap.mobile_use.robustness.calendar_context import calendar_context
 from minitap.mobile_use.robustness.checklist import render_checklist
 from minitap.mobile_use.robustness.failure_streak import update_streak
@@ -56,6 +57,10 @@ class CortexNode:
         use_scratchpad = ablation_config.use_scratchpad
 
         executor_feedback = get_executor_agent_feedback(state)
+
+        # P2 F6 (version B only): near the step limit, verify the goal instead of running out
+        if ablation_config.p2_no_redo and checkpoint_due(self.ctx, state, get_runtime()):
+            return await self._budget_checkpoint(state)
 
         current_locked_app_package = (
             self.ctx.execution_setup.get_locked_app_package() if self.ctx.execution_setup else None
@@ -126,6 +131,10 @@ class CortexNode:
                 runtime = get_runtime()
                 if runtime is not None:
                     runtime.event("p2_failure_streak", note=streak_note[:300])
+
+        # P2 F5 (version B only): deterministic sort-settings fact
+        if ablation_config.p2_disambiguation and self.ctx.p2_sort_fact:
+            messages.append(HumanMessage(content=self.ctx.p2_sort_fact))
 
         # P2 F2 (version B only): deterministic calendar facts from the device date
         if ablation_config.p2_tally:
@@ -256,6 +265,33 @@ class CortexNode:
             agent="cortex",
         )
 
+
+    async def _budget_checkpoint(self, state: State):
+        """P2 F6: mark the plan done so the graph routes to the goal verifier (once per task)."""
+        self.ctx.p2_budget_checkpoint_done = True
+        plan = checkpoint_plan(state.subgoal_plan)
+        note = "==== STEP BUDGET CHECKPOINT: verifying the goal on the device now ===="
+        runtime = get_runtime()
+        if runtime is not None:
+            runtime.event("p2_budget_checkpoint", node_runs=node_runs_used(runtime))
+        if self.ctx.on_plan_changes:
+            await self.ctx.on_plan_changes(plan, False)
+        return await state.asanitize_update(
+            ctx=self.ctx,
+            update={
+                "agents_thoughts": [note],
+                "subgoal_plan": plan,
+                "structured_decisions": None,
+                "complete_subgoals_by_ids": [],
+                "latest_ui_hierarchy": None,
+                "latest_screenshot": None,
+                "focused_app_info": None,
+                "device_date": None,
+                EXECUTOR_MESSAGES_KEY: [RemoveMessage(id=REMOVE_ALL_MESSAGES)],
+                "cortex_last_thought": note,
+            },
+            agent="cortex",
+        )
 
     async def _force_replan(self, state: State, loop_note: str):
         """Mark the current subgoal as failed (loop evidence as reason) and skip the LLM call.
