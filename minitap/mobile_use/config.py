@@ -629,6 +629,17 @@ class AblationConfig(BaseModel):
             ),
         ),
     ]
+    p2_executor_completion: Annotated[
+        bool,
+        Field(
+            default=False,
+            description=(
+                "P2 (architecture-adjacent, disclosed): when the Executor LLM emits fewer tool "
+                "calls than the Cortex decided (incl. none), dispatch the missing ones from the "
+                "Cortex's JSON, in order, stopping after a screen-changing action."
+            ),
+        ),
+    ]
     p2_step_screenshots: Annotated[
         bool,
         Field(

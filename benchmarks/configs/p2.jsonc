@@ -12,6 +12,7 @@
     "p2_disambiguation": true,
     "p2_no_redo": true,
     "p2_tool_fixes": true,
+    "p2_executor_completion": true,
     "p2_step_screenshots": true
   }
 }

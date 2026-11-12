@@ -39,6 +39,7 @@
     "p2_disambiguation": false,
     "p2_no_redo": false,
     "p2_tool_fixes": false,
+    "p2_executor_completion": false,
     // P2 recordings (measurement only, coordinator 2026-11-12): per-step screenshots, on in p2.jsonc.
     "p2_step_screenshots": false
   },

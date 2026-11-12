@@ -14,6 +14,8 @@ from minitap.mobile_use.tools.index import (
     VIDEO_RECORDING_WRAPPERS,
     get_tools_from_wrappers,
 )
+from minitap.mobile_use.robustness.executor_completion import completion_calls
+from minitap.mobile_use.tools.p2_tools import p2_tool_wrappers
 from minitap.mobile_use.utils.decorators import wrap_with_callbacks
 from minitap.mobile_use.utils.logger import get_logger
 
@@ -62,6 +64,8 @@ class ExecutorNode:
         executor_wrappers = list(EXECUTOR_WRAPPERS_TOOLS)
         if self.ctx.video_recording_enabled:
             executor_wrappers.extend(VIDEO_RECORDING_WRAPPERS)
+        # P2 (version B only): bind the P2 tools the Cortex may decide (empty list in version A)
+        executor_wrappers.extend(p2_tool_wrappers(self.ctx.get_ablation_config()))
 
         llm_bind_tools_kwargs: dict = {
             "tools": get_tools_from_wrappers(self.ctx, executor_wrappers),
@@ -77,6 +81,12 @@ class ExecutorNode:
             main_call=lambda: invoke_llm_with_timeout_message(llm.ainvoke(messages)),
             fallback_call=lambda: invoke_llm_with_timeout_message(llm_fallback.ainvoke(messages)),
         )
+        if self.ctx.get_ablation_config().p2_executor_completion:  # P2, disclosed
+            response = complete_executor_response(
+                response,
+                structured_decisions,
+                {t.name: t for t in llm_bind_tools_kwargs["tools"]},
+            )
         return await state.asanitize_update(
             ctx=self.ctx,
             update={
@@ -85,3 +95,28 @@ class ExecutorNode:
             },
             agent="executor",
         )
+
+
+def complete_executor_response(response, structured_decisions, tools: dict):
+    """P2 executor completion: append the Cortex-decided actions the Executor left out."""
+    from langchain_core.messages import AIMessage
+
+    from minitap.mobile_use.benchmark.runtime import get_runtime
+
+    emitted = list(getattr(response, "tool_calls", None) or [])
+    extra = completion_calls(structured_decisions, emitted, tools)
+    if not extra:
+        return response
+    runtime = get_runtime()
+    if runtime is not None:
+        runtime.event(
+            "p2_executor_completion",
+            emitted=len(emitted),
+            dispatched=[c["name"] for c in extra],
+        )
+    logger.info(f"Executor completion: dispatching {[c['name'] for c in extra]}")
+    return AIMessage(
+        content=getattr(response, "content", "") or "",
+        tool_calls=emitted + extra,
+        id=getattr(response, "id", None),
+    )

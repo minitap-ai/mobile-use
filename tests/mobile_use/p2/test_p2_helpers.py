@@ -326,3 +326,41 @@ def test_target_exists_checks_id_text_desc_and_hint():
     assert target_exists(live, None, "Your answer")
     assert target_exists(live, None, "Go")
     assert not target_exists(live, "com.example.calculate:id/field", "Enter expression")
+
+
+def test_executor_completion_appends_missing_predictable_actions():
+    import json
+
+    from minitap.mobile_use.robustness.executor_completion import completion_calls
+    from minitap.mobile_use.tools.p2_tools import get_calculate_tool
+
+    class _Schema:
+        @staticmethod
+        def model_validate(args):
+            if "target" not in args:
+                raise ValueError("target missing")
+
+    class _T:
+        def __init__(self, name):
+            self.name, self.tool_call_schema = name, _Schema
+
+    tools = {n: _T(n) for n in ("focus_and_input_text", "tap", "back")}
+    dec = json.dumps([
+        {"action": "focus_and_input_text", "text": "a", "target": {"resource_id": "f1"}},
+        {"action": "focus_and_input_text", "text": "b", "target": {"resource_id": "f2"}},
+        {"action": "tap", "target": {"text": "Save"}},
+        {"action": "back", "target": {}},
+    ])
+    emitted = [{"name": "focus_and_input_text", "args": {"text": "a"}, "id": "x"}]
+    extra = completion_calls(dec, emitted, tools)
+    # completes field 2, then the screen-changing tap, and stops before 'back'
+    assert [c["name"] for c in extra] == ["focus_and_input_text", "tap"]
+    assert extra[0]["args"]["text"] == "b" and extra[0]["args"]["agent_thought"]
+    # nothing emitted at all: dispatch from the start
+    assert [c["name"] for c in completion_calls(dec, [], tools)][:2] == ["focus_and_input_text"] * 2
+    # the Executor already ended on a screen-changing action: append nothing
+    assert completion_calls(dec, [{"name": "tap", "args": {}, "id": "y"}], tools) == []
+    # an invalid decided action stops the completion
+    bad = json.dumps([{"action": "focus_and_input_text", "text": "a"}])
+    assert completion_calls(bad, [], tools) == []
+    assert get_calculate_tool  # import sanity
