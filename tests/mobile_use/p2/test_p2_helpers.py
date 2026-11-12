@@ -582,3 +582,11 @@ def test_action_log_caps_entries_and_reports_dropped():
     out = action_log.render_action_log(ctx)
     assert out.startswith("(5 earlier action(s) not shown)")
     assert out.splitlines()[-1].startswith(f"#{action_log.MAX_ENTRIES + 5} back()")
+
+
+def test_no_null_treats_null_strings_as_omitted():
+    from minitap.mobile_use.tools.p2_tools import _no_null
+
+    assert _no_null("null") is None and _no_null(" None ") is None and _no_null('""') is None
+    assert _no_null(None) is None and _no_null("") is None
+    assert _no_null("Water") == "Water"

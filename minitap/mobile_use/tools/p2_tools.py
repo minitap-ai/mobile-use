@@ -242,6 +242,7 @@ def get_inspect_rows_tool(ctx: MobileUseContext) -> BaseTool:
             from minitap.mobile_use.robustness.row_inspector import inspect_rows as _inspect
 
             dev = android_device(ctx)
+            match, detail_contains = _no_null(match) or "", _no_null(detail_contains)
             res = await asyncio.to_thread(_inspect, dev, match or "", detail_contains)
             outcome, ok = res.render(), res.error is None
             if ok:
@@ -258,6 +259,14 @@ inspect_rows_wrapper = ToolWrapper(
     on_success_fn=lambda: "inspect_rows done.",
     on_failure_fn=lambda: "inspect_rows failed.",
 )
+
+
+def _no_null(v):
+    """Models sometimes send the string "null"/"None" for an omitted optional argument."""
+    if v is None:
+        return None
+    t = str(v).strip()
+    return None if t.lower() in ("", "null", "none", "undefined", '""', "''") else t
 
 
 def p2_tool_wrappers(ablation: AblationConfig) -> list[ToolWrapper]:
