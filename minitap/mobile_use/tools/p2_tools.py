@@ -64,6 +64,17 @@ def get_read_full_list_tool(ctx: MobileUseContext) -> BaseTool:
             dev = android_device(ctx)
             result = await asyncio.to_thread(read_full_list, dev, container_resource_id)
             outcome, ok = result.render(), result.error is None
+            if ok:
+                app = ""
+                try:
+                    from minitap.mobile_use.controllers.platform_specific_commands_controller import (
+                        get_current_foreground_package,
+                    )
+
+                    app = get_current_foreground_package(ctx) or ""
+                except Exception:
+                    pass
+                ctx.p2_tool_evidence = ((ctx.p2_tool_evidence or []) + [f"[{app}] {outcome[:4000]}"])[-6:]
         except Exception as e:  # device errors are reported, not raised
             logger.warning(f"read_full_list failed: {e}")
             outcome, ok = f"read_full_list failed: {e}", False

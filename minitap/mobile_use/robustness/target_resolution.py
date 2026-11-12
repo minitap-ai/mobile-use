@@ -69,6 +69,41 @@ def matching_elements(
     return [], "none"
 
 
+def snap_centre_written_as_top_left(
+    elements: list[dict], bounds: ElementBounds | None, screen_w: int, screen_h: int
+) -> Resolution:
+    """No usable selector: detect the centre-as-top-left error from the geometry alone.
+    1. A live element whose centre is (bounds.x, bounds.y) (±4 px) and whose size equals the given
+       size (±4 px): that element is meant.
+    2. Otherwise, if the given box runs off-screen while (x, y) is on-screen, (x, y) is the centre.
+    """
+    if bounds is None or bounds.width <= 0 or bounds.height <= 0:
+        return Resolution(bounds, False, "no bounds")
+    for e in _iter(elements):
+        b = get_bounds_for_element(e)
+        if b is None or b.width <= 0:
+            continue
+        c = b.get_center()
+        if (
+            abs(c.x - bounds.x) <= 4
+            and abs(c.y - bounds.y) <= 4
+            and abs(b.width - bounds.width) <= 4
+            and abs(b.height - bounds.height) <= 4
+        ):
+            return Resolution(b, True, "given x/y is the centre of a live element of that size")
+    c = bounds.get_center()
+    off = not (0 <= c.x < screen_w and 0 <= c.y < screen_h)
+    if off and 0 <= bounds.x < screen_w and 0 <= bounds.y < screen_h:
+        fixed = ElementBounds(
+            x=bounds.x - bounds.width // 2,
+            y=bounds.y - bounds.height // 2,
+            width=bounds.width,
+            height=bounds.height,
+        )
+        return Resolution(fixed, True, "box off-screen while x/y is on-screen: x/y used as centre")
+    return Resolution(bounds, False, "geometry consistent")
+
+
 def resolve_target_bounds(
     elements: list[dict],
     bounds: ElementBounds | None,
@@ -116,7 +151,7 @@ async def p2_resolve_target(ctx, target, controller) -> str | None:
     Returns a short note for the tool output when a correction was made."""
     if not ctx.get_ablation_config().p2_tool_fixes:
         return None
-    if not (target.resource_id or target.text):
+    if not (target.resource_id or target.text or target.bounds):
         return None
     try:
         elements = await controller.get_ui_elements()
@@ -130,6 +165,10 @@ async def p2_resolve_target(ctx, target, controller) -> str | None:
         target.text,
         target.text_index,
     )
+    if not res.corrected and res.reason in ("no selector", "no live match", "no live bounds"):
+        res = snap_centre_written_as_top_left(
+            elements, target.bounds, ctx.device.device_width, ctx.device.device_height
+        )
     if not res.corrected or res.bounds is None:
         return None
     old = target.bounds

@@ -37,7 +37,15 @@ def record_screen(ctx, step: int, package: str | None, elements) -> None:
     if log and log[-1]["texts"] == texts:
         return
     log.append({"step": step, "app": package, "texts": texts})
-    ctx.p2_screen_log = log[-MAX_SCREENS:]
+    recent = log[-MAX_SCREENS:]
+    # Keep the last screen of every app that left the window (e.g. the source document app
+    # after switching to the target app): the verifier needs one result screen per app.
+    apps_recent = {e["app"] for e in recent}
+    last_by_app: dict = {}
+    for e in log[:-MAX_SCREENS]:
+        if e["app"] not in apps_recent:
+            last_by_app[e["app"]] = e
+    ctx.p2_screen_log = list(last_by_app.values())[-4:] + recent
 
 
 def render_screen_log(log) -> str | None:

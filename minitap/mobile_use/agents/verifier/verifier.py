@@ -273,6 +273,13 @@ async def _p2_call(self, state: State):
             + json.dumps(screen.elements, indent=1, ensure_ascii=False)
         ),
     ]
+    if ablation.p2_checklist and ctx.p2_tool_evidence:
+        messages.append(
+            HumanMessage(
+                content="Complete list reads done earlier by the agents' read_full_list tool "
+                "(deterministic tool outputs, oldest first):\n" + "\n\n".join(ctx.p2_tool_evidence)
+            )
+        )
     if screen_log:
         messages.append(
             HumanMessage(

@@ -240,3 +240,39 @@ def test_screen_log_keeps_recent_distinct_screens():
     assert len(ctx.p2_screen_log) == MAX_SCREENS
     text = render_screen_log(ctx.p2_screen_log)
     assert "Item 18 | Category Others" in text and "Item 0 " not in text
+
+
+def test_geometry_only_centre_as_top_left():
+    from minitap.mobile_use.robustness.target_resolution import snap_centre_written_as_top_left
+
+    live = [_el("", "", 576, 1426, 720, 1536)]  # a 144x110 button at the right edge
+    given = ElementBounds(x=648, y=1481, width=144, height=110)  # its centre as top-left
+    r = snap_centre_written_as_top_left(live, given, 720, 1600)
+    assert r.corrected and r.bounds.get_center().x == 648 and r.bounds.get_center().y == 1481
+    # no matching live element, box off-screen, x/y on screen -> x/y used as the centre
+    r = snap_centre_written_as_top_left([], given, 720, 1600)
+    assert r.corrected and r.bounds.x == 576
+    # consistent geometry: unchanged
+    ok = ElementBounds(x=100, y=100, width=50, height=50)
+    assert not snap_centre_written_as_top_left([], ok, 720, 1600).corrected
+
+
+def test_replan_never_ends_with_an_all_done_plan():
+    prev = [_sg("Draw with the three colours", SubgoalStatus.SUCCESS),
+            _sg("Submit the drawing", SubgoalStatus.SUCCESS),
+            _sg("Satisfy the remaining goal requirement: tap Submit", SubgoalStatus.FAILURE)]
+    out = keep_completed_subgoals(prev, [_sg("Submit the drawing", SubgoalStatus.NOT_STARTED)])
+    assert [s.status for s in out].count(SubgoalStatus.NOT_STARTED) == 1
+    out = keep_completed_subgoals(prev, [])
+    assert out[-1].status == SubgoalStatus.NOT_STARTED and "tap Submit" in out[-1].description
+
+
+def test_screen_log_keeps_the_last_screen_of_an_app_that_left_the_window():
+    from minitap.mobile_use.robustness.screen_log import MAX_SCREENS, record_screen
+
+    ctx = SimpleNamespace(p2_screen_log=None)
+    record_screen(ctx, 0, "source.app", [{"text": "Row 1 | Row 2 | Row 3"}])
+    for i in range(1, MAX_SCREENS + 3):
+        record_screen(ctx, i, "target.app", [{"text": f"form {i}"}])
+    apps = [e["app"] for e in ctx.p2_screen_log]
+    assert apps[0] == "source.app" and len(ctx.p2_screen_log) == MAX_SCREENS + 1

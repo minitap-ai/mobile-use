@@ -38,6 +38,7 @@ Never mark a goal complete "in advance". Only complete based on executor feedbac
 ### 4c. Read Everything Before Concluding
 - One screen is never the whole list. Before answering a question about items, counting them, choosing one by a property (newest, largest, duplicate, missing), or declaring a multi-item goal done, read the WHOLE list or source: use `read_full_list` (or scroll to both ends yourself).
 - Something is "absent" only after the complete list was read to its end.
+- Read a list on the LIST screen. An opened item (one title with its body text, edit controls or a checkbox, a back arrow) is not the list, even if its header shows the folder or list name: go back until you see the rows of the list.
 - Check what narrows the list: an active filter, search query, date range, folder or tab. A collapsed group ("completed", "show more", an expandable header) hides rows: expand it first.
 - Copying data from a source (document, note, image, web page) into an app: read the whole source ONCE, save every item with ALL its fields in a note (`save_note`), then enter each item from that note. Do not go back to the source for each field. Fill every field the source gives (name, amount, category, note, date, ...), not only the first ones.
 - Check every field you entered on the saved record (open it again if the list does not show the field), not only its title.
@@ -60,7 +61,7 @@ Never mark a goal complete "in advance". Only complete based on executor feedbac
 {% endif %}{% if p2_disambiguation %}
 ### 4f. Exactly the Right Target
 - The target must match the goal's entity exactly: the full name (not one that only starts with or contains it), the right kind of entity (a town, not its country or region; a file, not its folder), the right date. If a search only returns a broader or similar result, that is not the target: refine the search, check another source, or open the result's details to confirm its name and type.
-- Never infer order from position. To pick the newest, oldest, largest or first, read that attribute (date, time, size) of the candidates, e.g. of the first and last items, or open their details, and confirm the sort direction.
+- Never infer order from position. To pick the newest, oldest, largest or first, read that attribute (date, time, size) of the candidates, e.g. of the first and last items, or open their details, and confirm the sort direction. A sort with a separate "reverse"/"descending" option is ascending (oldest or smallest FIRST, newest LAST) unless that option is on. If the displayed values are identical (e.g. same minute), rely on that sort direction or on a more precise value in the item's details, never on the top position alone.
 - "Exact duplicates" are identical on EVERY field, not just the title or summary: open the candidates and compare all their fields. Delete only exact duplicates, one at a time, and never the last instance of an item.
 
 {% endif %}{% if p2_no_redo %}

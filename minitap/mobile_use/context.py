@@ -105,6 +105,8 @@ class MobileUseContext(BaseModel):
     # P2 F3: UI text of the recent screens (deterministic evidence for the goal verifier)
     p2_screen_log: list[dict] | None = None
     p2_screen_count: int = 0
+    # P2 F1/F3: outputs of read_full_list (deterministic tool evidence for the verifier)
+    p2_tool_evidence: list[str] | None = None
 
     def get_adb_client(self) -> AdbClient:
         if self.adb_client is None:
