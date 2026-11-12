@@ -32,6 +32,17 @@ PREDICTABLE = {
 }
 
 
+def _key(name, args: dict) -> str:
+    """Identity of an action: tool + target (+ text for typing)."""
+    target = args.get("target")
+    if isinstance(target, str):
+        try:
+            target = json.loads(target)
+        except json.JSONDecodeError:
+            pass
+    return json.dumps([name, target, args.get("text")], sort_keys=True, default=str)
+
+
 def parse_decisions(decisions: str | None) -> list[dict]:
     if not decisions:
         return []
@@ -53,9 +64,12 @@ def completion_calls(decisions: str | None, emitted: list[dict], tools: dict) ->
     rest = actions[len(emitted):]
     if emitted and emitted[-1].get("name") not in PREDICTABLE:
         return []  # the Executor already ended the turn on a screen-changing action
+    emitted_keys = {_key(c.get("name"), c.get("args") or {}) for c in emitted}
     out: list[dict] = []
     for i, d in enumerate(rest):
         name = d["action"]
+        if _key(name, d) in emitted_keys:
+            continue  # never re-dispatch an action the Executor already emitted (tool + target)
         tool = tools.get(name)
         if tool is None:
             break  # unknown action name: leave it to the next Cortex turn

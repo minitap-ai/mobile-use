@@ -413,3 +413,34 @@ def test_inspect_rows_reads_every_matching_row_including_identical_cards():
     assert res.error is None and res.stopped is None, res.render()
     assert [r["details"][1] for r in res.rows] == ["servings 6", "servings 7", "servings 8", "servings 17"]
     assert fake.open is None  # back on the list
+
+
+def test_executor_completion_never_redispatches_an_emitted_action():
+    import json
+
+    from minitap.mobile_use.robustness.executor_completion import completion_calls
+
+    class _Schema:
+        @staticmethod
+        def model_validate(args):
+            return args
+
+    class _T:
+        def __init__(self, name):
+            self.name, self.tool_call_schema = name, _Schema
+
+    tools = {n: _T(n) for n in ("focus_and_input_text", "tap")}
+    shutter = {"resource_id": "cam:id/shutter_button"}
+    dec = json.dumps([
+        {"action": "focus_and_input_text", "text": "a", "target": {"resource_id": "f1"}},
+        {"action": "tap", "target": shutter},
+    ])
+    # the Executor emitted the shutter tap first (out of the decided order): it must not be re-dispatched
+    emitted = [{"name": "tap", "args": {"target": shutter}, "id": "x"}]
+    assert completion_calls(dec, emitted, tools) == []
+    # the Executor emitted the typing (same target, JSON-string form) but not the tap: dispatch only the tap
+    emitted = [{"name": "focus_and_input_text", "args": {"text": "a", "target": json.dumps({"resource_id": "f1"})}, "id": "y"}]
+    assert [c["name"] for c in completion_calls(dec, emitted, tools)] == ["tap"]
+    # nothing after a screen-changing action is ever dispatched
+    dec2 = json.dumps([{"action": "tap", "target": shutter}, {"action": "tap", "target": shutter}])
+    assert [c["name"] for c in completion_calls(dec2, [], tools)] == ["tap"]
