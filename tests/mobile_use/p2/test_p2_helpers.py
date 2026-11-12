@@ -532,3 +532,53 @@ def test_compose_vertical_list_is_read_but_a_pager_is_not():
     pager = ('<hierarchy><node class="android.view.View" scrollable="true" bounds="[0,0][720,1280]">'
              '<node class="android.view.View" bounds="[0,0][720,1280]"/></node></hierarchy>')
     assert find_main_container(ET.fromstring(pager), 720 * 1280) is None
+
+
+def test_action_log_records_each_executed_call_once():
+    from types import SimpleNamespace
+
+    from langchain_core.messages import AIMessage, ToolMessage
+
+    from minitap.mobile_use.robustness.action_log import record_actions, render_action_log
+
+    ctx = SimpleNamespace(p2_action_log=None, p2_action_ids=None, p2_action_count=0)
+    shutter = {"resource_id": "com.example:id/shutter_button", "bounds": {"x": 0, "y": 2022}}
+    turn1 = [
+        AIMessage(content="", tool_calls=[{"name": "tap", "args": {"target": shutter}, "id": "c1"}]),
+        ToolMessage(content="Tap ok", tool_call_id="c1", status="success"),
+    ]
+    record_actions(ctx, SimpleNamespace(executor_messages=turn1))
+    record_actions(ctx, SimpleNamespace(executor_messages=turn1))  # same turn seen twice
+    turn2 = [
+        AIMessage(content="", tool_calls=[
+            {"name": "focus_and_input_text", "args": {"target": '{"text": "Title"}', "text": "Hello"}, "id": "c2"},
+            {"name": "launch_app", "args": {"app_name": "Notes"}, "id": "c3"},
+        ]),
+        ToolMessage(content="ok", tool_call_id="c2", status="success"),
+        ToolMessage(content="boom", tool_call_id="c3", status="error"),
+    ]
+    record_actions(ctx, SimpleNamespace(executor_messages=turn2))
+    out = render_action_log(ctx)
+    lines = out.splitlines()
+    assert len(lines) == 3
+    assert lines[0] == "#1 tap(resource_id='com.example:id/shutter_button') -> ok"
+    assert "text='Title'" in lines[1] and "text='Hello'" in lines[1]
+    assert lines[2] == "#3 launch_app(app_name='Notes') -> failed"
+
+
+def test_action_log_caps_entries_and_reports_dropped():
+    from types import SimpleNamespace
+
+    from langchain_core.messages import AIMessage, ToolMessage
+
+    from minitap.mobile_use.robustness import action_log
+
+    ctx = SimpleNamespace(p2_action_log=None, p2_action_ids=None, p2_action_count=0)
+    msgs = []
+    for i in range(action_log.MAX_ENTRIES + 5):
+        msgs.append(AIMessage(content="", tool_calls=[{"name": "back", "args": {}, "id": f"b{i}"}]))
+        msgs.append(ToolMessage(content="ok", tool_call_id=f"b{i}", status="success"))
+    action_log.record_actions(ctx, SimpleNamespace(executor_messages=msgs))
+    out = action_log.render_action_log(ctx)
+    assert out.startswith("(5 earlier action(s) not shown)")
+    assert out.splitlines()[-1].startswith(f"#{action_log.MAX_ENTRIES + 5} back()")

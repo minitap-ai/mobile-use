@@ -13,6 +13,7 @@ from minitap.mobile_use.controllers.platform_specific_commands_controller import
     get_device_date,
 )
 from minitap.mobile_use.graph.state import State
+from minitap.mobile_use.robustness.action_log import record_actions
 from minitap.mobile_use.robustness.reobserve import reobserve_if_unchanged
 from minitap.mobile_use.robustness.order import record_sort_fact
 from minitap.mobile_use.robustness.screen_log import record_screen
@@ -58,6 +59,7 @@ class ContextorNode:
         if ablation_config.p2_checklist:  # P2 F3 (version B only): screen log for the verifier
             self.ctx.p2_screen_count += 1
             record_screen(self.ctx, self.ctx.p2_screen_count, current_app_package, device_data.elements)
+            record_actions(self.ctx, state)
         device_date = get_device_date(self.ctx)
         agent_outcome: str | None = None
 

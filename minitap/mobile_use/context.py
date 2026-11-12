@@ -111,6 +111,10 @@ class MobileUseContext(BaseModel):
     p2_sort_fact: str | None = None
     # P2 F6: the step-budget checkpoint fires once per task
     p2_budget_checkpoint_done: bool = False
+    # P2 F3: executed tool calls (tool, target, outcome) for the goal verifier
+    p2_action_log: list[str] | None = None
+    p2_action_ids: set[str] | None = None
+    p2_action_count: int = 0
 
     def get_adb_client(self) -> AdbClient:
         if self.adb_client is None:

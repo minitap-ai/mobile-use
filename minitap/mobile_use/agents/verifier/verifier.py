@@ -243,6 +243,12 @@ async def _p2_call(self, state: State):
     from minitap.mobile_use.robustness.screen_log import render_screen_log
 
     screen_log = render_screen_log(ctx.p2_screen_log) if ablation.p2_checklist else None
+    action_log = None
+    if ablation.p2_checklist:
+        from minitap.mobile_use.robustness.action_log import record_actions, render_action_log
+
+        record_actions(ctx, state)
+        action_log = render_action_log(ctx)
     use_vision = ablation.use_vision
     controller = create_device_controller(ctx)
     screen = await controller.get_screen_data()
@@ -256,6 +262,7 @@ async def _p2_call(self, state: State):
         calendar=calendar,
         has_full_read=bool(full_read),
         has_screen_log=bool(screen_log),
+        has_action_log=bool(action_log),
     )
     thoughts = "\n".join(state.agents_thoughts[-RECENT_THOUGHTS:])
     notes = "\n".join(f"- {k}: {v}" for k, v in (state.scratchpad or {}).items())
@@ -287,6 +294,13 @@ async def _p2_call(self, state: State):
             HumanMessage(
                 content="UI text of the recent screens, captured from the device (oldest first; "
                 "this is what the screens actually showed, not what the agents said):\n" + screen_log
+            )
+        )
+    if action_log:
+        messages.append(
+            HumanMessage(
+                content="Actions executed on the device by the agents, from the execution log "
+                "(oldest first; what was actually done, not what was planned):\n" + action_log
             )
         )
     if full_read:
