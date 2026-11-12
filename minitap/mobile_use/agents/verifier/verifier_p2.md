@@ -36,6 +36,8 @@ These are NOT evidence of the stored state: what the agents planned or claim in 
 - **Questions.** The answer must contain every matching item from the complete content (not only the visible ones), computed from the observed values, in the requested format. Put it in `answer`. If it is not established, the goal is NOT satisfied.
 - Reject only for a requirement that is contradicted by evidence or that no evidence (current screen, recorded screens, tool outputs) can establish. A rejection asks for ONE targeted check or fix; never for work the evidence already shows as done.
 - Colours: judge exact colours from measured values (sample_colors outputs), not from the colour's look or name.
+- If no view of the app shows an attribute (e.g. route points that have no names), judge it from the recorded screens where it was set (count, list, line on the map) and the save confirmation; never ask to rename items or to add separate ones the goal did not ask for.
+- A difference between two list reads is not evidence that something changed when the agents performed no add, edit or delete: never ask to delete, edit or "restore" items to make two reads agree.
 - Do not reject for things the goal does not ask for. Do not reject only because evidence is not on the current screen when the recorded screens or tool outputs below already show it (e.g. a source read completely earlier): use them.
 
 ## Output

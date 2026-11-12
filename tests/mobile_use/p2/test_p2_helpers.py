@@ -470,3 +470,53 @@ def test_custom_scrollable_views_are_never_scrolled_automatically():
     # explicitly named by the agent: allowed
     res2 = read_full_list(dev, prefer_id="com.android.camera2:id/filmstrip_view")
     assert res2.error is None
+
+
+class NoisyFakeList(FakeListWithDetails):
+    """Real-device-like: swipes/drags overshoot by a random amount (momentum), and cards cut by the
+    container edge report CLIPPED bounds (UIAutomator), not their full height."""
+
+    def __init__(self, items, details, overshoot=(0, 140), seed=0, **kw):
+        super().__init__(items, details, **kw)
+        import random as _r
+        self._rng, self.overshoot = _r.Random(seed), overshoot
+
+    def swipe(self, x1, y1, x2, y2, ms):
+        d = y1 - y2
+        extra = self._rng.randint(*self.overshoot) * (1 if d > 0 else -1)
+        self.offset = min(self.max_offset, max(0, self.offset + d + extra))
+
+    def device(self):
+        dev = super().device()
+        dev.drag = lambda x, y1, y2: setattr(self, "offset", min(self.max_offset, max(0, self.offset + (y1 - y2))))
+        return dev
+
+
+@pytest.mark.parametrize("seed", range(6))
+def test_reader_exact_with_identical_rows_clipping_and_flings(seed):
+    items = (["Avocado Toast | Healthy"] * 3 + [f"Recipe {i} | d" for i in range(8)]
+             + ["Soup | Warm"] * 8 + [f"Tail {i} | d" for i in range(10)] + ["Soup | Warm"] * 2)
+    fake = NoisyFakeList(items, [[t] for t in items], seed=seed)
+    fake.offset = fake.max_offset // 3
+    res = read_full_list(fake.device())
+    assert res.rows == items and res.reached_end
+
+
+def test_inspect_rows_detail_contains_and_identical_groups():
+    from minitap.mobile_use.robustness.row_inspector import inspect_rows
+
+    items = [f"Card {i}" for i in range(5)] + ["Stew | Hearty"] * 8 + [f"Card {i}" for i in range(5, 12)]
+    details = [[f"title {it}", "servings 4", "dir: mix"] for it in items]
+    details[5] = ["title Stew", "servings 2", "dir: simmer"]
+    details[7] = ["title Stew", "servings 2", "dir: simmer"]      # the exact duplicate pair
+    for i in (6, 8, 9, 10, 11, 12):
+        details[i] = ["title Stew", f"servings {i}", "dir: simmer"]
+    details[15] = ["title Card 7", "servings 4", "dir: add olives and mix"]
+    fake = NoisyFakeList(items, details, seed=3)
+    res = inspect_rows(fake.device(), "stew")
+    assert res.error is None and res.stopped is None, res.render()
+    assert [r["pos"] for r in res.rows] == list(range(6, 14)) and res.reached_end
+    assert res.groups() == [[6, 8]]
+    fake2 = NoisyFakeList(items, details, seed=4)
+    res2 = inspect_rows(fake2.device(), "", detail_contains="olives")
+    assert [r["pos"] for r in res2.rows] == [16] and res2.checked == len(items)

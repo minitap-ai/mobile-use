@@ -1,13 +1,16 @@
-"""P2 F1/F5: read the details of every list row matching a text, in ONE tool call.
+"""P2 F1/F5: read the details of list rows in ONE tool call (read-only).
 
-Observed in version B (dev rounds 2-7): comparing records whose list cards look identical (e.g.
-"exact duplicates" that differ only in fields shown on the detail screen) took ~3 Cortex turns per
-record (open, read, back), so a 30-row list exhausted the step budget before any decision.
+Observed in version B (dev rounds 2-9): comparing records whose list cards look identical (exact
+duplicates that differ only in fields on the detail screen), or finding the records whose DETAIL
+contains a text (a search box that only searches titles), took ~2-3 Cortex turns per record and
+exhausted the step budget.
 
-This helper, for each row of the main list whose text contains `match` (identical rows are kept
-apart by their occurrence order), taps the row, reads the whole detail screen (scrolling it to its
-end if it scrolls), presses BACK, and checks the list is back. It never edits anything; it stops
-at the first row that does not open a new screen or whose BACK does not return to the list.
+For each row of the main list (all rows, or those whose card text contains `match`), the helper taps
+the row, reads the whole detail screen (scrolled to its end, no truncation), presses BACK and checks
+the same list page is back. Rows are identified by their POSITION in the list (identical cards stay
+distinct). Optionally only rows whose details contain `detail_contains` are reported; records that
+are identical on every detail field are grouped. It never edits anything; it stops at a row that does
+not open, or when BACK does not return to the same list page.
 """
 
 from __future__ import annotations
@@ -18,47 +21,66 @@ from dataclasses import dataclass, field
 
 from minitap.mobile_use.robustness.list_reader import (
     Device,
-    _fully_visible,
     _signature,
-    _swipe_in,
     find_main_container,
-    merge_page,
+    iter_list,
     page_rows,
     read_full_list,
 )
 
-MAX_ROWS = 40
-MAX_PAGES = 30
+MAX_ROWS = 60
+DETAIL_TEXT_MAX = 20000
 
 
 @dataclass
 class Inspection:
-    rows: list[dict] = field(default_factory=list)  # {"n": i, "row": text, "details": [...]}
+    rows: list[dict] = field(default_factory=list)  # {"pos", "row", "details"}
+    checked: int = 0
+    total_seen: int = 0
     stopped: str | None = None
     error: str | None = None
+    detail_contains: str | None = None
+    reached_end: bool = False
 
-    def render(self, limit_chars: int = 14000) -> str:
+    def groups(self) -> list[list[int]]:
+        by: dict[tuple, list[int]] = {}
+        for r in self.rows:
+            by.setdefault(tuple(r["details"]), []).append(r["pos"])
+        return [g for g in by.values() if len(g) > 1]
+
+    def render(self, limit_chars: int = 16000) -> str:
         if self.error:
             return f"inspect_rows: {self.error}"
-        out = [f"Inspected {len(self.rows)} matching row(s)" + (f"; STOPPED: {self.stopped}" if self.stopped else "; all matching rows done") + "."]
-        used = len(out[0])
+        scope = (
+            f"{self.checked} row(s) opened; {len(self.rows)} reported"
+            + (f" (details containing {self.detail_contains!r})" if self.detail_contains else "")
+        )
+        end = "end of list reached" if self.reached_end else "END OF LIST NOT CONFIRMED"
+        head = f"inspect_rows: {scope}; {self.total_seen} list rows seen; {end}" + (
+            f"; STOPPED: {self.stopped}" if self.stopped else ""
+        )
+        out = [head + "."]
+        groups = self.groups()
+        if groups:
+            out.append(
+                "Records IDENTICAL on every detail field (by list position): "
+                + "; ".join(" = ".join(f"row {p}" for p in g) for g in groups)
+            )
+        elif len(self.rows) > 1:
+            out.append("No two reported records are identical on every detail field.")
+        used = sum(len(x) for x in out)
         for r in self.rows:
-            block = f"#{r['n']} [{r['row']}]\n  " + "\n  ".join(r["details"])
+            block = f"row {r['pos']} [{r['row'][:120]}]\n  " + "\n  ".join(r["details"])
             if used + len(block) > limit_chars:
-                out.append(f"... ({len(self.rows) - r['n'] + 1} more not shown)")
+                out.append(f"... (more rows not shown; see the identical-record groups above)")
                 break
             out.append(block)
             used += len(block)
         return "\n".join(out)
 
 
-def _tap(dev: Device, x: int, y: int):
-    dev.tap(x, y)
-    time.sleep(dev.settle_s * 2)
-
-
 def _detail_texts(dev: Device) -> list[str]:
-    res = read_full_list(dev, return_to_top=False)
+    res = read_full_list(dev, return_to_top=False, text_max=DETAIL_TEXT_MAX)
     if res.error is None and res.rows:
         return res.rows
     root = ET.fromstring(dev.dump_xml())  # non-scrolling detail screen: all its texts
@@ -71,58 +93,45 @@ def _detail_texts(dev: Device) -> list[str]:
     return out
 
 
-def inspect_rows(dev: Device, match: str, max_rows: int = MAX_ROWS) -> Inspection:
+def inspect_rows(
+    dev: Device, match: str = "", detail_contains: str | None = None, max_rows: int = MAX_ROWS
+) -> Inspection:
     root = ET.fromstring(dev.dump_xml())
     cont = find_main_container(root, dev.screen_w * dev.screen_h)
     if cont is None:
         return Inspection(error="no scrollable list on this screen")
     rect, cid = cont.rect, (cont.node.attrib.get("resource-id") or None)
-    needle = match.lower()
-
-    # to the top
-    sig = None
-    for _ in range(12):
-        s = _signature(page_rows(ET.fromstring(dev.dump_xml()), rect, cid))
-        if s == sig:
+    needle = (match or "").lower()
+    want = (detail_contains or "").lower() or None
+    result = Inspection(detail_contains=detail_contains)
+    state: dict = {}
+    for visit in iter_list(dev, rect, cid, state):
+        result.total_seen = visit.index
+        row = visit.row
+        if needle and needle not in row.text.lower():
+            continue
+        if result.checked >= max_rows:
+            result.stopped = f"row limit {max_rows} reached"
             break
-        sig = s
-        _swipe_in(dev, rect, "up_content")
-
-    result = Inspection()
-    prev_all = page_rows(ET.fromstring(dev.dump_xml()), rect, cid)
-    prev_vis = _fully_visible(prev_all, rect) or prev_all
-    todo = list(prev_vis)
-    for _page in range(MAX_PAGES):
-        for row in todo:
-            if needle not in row.text.lower():
-                continue
-            if len(result.rows) >= max_rows:
-                result.stopped = f"row limit {max_rows} reached"
-                return result
-            before = _signature(page_rows(ET.fromstring(dev.dump_xml()), rect, cid))
-            y = (max(row.top, rect.y1) + min(row.bottom, rect.y2)) // 2
-            _tap(dev, (rect.x1 + rect.x2) // 2, y)
-            after_root = ET.fromstring(dev.dump_xml())
-            if _signature(page_rows(after_root, rect, cid)) == before:
-                result.stopped = f"row '{row.text[:60]}' did not open a new screen"
-                return result
-            details = _detail_texts(dev)
-            dev.back()
-            time.sleep(dev.settle_s * 2)
-            back_rows = page_rows(ET.fromstring(dev.dump_xml()), rect, cid)
-            result.rows.append({"n": len(result.rows) + 1, "row": row.text, "details": details})
-            if not back_rows:
-                result.stopped = "BACK did not return to the list"
-                return result
-            if _signature(back_rows) != before:
-                result.stopped = "the list moved after BACK (inspection stopped to avoid opening the wrong row)"
-                return result
-        # next page
-        _swipe_in(dev, rect, "down_content")
-        cur_all = page_rows(ET.fromstring(dev.dump_xml()), rect, cid)
-        if _signature(cur_all) == _signature(prev_all):
+        before = _signature(page_rows(ET.fromstring(dev.dump_xml()), rect, cid))
+        y = (max(row.top, rect.y1) + min(row.bottom, rect.y2)) // 2
+        dev.tap((rect.x1 + rect.x2) // 2, y)
+        time.sleep(dev.settle_s * 2)
+        if _signature(page_rows(ET.fromstring(dev.dump_xml()), rect, cid)) == before:
+            result.stopped = f"row {visit.index} '{row.text[:60]}' did not open a new screen"
             break
-        cur_vis = _fully_visible(cur_all, rect) or cur_all
-        todo = merge_page([], prev_vis, cur_vis)
-        prev_all, prev_vis = cur_all, cur_vis
+        details = _detail_texts(dev)
+        dev.back()
+        time.sleep(dev.settle_s * 2)
+        result.checked += 1
+        if want is None or any(want in d.lower() for d in details):
+            result.rows.append({"pos": visit.index, "row": row.text, "details": details})
+        back = page_rows(ET.fromstring(dev.dump_xml()), rect, cid)
+        if not back:
+            result.stopped = "BACK did not return to the list"
+            break
+        if _signature(back) != before:
+            result.stopped = "the list moved after BACK (stopped to avoid opening the wrong row)"
+            break
+    result.reached_end = bool(state.get("reached_end")) and bool(state.get("certain", True))
     return result

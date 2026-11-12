@@ -220,28 +220,32 @@ def get_inspect_rows_tool(ctx: MobileUseContext) -> BaseTool:
     @tool
     async def inspect_rows(
         agent_thought: str,
-        match: str,
         tool_call_id: Annotated[str, InjectedToolCallId],
         state: Annotated[State, InjectedState],
+        match: str = "",
+        detail_contains: str | None = None,
     ) -> Command:
-        """Open EVERY row of the current list whose text contains `match`, read all the fields of
-        its detail screen, go back, and return the details of each row, in ONE call (read-only:
-        it never edits or deletes). Use it to compare records whose list cards look alike, e.g. to
-        find exact duplicates (identical on every field) or to check the fields of saved items,
-        instead of opening them one by one. Identical rows are reported separately (#1, #2, ...
-        in list order). It stops if a row does not open or BACK does not return to the list.
+        """Open rows of the current list one by one, read ALL the fields of each detail screen,
+        go back, and report them, in ONE call (read-only: never edits or deletes). Rows are
+        identified by their position in the list ("row 14"), so identical-looking cards stay
+        distinct, and records identical on EVERY detail field are grouped for you.
+        Use it (a) to compare look-alike records, e.g. to find exact duplicates: match = the text
+        the cards share; (b) to find the records whose DETAILS contain a text that the list or a
+        search box does not show (e.g. an ingredient, a note): match = "" (every row) and
+        detail_contains = that text; (c) to check the saved fields of items.
 
         Args:
-            match: text that the rows to inspect contain (e.g. a title shared by look-alike rows).
+            match: only rows whose card text contains this ("" = every row of the list).
+            detail_contains: report only rows whose detail screen contains this text.
         """
         try:
             from minitap.mobile_use.robustness.row_inspector import inspect_rows as _inspect
 
             dev = android_device(ctx)
-            res = await asyncio.to_thread(_inspect, dev, match)
+            res = await asyncio.to_thread(_inspect, dev, match or "", detail_contains)
             outcome, ok = res.render(), res.error is None
             if ok:
-                ctx.p2_tool_evidence = ((ctx.p2_tool_evidence or []) + [f"[inspect_rows {match!r}] {outcome[:4000]}"])[-6:]
+                ctx.p2_tool_evidence = ((ctx.p2_tool_evidence or []) + [f"[inspect_rows match={match!r} detail_contains={detail_contains!r}] {outcome[:12000]}"])[-6:]
         except Exception as e:
             outcome, ok = f"inspect_rows failed: {e}", False
         return await _command(ctx, state, tool_call_id, agent_thought, outcome, ok)

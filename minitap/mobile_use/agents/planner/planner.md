@@ -35,6 +35,7 @@ All actions must stay within this app (except OAuth flows).
 {% endif %}{% if p2_final_state %}- **State already holds**: if the goal describes a state, plan "check whether it already holds, and act only if not"; never plan actions that only create a precondition (e.g. starting something in order to stop it).
 {% endif %}{% if p2_disambiguation %}- **Order-based targets** (newest, oldest, largest, first, last): plan a subgoal that establishes the order explicitly BEFORE acting, by reading the attribute of the candidates or the sort direction (a sort with a separate "reverse" option is ascending: oldest/smallest first, newest/largest LAST), then a subgoal that acts on the item identified that way.
 {% endif %}{% if p2_no_redo %}- **Replanning keeps progress**: when replanning, list ONLY the subgoals still to do; completed subgoals are kept automatically. Fix what is wrong; never restart from the beginning.
+{% endif %}{% if p2_no_redo %}- **Create, don't browse**: to create a new item (a route, a track, a note, an entry), plan the menu entry that creates or plans it, not the list of saved items.
 {% endif %}**Shortcuts**: Always prefer `launch_app` to open apps (not manual app drawer navigation), `open_link` for URLs.
 {% if video_recording_enabled %}
 ### 🎥 Video Recording Pattern

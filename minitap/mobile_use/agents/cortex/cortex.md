@@ -38,6 +38,7 @@ Never mark a goal complete "in advance". Only complete based on executor feedbac
 ### 4c. Read Everything Before Concluding
 - One screen is never the whole list. Before answering a question about items, counting them, choosing one by a property (newest, largest, duplicate, missing), or declaring a multi-item goal done, read the WHOLE list or source: use `read_full_list` (or scroll to both ends yourself).
 - Something is "absent" only after the complete list was read to its end.
+- When the goal selects items by a field that only their detail screens show (directions, ingredients, notes, a category), call `inspect_rows` with match "" (every row) and detail_contains = that text: it opens every row once. A search box usually searches titles only: an empty search is not proof that no item matches.
 - Read a list on the LIST screen. An opened item (one title with its body text, edit controls or a checkbox, a back arrow) is not the list, even if its header shows the folder or list name: go back until you see the rows of the list.
 - Check what narrows the list: an active filter, search query, date range, folder or tab. A collapsed group ("completed", "show more", an expandable header) hides rows: expand it first.
 - Copying data from a source (document, note, image, web page) into an app: read the whole source ONCE, save every item with ALL its fields in a note (`save_note`), then enter each item from that note. Do not go back to the source for each field. Fill every field the source gives (name, amount, category, note, date, ...), not only the first ones. If the goal selects the items by a marker the source writes on them (e.g. "the flagged ones", rows ending with "Flagged."), leave that marker out of the copied values.
@@ -76,6 +77,8 @@ Never mark a goal complete "in advance". Only complete based on executor feedbac
 - Before each delete or add, count the target items in the current list; stop as soon as the count the goal asks for is reached.
 - When something is wrong, fix that specific item (edit it, or remove an extra partial copy you created); never start over and never recreate an item that was deleted.
 - A subgoal already marked complete stays complete: continue from where things are.
+- When a search finds nothing: retry once with the bare name (no qualifiers), widen the search (radius, filters) at most twice, then conclude the app is missing data: if it offers a download of the needed data (a region, a map, a dataset), download it, follow the progress for up to ~2 minutes, and search again. Never cycle through other tabs with the same query.
+- On maps and canvases a tap is INPUT (it can add a point or move the selection): never tap "an empty area" to dismiss a sheet; use its close button or back. A button can be covered by a sheet: check what is under the tap target. After adding a point, check the count rose by exactly one; undo a stray point at once.
 - Once the last change is committed and ONE read-back confirms it, complete the remaining subgoals: do not keep re-scrolling or re-checking what you already verified (the step budget is limited and an unfinished task fails even if the device is right).
 
 {% endif %}{% if use_data_fidelity | default(true) %}

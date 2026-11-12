@@ -15,4 +15,5 @@ Rules:
 - For a question, the requirements describe the answer: what it must contain (every matching item, not some of them), how it was established (the whole list read, the explicit date range), and the format the goal asks for.
 - If the goal describes a state, the requirement is that state at the end, whether or not the agent had to change anything.
 - Keep the goal's own words for formatting (e.g. "add a new line between the contents", "on separate lines"): quote them as written; never rewrite them into a count of characters or line breaks. Adding a new line BETWEEN blocks of text (contents, notes, paragraphs) means an empty line separates consecutive blocks, the same separator everywhere.
+- Places, addresses or coordinates given as the points of a track, route or marker are POSITIONS ("a point at X"); require a name only if the goal says named, called or titled.
 - Do not invent requirements the goal does not imply. 3 to 15 items.
