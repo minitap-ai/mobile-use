@@ -642,3 +642,50 @@ def test_tap_not_refused_for_children_wrappers_or_unlabelled_overlays():
     ]
     refusal, warning = p2_covered_check(_ctx_fixes(), _target(rid="app:id/btn"), overlay)
     assert refusal is None and warning
+
+
+class FakeListWithFab(FakeList):
+    """A floating button drawn over the middle-bottom of the list: drags that START on it move
+    nothing (the button takes the touch)."""
+
+    FAB = (260, 700, 460, 900)
+
+    def dump_xml(self):
+        x1, y1, x2, y2 = self.FAB
+        fab = (f'<node class="android.widget.ImageButton" content-desc="New" clickable="true" '
+               f'bounds="[{x1},{y1}][{x2},{y2}]"/>')
+        return super().dump_xml().replace("</node></node></hierarchy>", "</node>" + fab + "</node></hierarchy>")
+
+    def swipe(self, x1, y1, x2, y2, ms):
+        fx1, fy1, fx2, fy2 = self.FAB
+        if fx1 <= x1 < fx2 and fy1 <= y1 < fy2:
+            self.swipes += 1
+            return
+        super().swipe(x1, y1, x2, y2, ms)
+
+
+@pytest.mark.parametrize("n", [12, 30])
+def test_drags_avoid_an_overlay_and_the_end_is_confirmed(n):
+    items = [f"Task {i:02d}" for i in range(n)]
+    res = read_full_list(FakeListWithFab(items).device())
+    assert res.rows == items and res.reached_end
+
+
+def test_a_drag_that_moves_nothing_is_not_the_end():
+    from minitap.mobile_use.robustness import list_reader as lr
+
+    items = [f"Row {i:02d}" for i in range(20)]
+    fake = FakeList(items)
+    calls = {"n": 0}
+    real = fake.swipe
+
+    def flaky(x1, y1, x2, y2, ms):  # the first downward drag is swallowed
+        if y1 > y2:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return
+        real(x1, y1, x2, y2, ms)
+
+    fake.swipe = flaky
+    res = lr.read_full_list(fake.device())
+    assert res.rows == items and res.reached_end

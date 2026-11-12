@@ -346,12 +346,54 @@ def _swipe_in(dev: Device, rect: Rect, direction: str):
     time.sleep(dev.settle_s)
 
 
-def _drag_page(dev: Device, rect: Rect) -> int:
-    """Reveal content below with a no-fling drag of ~45 % of the container; returns the nominal
-    content displacement in pixels."""
-    x = (rect.x1 + rect.x2) // 2
-    y_from = rect.y1 + int(rect.height * 0.75)
-    y_to = rect.y1 + int(rect.height * 0.30)
+def drag_lanes(root: ET.Element, rect: Rect, cid: str | None) -> list[tuple[int, int, int]]:
+    """Drag paths (x, y_from, y_to) inside the list whose START point is not under an element drawn
+    on top of the list (a floating button, a bottom bar, a snackbar): a drag started there moves
+    nothing, and an unchanged page would wrongly look like the end of the list."""
+    cont, _ = locate_container(root, rect, cid)
+    overlays: list[Rect] = []
+    if cont is not None:
+        nodes = list(root.iter())
+        idx = next((i for i, n in enumerate(nodes) if n is cont), None)
+        own = {id(n) for n in cont.iter()}
+        for n in nodes[(idx + 1) if idx is not None else len(nodes):]:
+            if id(n) in own:
+                continue
+            r = parse_bounds(n.attrib.get("bounds"))
+            if r is None or r.area == 0 or r.area >= 0.6 * rect.area:
+                continue
+            if r.x2 <= rect.x1 or r.x1 >= rect.x2 or r.y2 <= rect.y1 or r.y1 >= rect.y2:
+                continue
+            overlays.append(r)
+    width = rect.x2 - rect.x1
+    lanes: list[tuple[int, int, int]] = []
+    for fx in (0.5, 0.3, 0.7, 0.15, 0.85):
+        x = rect.x1 + int(width * fx)
+        y_from = rect.y1 + int(rect.height * 0.75)
+        y_to = rect.y1 + int(rect.height * 0.30)
+        for _ in range(3):  # move the start above overlays that cover it
+            cover = [o for o in overlays if o.x1 <= x < o.x2 and o.y1 <= y_from < o.y2]
+            if not cover:
+                break
+            y_from = min(o.y1 for o in cover) - 8
+        if any(o.x1 <= x < o.x2 and o.y1 <= y_from < o.y2 for o in overlays):
+            continue
+        if y_from - y_to < 0.2 * rect.height:
+            continue
+        lanes.append((x, y_from, y_to))
+    return lanes or [(rect.x1 + width // 2, rect.y1 + int(rect.height * 0.75), rect.y1 + int(rect.height * 0.30))]
+
+
+def _drag_page(dev: Device, rect: Rect, lane: tuple[int, int, int] | None = None) -> int:
+    """Reveal content below with a no-fling drag (default ~45 % of the container); returns the
+    nominal content displacement in pixels."""
+    if lane is None:
+        lane = (
+            (rect.x1 + rect.x2) // 2,
+            rect.y1 + int(rect.height * 0.75),
+            rect.y1 + int(rect.height * 0.30),
+        )
+    x, y_from, y_to = lane
     if dev.drag is not None:
         dev.drag(x, y_from, y_to)
     else:
@@ -391,8 +433,10 @@ def iter_list(dev: Device, rect: Rect, cid: str | None, state: dict, text_max: i
         n += 1
         last_abs = r.top
         yield Visit(r, n)
+    root = ET.fromstring(dev.dump_xml())
     for _ in range(MAX_PAGES):
-        nominal = _drag_page(dev, rect)
+        lanes = drag_lanes(root, rect, cid)
+        nominal = _drag_page(dev, rect, lanes[0])
         root = ET.fromstring(dev.dump_xml())
         _, new_rect = locate_container(root, rect, cid)
         if new_rect is not None and new_rect != rect:
@@ -401,8 +445,15 @@ def iter_list(dev: Device, rect: Rect, cid: str | None, state: dict, text_max: i
         cur = page_rows(root, rect, cid, text_max)
         state["pages"] += 1
         if _signature(cur) == _signature(page):
-            state["reached_end"] = True
-            return
+            # Unchanged: the end, or a drag that did not move the list. Confirm with a second drag
+            # from another free point before calling it the end.
+            other = [ln for ln in drag_lanes(root, rect, cid) if ln[0] != lanes[0][0]] or lanes
+            nominal = _drag_page(dev, rect, other[0])
+            root = ET.fromstring(dev.dump_xml())
+            cur = page_rows(root, rect, cid, text_max)
+            if _signature(cur) == _signature(page):
+                state["reached_end"] = True
+                return
         cur_vis = full_rows(cur, rect) or cur
         dy, aligned, certain = align_offset(vis, cur_vis, nominal)
         if not certain:
