@@ -10,7 +10,7 @@ from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.unified_controller import UnifiedMobileController
 from minitap.mobile_use.graph.state import State
-from minitap.mobile_use.robustness.target_resolution import p2_resolve_target
+from minitap.mobile_use.robustness.target_resolution import p2_covered_check, p2_resolve_target
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 from minitap.mobile_use.tools.types import Target
 from minitap.mobile_use.tools.utils import has_valid_selectors, validate_coordinates_bounds
@@ -50,6 +50,29 @@ def get_tap_tool(ctx: MobileUseContext) -> BaseTool:
 
         controller = UnifiedMobileController(ctx)
         correction = await p2_resolve_target(ctx, target, controller)  # P2 F7; None in version A
+        refusal, cover_warning = None, None
+        if ctx.get_ablation_config().p2_tool_fixes:  # P2 F7: never tap a target hidden under a control
+            try:
+                refusal, cover_warning = p2_covered_check(ctx, target, await controller.get_ui_elements())
+            except Exception:
+                refusal, cover_warning = None, None
+        if refusal:
+            tool_message = ToolMessage(
+                tool_call_id=tool_call_id,
+                content=refusal,
+                additional_kwargs={"error": refusal},
+                status="error",
+            )
+            return Command(
+                update=await state.asanitize_update(
+                    ctx=ctx,
+                    update={
+                        "agents_thoughts": [agent_thought, refusal],
+                        EXECUTOR_MESSAGES_KEY: [tool_message],
+                    },
+                    agent="executor",
+                ),
+            )
 
         # 1. Try with COORDINATES FIRST (visual approach)
         if not success and target.bounds:
@@ -126,6 +149,8 @@ def get_tap_tool(ctx: MobileUseContext) -> BaseTool:
             agent_outcome = tap_wrapper.on_success_fn(successful_selector)
             if correction:
                 agent_outcome += " " + correction
+            if cover_warning:
+                agent_outcome += " " + cover_warning
         else:
             # Build detailed failure message with all attempts
             failure_details = "; ".join([f"{a['selector']}: {a['error']}" for a in attempts])

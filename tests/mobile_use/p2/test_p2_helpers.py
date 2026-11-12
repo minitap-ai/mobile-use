@@ -590,3 +590,55 @@ def test_no_null_treats_null_strings_as_omitted():
     assert _no_null("null") is None and _no_null(" None ") is None and _no_null('""') is None
     assert _no_null(None) is None and _no_null("") is None
     assert _no_null("Water") == "Water"
+
+
+def _cel(bounds, **kw):
+    x1, y1, x2, y2 = bounds
+    return {"bounds": f"[{x1},{y1}][{x2},{y2}]", **kw}
+
+
+def _ctx_fixes():
+    from types import SimpleNamespace
+
+    return SimpleNamespace(get_ablation_config=lambda: SimpleNamespace(p2_tool_fixes=True))
+
+
+def _target(rid=None, text=None):
+    from minitap.mobile_use.tools.types import Target
+
+    return Target(resource_id=rid, text=text)
+
+
+def test_tap_refused_when_a_labelled_control_is_drawn_over_the_target():
+    from minitap.mobile_use.robustness.target_resolution import p2_covered_check
+
+    elements = [
+        _cel((0, 0, 1080, 2400), **{"class": "FrameLayout"}),
+        _cel((500, 1400, 760, 1660), **{"resource-id": "app:id/add_point_button", "clickable": "true"}),
+        _cel((0, 1300, 1080, 1800), **{"class": "LinearLayout"}),  # popup container, not clickable
+        _cel((400, 1450, 900, 1600), text="NAVIGATION", clickable="true"),
+    ]
+    refusal, warning = p2_covered_check(_ctx_fixes(), _target(rid="app:id/add_point_button"), elements)
+    assert refusal and "NAVIGATION" in refusal and warning is None
+
+
+def test_tap_not_refused_for_children_wrappers_or_unlabelled_overlays():
+    from minitap.mobile_use.robustness.target_resolution import p2_covered_check
+
+    child = [
+        _cel((100, 100, 500, 200), **{"resource-id": "app:id/row", "clickable": "true"}),
+        _cel((120, 110, 300, 190), text="Title", clickable="true"),  # the target's own child
+    ]
+    assert p2_covered_check(_ctx_fixes(), _target(rid="app:id/row"), child) == (None, None)
+    wrapper = [
+        _cel((120, 110, 300, 190), text="Title"),
+        _cel((100, 100, 500, 200), clickable="true", **{"content-desc": "Open Title"}),
+    ]
+    refusal, warning = p2_covered_check(_ctx_fixes(), _target(text="Title"), wrapper)
+    assert refusal is None and warning  # a wrapper drawn after its text: warn only
+    overlay = [
+        _cel((100, 100, 500, 200), **{"resource-id": "app:id/btn", "clickable": "true"}),
+        _cel((0, 0, 1080, 2400), clickable="true"),  # unlabelled scrim
+    ]
+    refusal, warning = p2_covered_check(_ctx_fixes(), _target(rid="app:id/btn"), overlay)
+    assert refusal is None and warning
