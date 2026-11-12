@@ -444,3 +444,13 @@ def test_executor_completion_never_redispatches_an_emitted_action():
     # nothing after a screen-changing action is ever dispatched
     dec2 = json.dumps([{"action": "tap", "target": shutter}, {"action": "tap", "target": shutter}])
     assert [c["name"] for c in completion_calls(dec2, [], tools)] == ["tap"]
+
+
+def test_verified_final_answer_prefers_the_verifier():
+    from minitap.mobile_use.benchmark.runner import verified_final_answer
+
+    st = SimpleNamespace(agents_thoughts=["[cortex] Goal verification PASSED: ...", "[cortex] Final answer: 2",
+                                          "[executor] something"])
+    assert verified_final_answer(st) == "2"
+    assert verified_final_answer(SimpleNamespace(agents_thoughts=["[orchestrator] Final answer: 9"])) is None
+    assert verified_final_answer(None) is None

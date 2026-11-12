@@ -262,6 +262,14 @@ async def run_task(
             final_answer = str(raw_output["answer"])
         elif isinstance(raw_output, str):
             final_answer = raw_output
+        if answer_required and cfg.ablation.p2_checklist and agent is not None:
+            # P2 (version B only, disclosed): the answer the goal verifier established on device
+            # evidence is the final answer; the Outputter (small model) re-extracting it from the
+            # thoughts returned junk ('description1' for a verified '2', dev round p1p-pixel s47).
+            verified = verified_final_answer(agent.last_task_state)
+            if verified is not None and verified != final_answer:
+                runtime.event("p2_final_answer", outputter=final_answer, verified=verified)
+                final_answer = verified
     except _Handled:
         pass
     finally:
@@ -305,6 +313,18 @@ async def run_task(
     runtime_mod.deactivate()
     (out / "result.json").write_text(json.dumps(result, indent=2, ensure_ascii=False, default=str))
     return result
+
+
+def verified_final_answer(state) -> str | None:
+    """The last 'Final answer: X' thought written by the goal verifier (P2), if any."""
+    if state is None:
+        return None
+    for thought in reversed(state.agents_thoughts or []):
+        marker = "Final answer: "
+        if marker in thought and thought.lstrip().startswith("[cortex]"):
+            ans = thought.split(marker, 1)[1].strip()
+            return ans or None
+    return None
 
 
 class _Handled(Exception):
