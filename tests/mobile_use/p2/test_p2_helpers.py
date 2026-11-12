@@ -454,3 +454,19 @@ def test_verified_final_answer_prefers_the_verifier():
     assert verified_final_answer(st) == "2"
     assert verified_final_answer(SimpleNamespace(agents_thoughts=["[orchestrator] Final answer: 9"])) is None
     assert verified_final_answer(None) is None
+
+
+def test_custom_scrollable_views_are_never_scrolled_automatically():
+    """A camera filmstrip (custom view, scrollable=true): a vertical swipe deletes the photo."""
+    xml = ('<hierarchy><node class="android.widget.FrameLayout" bounds="[0,0][1080,2400]">'
+           '<node class="com.android.camera.widget.FilmstripView" scrollable="true" '
+           'resource-id="com.android.camera2:id/filmstrip_view" bounds="[0,0][1080,2400]">'
+           '<node class="android.widget.ImageView" content-desc="Photo" bounds="[0,0][1080,2400]"/></node>'
+           '</node></hierarchy>')
+    swipes = []
+    dev = Device(lambda: xml, lambda *a: swipes.append(a), 1080, 2400, settle_s=0)
+    res = read_full_list(dev)
+    assert res.error and not swipes
+    # explicitly named by the agent: allowed
+    res2 = read_full_list(dev, prefer_id="com.android.camera2:id/filmstrip_view")
+    assert res2.error is None

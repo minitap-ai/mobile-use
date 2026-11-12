@@ -25,6 +25,19 @@ from statistics import median
 
 _BOUNDS_RE = re.compile(r"\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]")
 NON_SCROLL_CLASS_HINTS = ("webview", "mapview", "surfaceview", "textureview", "glsurface", "canvas")
+# Only standard list / scroll containers are scrolled automatically. A custom scrollable view can
+# give a swipe another meaning: in a camera filmstrip a vertical swipe DELETES the photo (the
+# verifier's automatic full read deleted the photo it was checking, dev round p1p-emu s46).
+SAFE_SCROLL_CLASSES = (
+    "recyclerview.widget.recyclerview",
+    "android.widget.listview",
+    "android.widget.gridview",
+    "android.widget.expandablelistview",
+    "android.widget.scrollview",
+    "androidx.core.widget.nestedscrollview",
+    "android.support.v4.widget.nestedscrollview",
+    "android.support.v7.widget.recyclerview",
+)
 MIN_AREA_FRACTION = 0.20
 MAX_PAGES = 30
 MAX_TOP_SWIPES = 12
@@ -120,6 +133,9 @@ def find_main_container(root: ET.Element, screen_area: int, prefer_id: str | Non
             continue
         cls = (n.attrib.get("class") or "").lower()
         if any(h in cls for h in NON_SCROLL_CLASS_HINTS):
+            continue
+        rid0 = n.attrib.get("resource-id") or ""
+        if not (prefer_id and rid0 == prefer_id) and not any(cls.endswith(c) for c in SAFE_SCROLL_CLASSES):
             continue
         rect = parse_bounds(n.attrib.get("bounds"))
         if rect is None or rect.height < 100:
