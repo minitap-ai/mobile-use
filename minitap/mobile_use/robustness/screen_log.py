@@ -12,6 +12,10 @@ MAX_SCREENS = 14
 MAX_ITEMS = 120
 
 
+SCREEN_TEXT_MAX = 12000  # per screen
+ELEMENT_TEXT_MAX = 4000  # a whole document can be ONE element (e.g. a text editor)
+
+
 def _iter(elements):
     for el in elements or []:
         if isinstance(el, dict):
@@ -21,11 +25,15 @@ def _iter(elements):
 
 def screen_texts(elements) -> list[str]:
     out: list[str] = []
+    used = 0
     for el in _iter(elements):
         for key in ("text", "content-desc"):
             v = (el.get(key) or "").strip()
             if v and v not in out:
-                out.append(v[:200])
+                cap = ELEMENT_TEXT_MAX if used < SCREEN_TEXT_MAX else 200
+                item = v if len(v) <= cap else v[:cap] + f" [truncated: {len(v)} chars in total]"
+                out.append(item)
+                used += len(item)
         if len(out) >= MAX_ITEMS:
             break
     return out

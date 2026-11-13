@@ -861,3 +861,37 @@ def test_split_screen_full_read_takes_the_list_not_the_edit_pane():
     root = ET.fromstring(xml)
     assert lr.find_main_container(root, 720 * 1600).label == "app:id/edit"
     assert lr.find_main_container(root, 720 * 1600, exclude_forms=True).label == "app:id/list"
+
+
+def test_completion_ids_are_unique_across_turns_so_the_action_log_keeps_them():
+    from types import SimpleNamespace
+
+    from langchain_core.messages import AIMessage, ToolMessage
+
+    from minitap.mobile_use.robustness.action_log import record_actions
+    from minitap.mobile_use.robustness.executor_completion import completion_calls
+
+    class _T:
+        class tool_call_schema:
+            @staticmethod
+            def model_validate(args):
+                return args
+
+    tools = {"focus_and_input_text": _T()}
+    decisions = '[{"action": "focus_and_input_text", "target": {"text": "A"}, "text": "1"}, {"action": "focus_and_input_text", "target": {"text": "B"}, "text": "2"}]'
+    ctx = SimpleNamespace(p2_action_log=None, p2_action_ids=None, p2_action_count=0)
+    for _ in range(2):  # two Cortex turns with the same shape
+        calls = completion_calls(decisions, [], tools)
+        msgs = [AIMessage(content="", tool_calls=calls)] + [ToolMessage(content="ok", tool_call_id=c["id"], status="success") for c in calls]
+        record_actions(ctx, SimpleNamespace(executor_messages=msgs))
+    assert ctx.p2_action_count == 4
+
+
+def test_screen_log_keeps_long_single_elements_and_marks_truncation():
+    from minitap.mobile_use.robustness.screen_log import ELEMENT_TEXT_MAX, screen_texts
+
+    doc = "\n".join(f"row {i} Fine Dining 12.50" for i in range(100))
+    out = screen_texts([{"text": doc}])
+    assert out and out[0] == doc
+    big = "x" * (ELEMENT_TEXT_MAX + 50)
+    assert "[truncated:" in screen_texts([{"text": big}])[0]

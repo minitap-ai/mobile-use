@@ -13,6 +13,7 @@ Every appended call is logged (`p2_executor_completion` event) so the rate can b
 from __future__ import annotations
 
 import json
+import uuid
 
 from minitap.mobile_use.tools.text_fidelity import canonical_decisions
 
@@ -79,7 +80,7 @@ def completion_calls(decisions: str | None, emitted: list[dict], tools: dict) ->
             tool.tool_call_schema.model_validate(args)
         except Exception:
             break
-        out.append({"name": name, "args": args, "id": f"p2c_{len(emitted) + i}", "type": "tool_call"})
+        out.append({"name": name, "args": args, "id": f"p2c_{uuid.uuid4().hex[:12]}_{len(emitted) + i}", "type": "tool_call"})
         if name not in PREDICTABLE:
             break  # a screen-changing action ends the batch
     return out
