@@ -61,6 +61,11 @@ class Inspection:
             f"; STOPPED: {self.stopped}" if self.stopped else ""
         )
         out = [head + "."]
+        if self.detail_contains:
+            out.append(
+                "(Text match only: an attribute shown as an icon is not seen, and a match inside a "
+                "title or name is not a field value. 0 reported does not prove there is none.)"
+            )
         groups = self.groups()
         if groups:
             out.append(
