@@ -34,7 +34,8 @@ DETAIL_TEXT_MAX = 20000
 
 @dataclass
 class Inspection:
-    rows: list[dict] = field(default_factory=list)  # {"pos", "row", "details"}
+    rows: list[dict] = field(default_factory=list)  # {"pos", "row", "details"} (reported)
+    opened: list[dict] = field(default_factory=list)  # every row opened (groups use these)
     checked: int = 0
     total_seen: int = 0
     stopped: str | None = None
@@ -44,7 +45,7 @@ class Inspection:
 
     def groups(self) -> list[list[int]]:
         by: dict[tuple, list[int]] = {}
-        for r in self.rows:
+        for r in self.opened or self.rows:
             by.setdefault(tuple(r["details"]), []).append(r["pos"])
         return [g for g in by.values() if len(g) > 1]
 
@@ -66,8 +67,8 @@ class Inspection:
                 "Records IDENTICAL on every detail field (by list position): "
                 + "; ".join(" = ".join(f"row {p}" for p in g) for g in groups)
             )
-        elif len(self.rows) > 1:
-            out.append("No two reported records are identical on every detail field.")
+        elif len(self.opened or self.rows) > 1:
+            out.append("No two opened records are identical on every detail field.")
         used = sum(len(x) for x in out)
         for r in self.rows:
             block = f"row {r['pos']} [{r['row'][:120]}]\n  " + "\n  ".join(r["details"])
@@ -124,8 +125,10 @@ def inspect_rows(
         dev.back()
         time.sleep(dev.settle_s * 2)
         result.checked += 1
+        rec = {"pos": visit.index, "row": row.text, "details": details}
+        result.opened.append(rec)
         if want is None or any(want in d.lower() for d in details):
-            result.rows.append({"pos": visit.index, "row": row.text, "details": details})
+            result.rows.append(rec)
         back = page_rows(ET.fromstring(dev.dump_xml()), rect, cid)
         if not back:
             result.stopped = "BACK did not return to the list"

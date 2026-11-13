@@ -709,3 +709,50 @@ def test_read_full_list_tool_schema_accepts_an_object_container():
     t.tool_call_schema.model_validate(
         {"agent_thought": "x", "container_resource_id": {"resource_id": "app:id/list", "bounds": {"x": 0}}}
     )
+
+
+class FakeListSlop(FakeList):
+    """Drags move the content by only `ratio` of the finger distance (touch slop), as on devices."""
+
+    def __init__(self, items, ratio, **kw):
+        super().__init__(items, **kw)
+        self.ratio = ratio
+
+    def swipe(self, x1, y1, x2, y2, ms):
+        self.swipes += 1
+        d = round((y1 - y2) * self.ratio) if y1 > y2 else (y1 - y2)
+        self.offset = min(self.max_offset, max(0, self.offset + d))
+
+
+@pytest.mark.parametrize("ratio", [0.80, 0.83, 0.86, 0.90])
+@pytest.mark.parametrize(
+    "items",
+    [
+        [f"U{i}" for i in range(15)] + ["Same card"] * 8 + [f"V{i}" for i in range(9)],
+        ["Same card"] * 6 + [f"W{i}" for i in range(6)],
+        [f"A{i}" for i in range(3)] + ["Same card"] * 14 + [f"B{i}" for i in range(4)],
+    ],
+)
+def test_runs_of_identical_rows_are_counted_exactly_under_drag_slop(items, ratio):
+    res = read_full_list(FakeListSlop(items, ratio).device())
+    assert res.rows == items and res.reached_end
+
+
+@pytest.mark.parametrize("ratio", [0.6, 0.7, 1.0])
+def test_identical_rows_never_silently_miscounted(ratio):
+    items = ["Same card"] * 12 + [f"W{i}" for i in range(6)]
+    res = read_full_list(FakeListSlop(items, ratio).device())
+    # either exact, or honestly flagged as possibly incomplete
+    assert res.rows == items or not res.reached_end
+
+
+def test_inspect_rows_groups_cover_every_opened_row_even_with_a_filter():
+    from minitap.mobile_use.robustness.row_inspector import inspect_rows
+
+    items = ["Pie", "Pie", "Pie", "Soup"]
+    details = [["Pie", "2 servings", "apples"], ["Pie", "2 servings", "apples"], ["Pie", "4 servings", "pears"], ["Soup", "1 serving", "leeks"]]
+    fake = FakeListWithDetails(items, details)
+    res = inspect_rows(fake.device(), match="Pie", detail_contains="no such text")
+    assert res.rows == [] and res.checked == 3
+    assert res.groups() == [[1, 2]]
+    assert "row 1 = row 2" in res.render()

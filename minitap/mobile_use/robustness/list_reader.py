@@ -297,9 +297,84 @@ def align_offset(prev: list[Row], new: list[Row], nominal: int | None, tol: int 
     return dy, good, True
 
 
-def full_rows(rows: list[Row], rect: Rect, tol: int = 2) -> list[Row]:
+def _identical_pitch(rows: list[Row]) -> int | None:
+    """Smallest vertical distance between two rows with the same text on a page, or None."""
+    by: dict[str, list[int]] = {}
+    for r in rows:
+        by.setdefault(r.text, []).append(r.top)
+    gaps = [b - a for tops in by.values() for a, b in zip(sorted(tops), sorted(tops)[1:]) if b - a > 0]
+    return min(gaps) if gaps else None
+
+
+DEFAULT_DRAG_RATIO = 0.85  # content moves ~85 % of a no-fling drag (touch slop), measured on devices
+
+
+def align_pages(
+    prev: list[Row], new: list[Row], expected: float | None, tol: int = 6, max_shift: int | None = None
+) -> tuple[int, int, bool, bool]:
+    """Like `align_offset`, but aware of runs of identical rows.
+
+    A candidate offset is CONSISTENT if every new row landing on the previous page lands on a row
+    with the same text (no mismatch). With identical rows, several consistent offsets exist, one
+    row-pitch apart, and their scores favour the wrong (smaller) one; the text cannot decide. Then
+    the consistent offset nearest the EXPECTED displacement (calibrated drag) is used, and the
+    result is certain only if it is clearly closer than the others.
+    Returns (dy, aligned rows, certain, ambiguous)."""
+    if not prev or not new:
+        return int(expected or 0), 0, False, False
+    by_text: dict[str, list[Row]] = {}
+    for r in new:
+        by_text.setdefault(r.text, []).append(r)
+    cands = sorted({r.top - s.top for r in prev for s in by_text.get(r.text, [])})
+    lo, hi = min(r.top for r in prev), max(r.top for r in prev)
+
+    def counts(dy: int) -> tuple[int, int]:
+        good = bad = 0
+        for s in new:
+            pos = s.top + dy
+            if pos < lo - tol or pos > hi + tol:
+                continue
+            hit = [r for r in prev if abs(r.top - pos) <= tol]
+            if any(r.text == s.text for r in hit):
+                good += 1
+            elif hit:
+                bad += 1
+        return good, bad
+
+    scored = [(dy, *counts(dy)) for dy in cands]
+    consistent = [(dy, g) for dy, g, b in scored if g > 0 and b == 0 and dy > 0]
+    distinct: list[tuple[int, int]] = []
+    for dy, g in consistent:
+        if not distinct or dy - distinct[-1][0] > tol:
+            distinct.append((dy, g))
+    if max_shift is not None:
+        # The drag moved the content by less than one row pitch: exactly one consistent offset
+        # lies in (0, max_shift), whatever the slop or an end-of-list clamp.
+        small = [c for c in distinct if c[0] < max_shift]
+        if len(small) == 1:
+            return small[0][0], small[0][1], True, True
+        if small:
+            return small[0][0], small[0][1], False, True
+    if len(distinct) == 1:
+        return distinct[0][0], distinct[0][1], True, False
+    if len(distinct) >= 2:
+        if expected is None:
+            dy, g = max(distinct, key=lambda c: c[1])
+            return dy, g, False, True
+        ranked = sorted(distinct, key=lambda c: abs(c[0] - expected))
+        best, second = ranked[0], ranked[1]
+        spacing = abs(second[0] - best[0])
+        certain = abs(best[0] - expected) <= spacing / 3
+        return best[0], best[1], certain, True
+    dy, good, certain = align_offset(prev, new, int(expected) if expected is not None else None, tol)
+    return dy, good, certain, False
+
+
+def full_rows(rows: list[Row], rect: Rect, tol: int = 2, at_top: bool = False) -> list[Row]:
     """Rows entirely on screen. UIAutomator clips bounds to the visible area, so a half-visible card
-    still looks 'inside': a row also has to be (nearly) as tall as the typical row of the page."""
+    still looks 'inside': a row also has to be (nearly) as tall as the typical row of the page.
+    A row cut by the TOP edge has a wrong top (used for alignment), so there any shortfall drops it,
+    except on the first page of the list (`at_top`), whose first row is not cut."""
     inside = [r for r in rows if r.top >= rect.y1 - tol and r.bottom <= rect.y2 + tol]
     heights = sorted(r.bottom - r.top for r in inside if r.bottom > r.top)
     if len(heights) < 3:
@@ -308,6 +383,8 @@ def full_rows(rows: list[Row], rect: Rect, tol: int = 2) -> list[Row]:
     out = []
     for r in inside:
         h = r.bottom - r.top
+        if not at_top and r.top <= rect.y1 + tol and h < typical - 3:
+            continue
         clipped_edge = r.top <= rect.y1 + tol or r.bottom >= rect.y2 - tol
         if clipped_edge and h < 0.85 * typical:
             continue
@@ -426,7 +503,7 @@ def iter_list(dev: Device, rect: Rect, cid: str | None, state: dict, text_max: i
     state['reached_end'], state['certain'], state['pages']."""
     scroll_to_top(dev, rect, cid)
     page = page_rows(ET.fromstring(dev.dump_xml()), rect, cid, text_max)
-    vis = full_rows(page, rect) or page
+    vis = full_rows(page, rect, at_top=True) or page
     state.update(reached_end=False, certain=True, pages=1)
     offset, last_abs, n = 0, None, 0
     for r in vis:
@@ -434,9 +511,17 @@ def iter_list(dev: Device, rect: Rect, cid: str | None, state: dict, text_max: i
         last_abs = r.top
         yield Visit(r, n)
     root = ET.fromstring(dev.dump_xml())
-    for _ in range(MAX_PAGES):
+    for _ in range(MAX_PAGES * 4):
         lanes = drag_lanes(root, rect, cid)
-        nominal = _drag_page(dev, rect, lanes[0])
+        pitch = _identical_pitch(vis)
+        if pitch:
+            # Identical rows on the page: the text cannot tell one row from the next, so move by
+            # less than one row (the offset is then unambiguous).
+            x, y_from, _ = lanes[0]
+            lane = (x, y_from, max(rect.y1 + 2, y_from - int(0.9 * pitch)))
+            nominal = _drag_page(dev, rect, lane)
+        else:
+            nominal = _drag_page(dev, rect, lanes[0])
         root = ET.fromstring(dev.dump_xml())
         _, new_rect = locate_container(root, rect, cid)
         if new_rect is not None and new_rect != rect:
@@ -455,9 +540,15 @@ def iter_list(dev: Device, rect: Rect, cid: str | None, state: dict, text_max: i
                 state["reached_end"] = True
                 return
         cur_vis = full_rows(cur, rect) or cur
-        dy, aligned, certain = align_offset(vis, cur_vis, nominal)
+        ratio = state.get("drag_ratio")
+        expected = nominal * (ratio if ratio is not None else DEFAULT_DRAG_RATIO)
+        dy, aligned, certain, ambiguous = align_pages(
+            vis, cur_vis, expected, max_shift=pitch if pitch else None
+        )
         if not certain:
             state["certain"] = False
+        elif not ambiguous and not pitch and nominal > 0 and 0.4 <= dy / nominal <= 1.2:
+            state["drag_ratio"] = dy / nominal  # calibrate on pages the text aligns unambiguously
         offset += dy
         for r in cur_vis:
             abs_top = r.top + offset
