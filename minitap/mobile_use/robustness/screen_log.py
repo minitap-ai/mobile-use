@@ -8,12 +8,12 @@ last screens, so the verifier can judge records opened before the final screen o
 
 from __future__ import annotations
 
-MAX_SCREENS = 14
+MAX_SCREENS = 40  # whole-run evidence: detail/edit screens opened early must stay visible
 MAX_ITEMS = 120
 
 
-SCREEN_TEXT_MAX = 12000  # per screen
-ELEMENT_TEXT_MAX = 4000  # a whole document can be ONE element (e.g. a text editor)
+SCREEN_TEXT_MAX = 20000  # per screen
+ELEMENT_TEXT_MAX = 16000  # a whole document can be ONE element (e.g. a text editor)
 
 
 def _iter(elements):
@@ -56,9 +56,18 @@ def record_screen(ctx, step: int, package: str | None, elements) -> None:
     ctx.p2_screen_log = list(last_by_app.values())[-4:] + recent
 
 
+RENDER_MAX = 90000  # total characters given to the verifier
+
+
 def render_screen_log(log) -> str | None:
     if not log:
         return None
-    return "\n".join(
-        f"[screen {e['step']}, {e.get('app') or '?'}] " + " | ".join(e["texts"]) for e in log
-    )
+    lines = [f"[screen {e['step']}, {e.get('app') or '?'}] " + " | ".join(e["texts"]) for e in log]
+    out, used = [], 0
+    for line in reversed(lines):  # newest first, until the budget is used
+        if used + len(line) > RENDER_MAX and out:
+            out.append(f"[{len(lines) - len(out)} older screen(s) not shown]")
+            break
+        out.append(line)
+        used += len(line)
+    return "\n".join(reversed(out))

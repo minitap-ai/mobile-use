@@ -895,3 +895,29 @@ def test_screen_log_keeps_long_single_elements_and_marks_truncation():
     assert out and out[0] == doc
     big = "x" * (ELEMENT_TEXT_MAX + 50)
     assert "[truncated:" in screen_texts([{"text": big}])[0]
+
+
+def test_list_rows_carry_their_checked_state():
+    import xml.etree.ElementTree as ET
+
+    from minitap.mobile_use.robustness import list_reader as lr
+
+    row = ('<node class="android.widget.LinearLayout" bounds="[0,{y}][720,{y2}]">'
+           '<node class="android.widget.CheckBox" checkable="true" checked="{c}" bounds="[0,{y}][80,{y2}]"/>'
+           '<node class="android.widget.TextView" text="{t}" bounds="[90,{y}][700,{y2}]"/></node>')
+    rows = "".join(row.format(y=200 + i * 100, y2=300 + i * 100, c="true" if i == 1 else "false", t=f"Task {i}") for i in range(4))
+    xml = f'<hierarchy><node class="androidx.recyclerview.widget.RecyclerView" scrollable="true" resource-id="a:id/l" bounds="[0,200][720,1000]">{rows}</node></hierarchy>'
+    texts = [r.text for r in lr.page_rows(ET.fromstring(xml), lr.Rect(0, 200, 720, 1000), "a:id/l")]
+    assert texts[1].startswith("[checked]") and texts[0].startswith("[unchecked]")
+
+
+def test_misshapen_bounds_fall_back_to_the_named_index():
+    from minitap.mobile_use.robustness.target_resolution import resolve_target_bounds
+    from minitap.mobile_use.utils.ui_hierarchy import ElementBounds
+
+    rows = [{"resource-id": "a:id/conv", "bounds": f"[0,{296 + i*254}][1080,{550 + i*254}]"} for i in range(4)]
+    given = ElementBounds(x=0, y=296, width=1080, height=550)  # centre (540, 571) lies in row 2
+    res = resolve_target_bounds(rows, given, "a:id/conv", 0, None, None)
+    assert res.corrected and res.bounds.y == 296 and res.bounds.height == 254
+    ok = ElementBounds(x=0, y=550, width=1080, height=254)  # a real row's rect: trusted as given
+    assert not resolve_target_bounds(rows, ok, "a:id/conv", 0, None, None).corrected

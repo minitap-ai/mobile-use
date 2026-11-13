@@ -121,6 +121,14 @@ def _node_text(node: ET.Element) -> list[str]:
         for v in (t, d):
             if v and v not in out:
                 out.append(v)
+    # A row's checkbox/switch state is part of its content (done/not done, on/off).
+    states = [
+        "[checked]" if n.attrib.get("checked") == "true" else "[unchecked]"
+        for n in node.iter()
+        if n.attrib.get("checkable") == "true"
+    ]
+    if out and len(states) == 1:
+        out.insert(0, states[0])
     return out
 
 

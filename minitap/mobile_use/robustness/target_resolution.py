@@ -136,6 +136,23 @@ def resolve_target_bounds(
         return Resolution(bounds, False, "no live bounds")
     if bounds is not None:
         c = bounds.get_center()
+
+        def _same_size(b):
+            return (
+                abs(b.width - bounds.width) <= 0.4 * max(b.width, 1)
+                and abs(b.height - bounds.height) <= 0.4 * max(b.height, 1)
+            )
+
+        idx0 = (resource_id_index if how.startswith("resource_id") else text_index) or 0
+        if (
+            len(live) > 1
+            and 0 <= idx0 < len(live)
+            and not any(_same_size(b) for b in live)
+            and not _contains(live[idx0], c.x, c.y)
+        ):
+            # The given rect matches no live element's size (a guessed or merged rect): its centre
+            # can fall on a neighbouring row. Use the element at the given index instead.
+            return Resolution(live[idx0], True, f"given bounds match no live element's size; using {how} index {idx0}")
         if any(_contains(b, c.x, c.y) for b in live):
             return Resolution(bounds, False, "given bounds inside a live match")
     idx = (resource_id_index if how.startswith("resource_id") else text_index) or 0
