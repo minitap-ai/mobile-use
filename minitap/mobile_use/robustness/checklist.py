@@ -42,6 +42,9 @@ SOURCE_COPY_REQUIREMENTS = [
     "If the goal selects records by a property that the source writes as a tag or marker word on each "
     'record (e.g. a note ending in "Flagged."), that marker is left out of the copied fields; every '
     "other field is copied exactly as in the source.",
+    "Each field value is copied complete, as the source writes it, including unit and qualifier words "
+    '(e.g. "3 kg" stays "3 kg", never "3"). When saving the source to a note, copy its lines verbatim with '
+    "the source's own field labels; a note the agents wrote is not proof of what the source says.",
 ]
 
 

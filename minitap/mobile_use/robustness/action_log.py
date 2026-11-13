@@ -11,10 +11,13 @@ of things the agents created, sent or captured can be read from what was done.
 from __future__ import annotations
 
 import json
+import re
 
 from langchain_core.messages import AIMessage, ToolMessage
 
 MAX_ENTRIES = 80
+# D3: an action whose target or text names a delete control (used by the verifier's delete gate)
+DELETE_ACTION_RE = re.compile(r"delet|remov|trash", re.IGNORECASE)
 TEXT_MAX = 60
 
 
@@ -68,7 +71,10 @@ def record_actions(ctx, state) -> None:
         name, args = calls.get(m.tool_call_id, (m.name or "tool", {}))
         status = "failed" if m.status == "error" else "ok"
         ctx.p2_action_count += 1
-        log.append(f"#{ctx.p2_action_count} {describe(name, args)} -> {status}")
+        desc = describe(name, args)
+        if status == "ok" and DELETE_ACTION_RE.search(desc):
+            ctx.p2_delete_seen = True
+        log.append(f"#{ctx.p2_action_count} {desc} -> {status}")
     ctx.p2_action_log = log[-MAX_ENTRIES:]
     ctx.p2_action_ids = seen
 

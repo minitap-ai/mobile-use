@@ -35,3 +35,19 @@ def restore_from_decision(text: str, decisions: str | None) -> str | None:
     if best is not None and best_ratio >= MIN_RATIO:
         return best
     return None
+
+
+def trailing_newlines_missing(intended: str, read_back: str | None) -> int:
+    """D3: how many of the intended text's trailing newlines the field's raw readback lacks.
+
+    0 when nothing was read back (no evidence), when the readback has at least as many, or when the
+    field is not shown to be multi-line: both the text body and the readback must already contain a
+    line break. A single-line field (a search box) never keeps a newline, and there the first Enter
+    submitted; pressing it again would submit twice."""
+    if not read_back:
+        return 0
+    if "\n" not in intended.rstrip("\n") or "\n" not in read_back.rstrip("\n"):
+        return 0
+    want = len(intended) - len(intended.rstrip("\n"))
+    have = len(read_back) - len(read_back.rstrip("\n"))
+    return max(0, want - have)

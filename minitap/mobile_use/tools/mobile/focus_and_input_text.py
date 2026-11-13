@@ -17,7 +17,7 @@ from minitap.mobile_use.benchmark.text_check import (
     find_focused_text_element,
 )
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
-from minitap.mobile_use.robustness.text_copy import restore_from_decision
+from minitap.mobile_use.robustness.text_copy import restore_from_decision, trailing_newlines_missing
 from minitap.mobile_use.tools.text_fidelity import restore_text
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.controller_factory import create_device_controller
@@ -216,6 +216,32 @@ def get_focus_and_input_text_tool(ctx: MobileUseContext) -> BaseTool:
             # ABLATION BASELINE MODE: No validation, just report success
             logger.warning("Skipping post-input validation (ablation baseline)")
             text_input_content = f"(validation skipped) {text}"
+
+        if trailing_enters and readback_element is not None:
+            # D3: an Enter press can be lost (observed on a held-out seed: the field read back
+            # without the final line break, and the whitespace-normalized check still said MATCH).
+            # When the raw readback has fewer trailing newlines than the text, press the missing
+            # Enters once and read the field again. Behaviour is unchanged when nothing was lost.
+            missing = trailing_newlines_missing(text, text_input_content)
+            if missing:
+                controller = create_device_controller(ctx)
+                for _ in range(missing):
+                    await controller.press_enter()
+                screen_data = await controller.get_screen_data()
+                state.latest_ui_hierarchy = screen_data.elements
+                readback_hierarchy = screen_data.elements
+                element = find_element_by_resource_id(
+                    ui_hierarchy=state.latest_ui_hierarchy,
+                    resource_id=target.resource_id,
+                    index=target.resource_id_index,
+                    legacy_v1=legacy_v1(ctx),
+                )
+                if element:
+                    readback_element = element
+                    text_input_content = get_element_text(element)
+                runtime = get_runtime()
+                if runtime is not None:
+                    runtime.event("p2_trailing_newline_retry", missing=missing)
 
         agent_outcome = (
             focus_and_input_text_wrapper.on_success_fn(

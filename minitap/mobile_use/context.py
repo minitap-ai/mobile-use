@@ -118,6 +118,10 @@ class MobileUseContext(BaseModel):
     p2_action_log: list[str] | None = None
     p2_action_ids: set[str] | None = None
     p2_action_count: int = 0
+    # D3: an executed action whose target or text names a delete/remove/trash control, and whether the
+    # verifier's one-time gate for named-delete goals has fired
+    p2_delete_seen: bool = False
+    p2_delete_gate_used: bool = False
 
     def get_adb_client(self) -> AdbClient:
         if self.adb_client is None:

@@ -1006,3 +1006,82 @@ def test_source_copy_lines_appended_even_if_llm_fails(monkeypatch):
     ctx2 = _checklist_ctx()
     assert asyncio.run(ensure_goal_checklist(ctx2, "Add an entry Lunch 12 to the app.")) == []
     assert asyncio.run(ensure_goal_checklist(_checklist_ctx(False), "Add the entries from a.jpg to b.")) is None
+
+
+# --- D3: trailing-newline retry and the named-delete verifier gate ---
+from minitap.mobile_use.robustness.delete_gate import delete_gate, is_named_delete_goal  # noqa: E402
+from minitap.mobile_use.robustness.text_copy import trailing_newlines_missing  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "intended, read_back, missing",
+    [
+        ("Head\n\nBody.\n", "Head\n\nBody.", 1),
+        ("Head\n\nBody.\n", "Head\n\nBody.\n", 0),
+        ("Head\n\nBody.\n\n", "Head\n\nBody.", 2),
+        ("query\n", "query", 0),  # single-line field: the Enter submitted, never press again
+        ("Head\nBody.\n", "Head Body.", 0),  # field not shown multi-line
+        ("Head\nBody.\n", None, 0),
+        ("Head\nBody.", "Head\nBody.", 0),
+    ],
+)
+def test_trailing_newlines_missing(intended, read_back, missing):
+    assert trailing_newlines_missing(intended, read_back) == missing
+
+
+@pytest.mark.parametrize(
+    "goal, named",
+    [
+        ("Delete the following entries from the budget app: Lunch, Taxi.", True),
+        ("Delete the file song.mp3 from the Ringtones folder.", True),
+        ("Delete the note in the editor named my_note.", True),
+        ("In the calendar, delete the event on 2023-10-17 at 13h with the title 'Review'.", True),
+        ("Remove the contact titled Bob.", True),
+        ("Delete all my notes in the editor.", False),
+        ("Delete the newest note in the editor.", False),
+        ("Delete all but one of any entries that are exact duplicates.", False),
+        ("Delete the entries that use butter in the directions.", False),
+        ("Add the following entries to the app: Lunch.", False),
+    ],
+)
+def test_named_delete_trigger(goal, named):
+    assert is_named_delete_goal(goal) is named
+
+
+def _gate_ctx(seen=False):
+    return SimpleNamespace(p2_delete_seen=seen, p2_delete_gate_used=False)
+
+
+def test_delete_gate_fires_once_without_a_delete_action():
+    ctx = _gate_ctx()
+    goal = "Delete the following entries from the app: Pan-Fried Fish."
+    assert delete_gate(ctx, goal)
+    assert delete_gate(ctx, goal) is None  # at most once per run
+    assert delete_gate(_gate_ctx(seen=True), goal) is None
+    assert delete_gate(_gate_ctx(), "Delete all my notes.") is None
+
+
+def test_action_log_marks_delete_actions():
+    from langchain_core.messages import AIMessage, ToolMessage
+
+    from minitap.mobile_use.robustness.action_log import record_actions
+
+    ctx = SimpleNamespace(p2_action_log=None, p2_action_ids=None, p2_action_count=0, p2_delete_seen=False)
+    msgs = [
+        AIMessage(content="", tool_calls=[{"id": "a", "name": "tap", "args": {"target": {"text": "Search"}}}]),
+        ToolMessage(content="ok", tool_call_id="a"),
+    ]
+    record_actions(ctx, SimpleNamespace(executor_messages=msgs))
+    assert ctx.p2_delete_seen is False
+    msgs += [
+        AIMessage(content="", tool_calls=[{"id": "b", "name": "tap", "args": {"target": {"text": "Delete"}}}]),
+        ToolMessage(content="boom", tool_call_id="b", status="error"),
+    ]
+    record_actions(ctx, SimpleNamespace(executor_messages=msgs))
+    assert ctx.p2_delete_seen is False  # a failed tap is not a delete
+    msgs += [
+        AIMessage(content="", tool_calls=[{"id": "c", "name": "tap", "args": {"target": {"content_desc": "Delete"}}}]),
+        ToolMessage(content="ok", tool_call_id="c"),
+    ]
+    record_actions(ctx, SimpleNamespace(executor_messages=msgs))
+    assert ctx.p2_delete_seen is True
