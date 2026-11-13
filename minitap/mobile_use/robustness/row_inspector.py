@@ -15,6 +15,7 @@ not open, or when BACK does not return to the same list page.
 
 from __future__ import annotations
 
+import re
 import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
@@ -25,6 +26,7 @@ from minitap.mobile_use.robustness.list_reader import (
     find_main_container,
     iter_list,
     page_rows,
+    parse_bounds,
     read_full_list,
 )
 
@@ -42,6 +44,7 @@ class Inspection:
     error: str | None = None
     detail_contains: str | None = None
     reached_end: bool = False
+    discarded: list[int] = field(default_factory=list)  # rows whose detail asked to discard on BACK
 
     def groups(self) -> list[list[int]]:
         by: dict[tuple, list[int]] = {}
@@ -61,6 +64,11 @@ class Inspection:
             f"; STOPPED: {self.stopped}" if self.stopped else ""
         )
         out = [head + "."]
+        if self.discarded:
+            out.append(
+                "Note: leaving the detail of row(s) " + ", ".join(map(str, self.discarded))
+                + " asked to discard changes; the tool chose DISCARD, so nothing was saved."
+            )
         if self.detail_contains:
             out.append(
                 "(Text match only: an attribute shown as an icon is not seen, and a match inside a "
@@ -99,6 +107,25 @@ def _detail_texts(dev: Device) -> list[str]:
     return out
 
 
+DISCARD_RE = re.compile(r"\b(discard|don'?t save|do not save|without saving)\b", re.I)
+
+
+def _discard_dialog(dev: Device) -> bool:
+    """If a dialog offers to discard unsaved changes, tap that option (never the one that saves
+    or keeps editing). Returns True if it did."""
+    if dev.tap is None:
+        return False
+    root = ET.fromstring(dev.dump_xml())
+    for n in root.iter():
+        t = (n.attrib.get("text") or n.attrib.get("content-desc") or "").strip()
+        if t and len(t) <= 30 and DISCARD_RE.search(t) and n.attrib.get("clickable") == "true":
+            b = parse_bounds(n.attrib.get("bounds"))
+            if b is not None:
+                dev.tap((b.x1 + b.x2) // 2, (b.y1 + b.y2) // 2)
+                return True
+    return False
+
+
 def inspect_rows(
     dev: Device, match: str = "", detail_contains: str | None = None, max_rows: int = MAX_ROWS
 ) -> Inspection:
@@ -131,6 +158,9 @@ def inspect_rows(
         details = _detail_texts(dev)
         dev.back()
         time.sleep(dev.settle_s * 2)
+        if not page_rows(ET.fromstring(dev.dump_xml()), rect, cid) and _discard_dialog(dev):
+            result.discarded.append(visit.index)  # nothing was saved: the stored record is unchanged
+            time.sleep(dev.settle_s * 2)
         result.checked += 1
         rec = {"pos": visit.index, "row": row.text, "details": details}
         result.opened.append(rec)

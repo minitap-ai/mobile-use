@@ -38,6 +38,8 @@ SAFE_SCROLL_CLASSES = (
     "android.support.v4.widget.nestedscrollview",
     "android.support.v7.widget.recyclerview",
 )
+INPUT_CLASS_HINTS = ("edittext", "seekbar", "slider", "switch", "checkbox", "radiobutton", "spinner",
+                     "ratingbar", "togglebutton", "compoundbutton", "numberpicker", "timepicker", "datepicker")
 MIN_AREA_FRACTION = 0.20
 MAX_PAGES = 30
 MAX_TOP_SWIPES = 12
@@ -471,6 +473,14 @@ def drag_lanes(root: ET.Element, rect: Rect, cid: str | None) -> list[tuple[int,
             if r.x2 <= rect.x1 or r.x1 >= rect.x2 or r.y2 <= rect.y1 or r.y1 >= rect.y2:
                 continue
             overlays.append(r)
+        # Never start a drag on an input widget inside the container (a text field, slider,
+        # switch...): touching it can focus or change it (an edit form then reports changes).
+        for m in cont.iter():
+            mcls = (m.attrib.get("class") or "").lower()
+            if any(k in mcls for k in INPUT_CLASS_HINTS):
+                r = parse_bounds(m.attrib.get("bounds"))
+                if r is not None and r.area > 0:
+                    overlays.append(r)
     width = rect.x2 - rect.x1
     lanes: list[tuple[int, int, int]] = []
     for fx in (0.5, 0.3, 0.7, 0.15, 0.85):

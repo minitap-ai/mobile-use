@@ -786,3 +786,61 @@ def test_nested_scrollables_prefer_the_inner_list_and_relocate_by_id():
     collapsed = ET.fromstring(xml.replace("[0,192][720,1574]", "[0,94][720,1574]"))
     n, r = lr.locate_container(collapsed, lr.Rect(0, 94, 720, 1574), "app:id/list")
     assert n.attrib["resource-id"] == "app:id/list"
+
+
+class FakeListWithDiscardDialog(FakeListWithDetails):
+    """Leaving a detail screen raises 'discard your changes?' (DISCARD / KEEP EDITING)."""
+
+    def __init__(self, items, details, **kw):
+        super().__init__(items, details, **kw)
+        self.dialog = False
+        self.kept_editing = 0
+
+    def dump_xml(self):
+        if self.dialog:
+            return ('<hierarchy><node class="android.widget.FrameLayout" bounds="[0,0][720,1280]">'
+                    '<node class="android.widget.TextView" text="Are you sure you want to discard your changes?" bounds="[60,600][660,680]"/>'
+                    '<node class="android.widget.Button" text="DISCARD" clickable="true" bounds="[200,700][400,760]"/>'
+                    '<node class="android.widget.Button" text="KEEP EDITING" clickable="true" bounds="[420,700][660,760]"/>'
+                    '</node></hierarchy>')
+        return super().dump_xml()
+
+    def tap(self, x, y):
+        if self.dialog:
+            if 200 <= x < 400 and 700 <= y < 760:
+                self.dialog, self.open = False, None
+            else:
+                self.kept_editing += 1
+            return
+        super().tap(x, y)
+
+    def back(self):
+        if self.open is not None:
+            self.dialog = True
+
+
+def test_inspect_rows_discards_instead_of_saving_when_leaving_a_form():
+    from minitap.mobile_use.robustness.row_inspector import inspect_rows
+
+    items = [f"Task {i}" for i in range(5)]
+    details = [[f"Task {i}", "Monday"] for i in range(5)]
+    fake = FakeListWithDiscardDialog(items, details)
+    res = inspect_rows(fake.device())
+    assert res.stopped is None and res.checked == 5, res.render()
+    assert res.discarded == [1, 2, 3, 4, 5] and fake.kept_editing == 0
+    assert "nothing was saved" in res.render()
+
+
+def test_drags_never_start_on_an_input_widget():
+    import xml.etree.ElementTree as ET
+
+    from minitap.mobile_use.robustness import list_reader as lr
+
+    xml = ('<hierarchy><node class="android.widget.ScrollView" scrollable="true" resource-id="app:id/form" bounds="[0,100][720,1500]">'
+           '<node class="android.widget.TextView" text="Title" bounds="[0,100][720,300]"/>'
+           '<node class="android.widget.EditText" text="Notes" bounds="[0,900][720,1300]"/>'
+           '</node></hierarchy>')
+    root = ET.fromstring(xml)
+    lanes = lr.drag_lanes(root, lr.Rect(0, 100, 720, 1500), "app:id/form")
+    for x, y_from, _ in lanes:
+        assert not (0 <= x < 720 and 900 <= y_from < 1300)
