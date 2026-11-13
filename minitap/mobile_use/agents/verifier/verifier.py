@@ -181,10 +181,12 @@ async def _p2_full_read(ctx) -> str | None:
     dev = android_device(ctx)
     xml_text = dev.dump_xml()
     root = ET.fromstring(xml_text)
-    cont = find_main_container(root, dev.screen_w * dev.screen_h)
+    # Largest list that is not a form: on a split screen the edit pane can be larger than the list.
+    cont = find_main_container(root, dev.screen_w * dev.screen_h, exclude_forms=True)
     if cont is None or _has_edit_field(ET.tostring(cont.node, encoding="unicode")):
         return None
-    result = await asyncio.to_thread(read_full_list, dev)
+    cid = cont.node.attrib.get("resource-id") or None
+    result = await asyncio.to_thread(read_full_list, dev, cid, True, 400, True)
     return None if result.error else result.render()
 
 

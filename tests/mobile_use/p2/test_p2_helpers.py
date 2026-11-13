@@ -844,3 +844,20 @@ def test_drags_never_start_on_an_input_widget():
     lanes = lr.drag_lanes(root, lr.Rect(0, 100, 720, 1500), "app:id/form")
     for x, y_from, _ in lanes:
         assert not (0 <= x < 720 and 900 <= y_from < 1300)
+
+
+def test_split_screen_full_read_takes_the_list_not_the_edit_pane():
+    import xml.etree.ElementTree as ET
+
+    from minitap.mobile_use.robustness import list_reader as lr
+
+    rows = "".join(f'<node class="android.widget.LinearLayout" bounds="[0,{100+i*100}][270,{200+i*100}]"><node class="android.widget.TextView" text="Task {i}" bounds="[5,{100+i*100}][265,{200+i*100}]"/></node>' for i in range(6))
+    xml = ('<hierarchy><node class="android.widget.FrameLayout" bounds="[0,0][720,1600]">'
+           f'<node class="androidx.recyclerview.widget.RecyclerView" scrollable="true" resource-id="app:id/list" bounds="[0,100][270,1500]">{rows}</node>'
+           '<node class="android.widget.ScrollView" scrollable="true" resource-id="app:id/edit" bounds="[270,100][720,1500]">'
+           '<node class="android.widget.EditText" text="Notes" bounds="[280,200][710,400]"/>'
+           '<node class="android.widget.TextView" text="Monday" bounds="[280,500][710,600]"/><node class="android.widget.TextView" text="Priority" bounds="[280,700][710,800]"/></node>'
+           '</node></hierarchy>')
+    root = ET.fromstring(xml)
+    assert lr.find_main_container(root, 720 * 1600).label == "app:id/edit"
+    assert lr.find_main_container(root, 720 * 1600, exclude_forms=True).label == "app:id/list"

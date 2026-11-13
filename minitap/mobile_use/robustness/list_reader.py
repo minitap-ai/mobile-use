@@ -142,7 +142,13 @@ def _vertical_stack(node: ET.Element) -> bool:
     return len(boxes) >= 3 and all(a < b for a, b in zip(tops, tops[1:]))
 
 
-def find_main_container(root: ET.Element, screen_area: int, prefer_id: str | None = None):
+def _is_form(node: ET.Element) -> bool:
+    return any("edittext" in (m.attrib.get("class") or "").lower() for m in node.iter())
+
+
+def find_main_container(
+    root: ET.Element, screen_area: int, prefer_id: str | None = None, exclude_forms: bool = False
+):
     best: Container | None = None
     for n in root.iter():
         if not _is_scrollable(n):
@@ -159,6 +165,8 @@ def find_main_container(root: ET.Element, screen_area: int, prefer_id: str | Non
         rect = parse_bounds(n.attrib.get("bounds"))
         if rect is None or rect.height < 100:
             continue
+        if exclude_forms and _is_form(n):
+            continue  # a split screen's edit pane is not the list
         rid = n.attrib.get("resource-id") or ""
         label = rid or (n.attrib.get("class") or "scrollable")
         if prefer_id and rid == prefer_id:
@@ -601,13 +609,14 @@ def iter_list(dev: Device, rect: Rect, cid: str | None, state: dict, text_max: i
 
 
 def read_full_list(
-    dev: Device, prefer_id: str | None = None, return_to_top: bool = True, text_max: int = ROW_TEXT_MAX
+    dev: Device, prefer_id: str | None = None, return_to_top: bool = True, text_max: int = ROW_TEXT_MAX,
+    exclude_forms: bool = False,
 ) -> ReadResult:
     try:
         root = ET.fromstring(dev.dump_xml())
     except ET.ParseError as e:
         return ReadResult(error=f"cannot parse the UI tree ({e})")
-    cont = find_main_container(root, dev.screen_w * dev.screen_h, prefer_id)
+    cont = find_main_container(root, dev.screen_w * dev.screen_h, prefer_id, exclude_forms=exclude_forms)
     if cont is None:
         return ReadResult(error="no scrollable list or document on this screen (nothing to read)")
     if dev.home_package and cont.node.attrib.get("package") == dev.home_package:
