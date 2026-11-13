@@ -1,5 +1,6 @@
 """Unit tests of the deterministic P2 helpers (no device, no LLM)."""
 
+import asyncio
 from types import SimpleNamespace
 
 import pytest
@@ -938,3 +939,70 @@ def test_stop_screenrecord_signals_only_our_own_recorder():
     asyncio.run(p2_stop_screenrecord(Dev(), None, timeout_s=0.1, path="/sdcard/screen_recording_0.mp4"))
     assert cmds and "pgrep -f /sdcard/screen_recording_0.mp4" in cmds[0]
     assert not any("pkill" in c for c in cmds)
+
+
+# --- D3: fixed checklist lines for goals that copy records from a named source file or image ---
+from minitap.mobile_use.robustness.checklist import (  # noqa: E402
+    SOURCE_COPY_REQUIREMENTS,
+    ensure_goal_checklist,
+    is_source_copy_goal,
+)
+
+
+@pytest.mark.parametrize(
+    "goal",
+    [
+        "Add the entries from list.jpg in the photo viewer to the budget app.",
+        "Go through the purchases in my_list.txt in the editor. Log the flagged purchases in the budget app.",
+        "Add the items from items.txt in the editor that cost 5 to the shop app.",
+        "Import the contacts from people.csv into the address book.",
+    ],
+)
+def test_source_copy_trigger_matches(goal):
+    assert is_source_copy_goal(goal)
+
+
+@pytest.mark.parametrize(
+    "goal",
+    [
+        'Record a clip and save it with name "brief.m4a".',
+        "Create a new note in the editor named notes_1.md with the following text: hello.",
+        "Move the file film.mp4 from DCIM to Movies.",
+        "In the photo viewer, copy photo_1.jpg in DCIM and save a copy with the same name in Download.",
+        "Delete the file song.mp3 from the Ringtones folder.",
+        "How many entries do I have due next week?",
+        "Add the following entries into the budget app: Lunch, 12.",
+    ],
+)
+def test_source_copy_trigger_ignores_other_goals(goal):
+    assert not is_source_copy_goal(goal)
+
+
+def _checklist_ctx(enabled=True):
+    abl = SimpleNamespace(p2_checklist=enabled)
+    return SimpleNamespace(
+        get_ablation_config=lambda: abl,
+        p2_goal_checklist=None,
+        device=SimpleNamespace(mobile_platform=SimpleNamespace(value="android")),
+    )
+
+
+def test_source_copy_lines_appended_even_if_llm_fails(monkeypatch):
+    import minitap.mobile_use.robustness.checklist as cl
+
+    class _Llm:
+        def with_structured_output(self, _schema):
+            return self
+
+    async def boom(**_):
+        raise RuntimeError("no llm")
+
+    monkeypatch.setattr(cl, "get_llm", lambda **_: _Llm())
+    monkeypatch.setattr(cl, "with_fallback", boom)
+    monkeypatch.setattr(cl, "get_runtime", lambda: None)
+    ctx = _checklist_ctx()
+    items = asyncio.run(ensure_goal_checklist(ctx, "Add the entries from list.jpg in the viewer to the app."))
+    assert items == SOURCE_COPY_REQUIREMENTS
+    ctx2 = _checklist_ctx()
+    assert asyncio.run(ensure_goal_checklist(ctx2, "Add an entry Lunch 12 to the app.")) == []
+    assert asyncio.run(ensure_goal_checklist(_checklist_ctx(False), "Add the entries from a.jpg to b.")) is None

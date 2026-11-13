@@ -6,6 +6,7 @@ the Cortex and the goal verifier, which judges every requirement separately.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from jinja2 import Template
@@ -21,6 +22,31 @@ logger = get_logger(__name__)
 
 class ChecklistOutput(BaseModel):
     requirements: list[str] = Field(description="Numbered atomic requirements, verbatim values.")
+
+
+# D3: fixed requirements for goals that copy records into an app from a named source file or image.
+# The checklist LLM sometimes dropped the marker rule or turned the goal's word for the records into a
+# filter (both rules exist in the prompts); these lines are appended deterministically instead.
+# Trigger (goal wording only): a copy verb (add / log / enter / import / copy) and a source named as a
+# file with a document or image extension, introduced by "from" or "in".
+_SOURCE_FILE = r"\b(?:from|in)\s+(?:the\s+)?[\w.-]+\.(?:txt|md|csv|jpg|jpeg|png)\b"
+_COPY_VERB = r"\b(?:add|log|enter|import|copy)\b"
+_SOURCE_COPY_RE = re.compile(
+    rf"{_COPY_VERB}.*?{_SOURCE_FILE}|{_SOURCE_FILE}.*?{_COPY_VERB}", re.IGNORECASE | re.DOTALL
+)
+SOURCE_COPY_REQUIREMENTS = [
+    "Every record in the named source file or image is in scope. The goal's word for the records "
+    '(e.g. "the entries", "the items", "the purchases") names the kind of record, not a filter: a '
+    "record's own category or type value never excludes it. Only a condition the goal states in words "
+    '(e.g. "the flagged ones", "the ones over 50") selects records.',
+    "If the goal selects records by a property that the source writes as a tag or marker word on each "
+    'record (e.g. a note ending in "Flagged."), that marker is left out of the copied fields; every '
+    "other field is copied exactly as in the source.",
+]
+
+
+def is_source_copy_goal(goal: str) -> bool:
+    return bool(_SOURCE_COPY_RE.search(goal or ""))
 
 
 def render_checklist(items: list[str] | None) -> str | None:
@@ -51,6 +77,8 @@ async def ensure_goal_checklist(ctx, goal: str) -> list[str] | None:
     except Exception as e:  # never block the task on the checklist
         logger.warning(f"goal checklist failed: {e}")
         items = []
+    if is_source_copy_goal(goal):
+        items = items + SOURCE_COPY_REQUIREMENTS
     ctx.p2_goal_checklist = items
     runtime = get_runtime()
     if runtime is not None:
