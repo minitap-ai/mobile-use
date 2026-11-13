@@ -296,7 +296,17 @@ async def _run_text_match_check(
             marked_as_error=failed,
         )
     logger.info(f"Text match check: {check.verdict} (expected={text!r}, actual={actual!r})")
-    return check.as_feedback(), failed
+    feedback = check.as_feedback()
+    _abl = getattr(ctx, "get_ablation_config", None)
+    _p2_fixes = bool(_abl and getattr(_abl(), "p2_tool_fixes", False))
+    if _p2_fixes and method == "focused_element" and element is not None:
+        # P2 F7: typed by coordinates: say WHICH field received the text, so a field that changed
+        # under the finger (a dialog that closed, focus that moved) is visible to the agent.
+        rid = element.get("resource-id") or element.get("resourceId") or ""
+        hint = element.get("hint") or element.get("hintText") or element.get("content-desc") or ""
+        name = " ".join(x for x in (repr(rid) if rid else "", f"hint {hint!r}" if hint else "") if x) or "unnamed field"
+        feedback += f" (read back from the focused field {name}: check it is the field you meant)"
+    return feedback, failed
 
 
 def _on_input_success(text_to_type, text_from_resource_id, target_resource_id, focus_method):
