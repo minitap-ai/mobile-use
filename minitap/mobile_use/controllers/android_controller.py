@@ -48,13 +48,14 @@ def resolve_launcher_component(device, package: str) -> str | None:
     return None
 
 
-async def p2_stop_screenrecord(device, process, timeout_s: float = 15.0) -> None:
-    """P2 F7: SIGINT the remote screenrecord, wait for it to finish its file, then reap the
-    local adb client (it exits by itself once the remote command ends)."""
-    device.shell("pkill -2 screenrecord || true")
+async def p2_stop_screenrecord(device, process, timeout_s: float = 15.0, path: str | None = None) -> None:
+    """P2 F7: SIGINT OUR remote screenrecord (the one writing `path`; never other recorders on
+    the device), wait for it to finish its file, then reap the local adb client."""
+    sel = f"pgrep -f {path}" if path else "pidof screenrecord"
+    device.shell(f"for p in $({sel}); do kill -2 $p; done; true")
     deadline = time.time() + timeout_s
     while time.time() < deadline:
-        if not str(device.shell("pidof screenrecord || true")).strip():
+        if not str(device.shell(f"{sel} || true")).strip():
             break
         await asyncio.sleep(0.5)
     if process is not None:
@@ -507,7 +508,7 @@ class AndroidDeviceController(MobileDeviceController):
                 # P2 F7: stop screenrecord with SIGINT FIRST and wait until it has exited, so it
                 # writes the MP4 index (moov atom). Killing the local adb client first killed the
                 # remote screenrecord mid-file: "moov atom not found", then provider 400s.
-                await p2_stop_screenrecord(self.device, process)
+                await p2_stop_screenrecord(self.device, process, path=session.android_device_path)
             elif process is not None:
                 try:
                     process.terminate()
@@ -577,6 +578,13 @@ class AndroidDeviceController(MobileDeviceController):
 
         except Exception as e:
             logger.error(f"Failed to stop Android recording: {e}")
+            if getattr(self, "p2_tool_fixes", False):
+                # P2 F7: never leave our recordings on the device (they get indexed as user videos)
+                try:
+                    for i in range(session.android_segment_index + 1):
+                        self.device.shell(f"rm -f /sdcard/screen_recording_{i}.mp4")
+                except Exception:
+                    pass
             remove_active_session(self.device_id)
             return VideoRecordingResult(
                 success=False,

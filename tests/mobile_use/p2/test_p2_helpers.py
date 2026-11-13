@@ -224,7 +224,7 @@ def test_screenrecord_is_stopped_before_the_local_client():
             calls.append("kill")
 
     asyncio.run(p2_stop_screenrecord(Dev(), Proc(), timeout_s=5))
-    assert calls[0].startswith("pkill -2 screenrecord")
+    assert "kill -2" in calls[0] and "pkill" not in calls[0]
     assert calls.index("local_wait") > max(i for i, c in enumerate(calls) if c.startswith("pidof"))
     assert "kill" not in calls
 
@@ -921,3 +921,20 @@ def test_misshapen_bounds_fall_back_to_the_named_index():
     assert res.corrected and res.bounds.y == 296 and res.bounds.height == 254
     ok = ElementBounds(x=0, y=550, width=1080, height=254)  # a real row's rect: trusted as given
     assert not resolve_target_bounds(rows, ok, "a:id/conv", 0, None, None).corrected
+
+
+def test_stop_screenrecord_signals_only_our_own_recorder():
+    import asyncio
+
+    from minitap.mobile_use.controllers.android_controller import p2_stop_screenrecord
+
+    cmds = []
+
+    class Dev:
+        def shell(self, c):
+            cmds.append(c)
+            return ""
+
+    asyncio.run(p2_stop_screenrecord(Dev(), None, timeout_s=0.1, path="/sdcard/screen_recording_0.mp4"))
+    assert cmds and "pgrep -f /sdcard/screen_recording_0.mp4" in cmds[0]
+    assert not any("pkill" in c for c in cmds)
