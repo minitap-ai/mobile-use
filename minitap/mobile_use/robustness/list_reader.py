@@ -165,6 +165,27 @@ def find_main_container(root: ET.Element, screen_area: int, prefer_id: str | Non
             continue
         if best is None or rect.area > best.rect.area:
             best = Container(n, rect, label)
+    # A scrollable wrapper (e.g. a ScrollView holding an app bar and the list) contains the real
+    # list: prefer the innermost scrollable list that covers most of it.
+    while best is not None:
+        inner = None
+        for m in best.node.iter():
+            if m is best.node or not _is_scrollable(m):
+                continue
+            mcls = (m.attrib.get("class") or "").lower()
+            if any(h in mcls for h in NON_SCROLL_CLASS_HINTS):
+                continue
+            msafe = any(mcls.endswith(c) for c in SAFE_SCROLL_CLASSES) or (
+                mcls == "android.view.view" and _vertical_stack(m)
+            )
+            mr = parse_bounds(m.attrib.get("bounds"))
+            if not msafe or mr is None or mr.area < 0.5 * best.rect.area:
+                continue
+            if inner is None or mr.area > inner.rect.area:
+                inner = Container(m, mr, m.attrib.get("resource-id") or (m.attrib.get("class") or "scrollable"))
+        if inner is None:
+            break
+        best = inner
     return best
 
 
@@ -191,6 +212,12 @@ def _iou(a: Rect, b: Rect) -> float:
 def locate_container(root: ET.Element, container_rect: Rect, container_id: str | None):
     """The list container on a new dump: same resource-id or same bounds, else (no id, bounds
     moved, e.g. a collapsing app bar) the scrollable node overlapping the old area the most."""
+    if container_id:  # the same container by id first: bounds can coincide with a parent's
+        for n in root.iter():
+            if _is_scrollable(n) and (n.attrib.get("resource-id") or "") == container_id:
+                r = parse_bounds(n.attrib.get("bounds"))
+                if r is not None:
+                    return n, r
     best, best_iou = None, 0.5
     for n in root.iter():
         if not _is_scrollable(n):
@@ -198,8 +225,7 @@ def locate_container(root: ET.Element, container_rect: Rect, container_id: str |
         r = parse_bounds(n.attrib.get("bounds"))
         if r is None:
             continue
-        rid = n.attrib.get("resource-id") or ""
-        if r == container_rect or (container_id and rid == container_id):
+        if r == container_rect and not (container_id and (n.attrib.get("resource-id") or "")):
             return n, r
         iou = _iou(r, container_rect)
         if iou > best_iou:
@@ -410,6 +436,9 @@ class Device:
     # A drag that does NOT fling (finger held still before release): the content moves by the
     # drag distance only. Falls back to a slow swipe.
     drag: Callable[[int, int, int], None] | None = None
+    # Package of the home screen (launcher): its workspace reports itself as a scrollable, but
+    # dragging it opens the app drawer or the notification shade. Never read it.
+    home_package: str | None = None
 
 
 def _swipe_in(dev: Device, rect: Rect, direction: str):
@@ -571,6 +600,8 @@ def read_full_list(
     cont = find_main_container(root, dev.screen_w * dev.screen_h, prefer_id)
     if cont is None:
         return ReadResult(error="no scrollable list or document on this screen (nothing to read)")
+    if dev.home_package and cont.node.attrib.get("package") == dev.home_package:
+        return ReadResult(error="this is the home screen, not a list (nothing to read; open the app first)")
     rect, cid = cont.rect, (cont.node.attrib.get("resource-id") or None)
     state: dict = {}
     rows = [v.row.text for v in iter_list(dev, rect, cid, state, text_max)]
@@ -612,7 +643,18 @@ def android_device(ctx) -> Device:
         if "__rc=0" not in out:  # motionevent unsupported: slow swipe instead
             device.shell(f"input touchscreen swipe {x} {y_from} {x} {y_to} 1500")
 
+    home = None
+    try:
+        out = str(device.shell(
+            "cmd package resolve-activity --brief -a android.intent.action.MAIN "
+            "-c android.intent.category.HOME"
+        )).strip().splitlines()
+        home = out[-1].split("/")[0].strip() if out and "/" in out[-1] else None
+    except Exception:
+        home = None
+
     return Device(
+        home_package=home,
         dump_xml=lambda: ui.get_hierarchy(),
         swipe=swipe,
         screen_w=ctx.device.device_width,

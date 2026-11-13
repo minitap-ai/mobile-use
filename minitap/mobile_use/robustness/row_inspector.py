@@ -101,6 +101,8 @@ def inspect_rows(
     cont = find_main_container(root, dev.screen_w * dev.screen_h)
     if cont is None:
         return Inspection(error="no scrollable list on this screen")
+    if dev.home_package and cont.node.attrib.get("package") == dev.home_package:
+        return Inspection(error="this is the home screen, not a list (open the app first)")
     rect, cid = cont.rect, (cont.node.attrib.get("resource-id") or None)
     needle = (match or "").lower()
     want = (detail_contains or "").lower() or None

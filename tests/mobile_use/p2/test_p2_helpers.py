@@ -756,3 +756,33 @@ def test_inspect_rows_groups_cover_every_opened_row_even_with_a_filter():
     assert res.rows == [] and res.checked == 3
     assert res.groups() == [[1, 2]]
     assert "row 1 = row 2" in res.render()
+
+
+def test_reader_refuses_the_home_screen():
+    from minitap.mobile_use.robustness.list_reader import Device, read_full_list
+
+    xml = ('<hierarchy><node class="android.widget.FrameLayout" package="com.example.launcher" bounds="[0,0][720,1600]">'
+           '<node class="android.widget.ScrollView" scrollable="true" package="com.example.launcher" resource-id="com.example.launcher:id/workspace" bounds="[0,0][720,1600]">'
+           + "".join(f'<node class="android.widget.TextView" package="com.example.launcher" text="App {i}" bounds="[0,{100+i*200}][720,{280+i*200}]"/>' for i in range(5))
+           + '</node></node></hierarchy>')
+    swipes = []
+    dev = Device(lambda: xml, lambda *a: swipes.append(a), 720, 1600, settle_s=0, home_package="com.example.launcher")
+    res = read_full_list(dev)
+    assert res.error and "home screen" in res.error and swipes == []
+
+
+def test_nested_scrollables_prefer_the_inner_list_and_relocate_by_id():
+    import xml.etree.ElementTree as ET
+
+    from minitap.mobile_use.robustness import list_reader as lr
+
+    rows = "".join(f'<node class="android.widget.LinearLayout" bounds="[0,{200+i*180}][720,{380+i*180}]"><node class="android.widget.TextView" text="Task {i}" bounds="[10,{200+i*180}][700,{380+i*180}]"/></node>' for i in range(7))
+    xml = ('<hierarchy><node class="android.widget.ScrollView" scrollable="true" resource-id="app:id/coordinator" bounds="[0,94][720,1574]">'
+           '<node class="android.widget.TextView" text="Toolbar" bounds="[0,94][720,192]"/>'
+           f'<node class="androidx.recyclerview.widget.RecyclerView" scrollable="true" resource-id="app:id/list" bounds="[0,192][720,1574]">{rows}</node>'
+           '</node></hierarchy>')
+    root = ET.fromstring(xml)
+    assert lr.find_main_container(root, 720 * 1600).label == "app:id/list"
+    collapsed = ET.fromstring(xml.replace("[0,192][720,1574]", "[0,94][720,1574]"))
+    n, r = lr.locate_container(collapsed, lr.Rect(0, 94, 720, 1574), "app:id/list")
+    assert n.attrib["resource-id"] == "app:id/list"
