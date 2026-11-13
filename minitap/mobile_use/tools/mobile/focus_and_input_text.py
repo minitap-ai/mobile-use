@@ -178,7 +178,20 @@ def get_focus_and_input_text_tool(ctx: MobileUseContext) -> BaseTool:
                 text = restored
 
         # Step 3: Type the text
-        result = await _controller_input_text(ctx=ctx, text=text)
+        trailing_enters = 0
+        if ablation_config.p2_tool_fixes and text.endswith("\n") and text.strip("\n"):
+            # P2 F7: a trailing newline typed into a single-line field (a search box) becomes a
+            # space instead of submitting. Type the text, then press Enter once per newline: it
+            # submits single-line fields and adds the line break in multi-line ones.
+            body = text.rstrip("\n")
+            trailing_enters = len(text) - len(body)
+            result = await _controller_input_text(ctx=ctx, text=body)
+            if result.ok:
+                controller = create_device_controller(ctx)
+                for _ in range(trailing_enters):
+                    await controller.press_enter()
+        else:
+            result = await _controller_input_text(ctx=ctx, text=text)
         status: Literal["success", "error"] = "success" if result.ok else "error"
 
         text_input_content = ""
