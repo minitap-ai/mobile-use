@@ -338,6 +338,20 @@ async def _p2_call(self, state: State):
             out.missing = gate
             if runtime is not None:
                 runtime.event("p2_delete_gate", fired=True)
+    if out.satisfied and ablation.p2_checklist:
+        from minitap.mobile_use.robustness.delete_gate import add_delete_gate, presence_gate
+
+        for name, check in (
+            ("p2_delete_presence_gate", lambda: presence_gate(ctx, state.initial_goal, full_read)),
+            ("p2_add_delete_gate", lambda: add_delete_gate(ctx, state.initial_goal)),
+        ):
+            gate = check()
+            if gate:
+                out.satisfied = False
+                out.missing = gate
+                if runtime is not None:
+                    runtime.event(name, fired=True)
+                break
 
     if runtime is not None:
         runtime.event(

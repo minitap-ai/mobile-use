@@ -1085,3 +1085,52 @@ def test_action_log_marks_delete_actions():
     ]
     record_actions(ctx, SimpleNamespace(executor_messages=msgs))
     assert ctx.p2_delete_seen is True
+
+
+# --- D4 candidates (offline; not on the D3 pin) ---
+from minitap.mobile_use.robustness.delete_gate import (  # noqa: E402
+    add_delete_gate,
+    listed_delete_names,
+    names_still_listed,
+    presence_gate,
+)
+
+_READ = (
+    "Read 4 rows from list in 2 page(s); END OF LIST REACHED (this is the complete content).\n"
+    "1. Pan-Fried Fish with Rice | A quick dinner\n"
+    "2. Pan-Fried Fish with Rice Bowl | Lunch\n"
+    "3. Green Salad | Fresh\n"
+    '4. Fried "Rice" | Side'
+)
+
+
+def test_listed_delete_names():
+    g = 'Delete the following entries from the app: Pan-Fried Fish with Rice, Tofu Bowl, Fried "Rice".'
+    assert listed_delete_names(g) == ["Pan-Fried Fish with Rice", "Tofu Bowl", 'Fried "Rice"']
+    assert listed_delete_names("Delete the note named a.") == []
+    assert listed_delete_names("Add the following entries: A, B.") == []
+
+
+def test_names_still_listed_matches_whole_segments_only():
+    g = 'Delete the following entries from the app: Pan-Fried Fish with Rice, Tofu Bowl, Fried "Rice".'
+    assert names_still_listed(g, _READ) == ["Pan-Fried Fish with Rice", 'Fried "Rice"']
+    g2 = "Delete the following entries from the app: Pan-Fried Fish, Tofu Bowl."
+    assert names_still_listed(g2, _READ) == []  # a prefix of a longer title is a different item
+    assert names_still_listed(g, None) == []
+
+
+def test_presence_gate_once():
+    ctx = SimpleNamespace(p2_delete_presence_used=False)
+    g = "Delete the following entries from the app: Green Salad."
+    msg = presence_gate(ctx, g, _READ)
+    assert msg and '"Green Salad"' in msg
+    assert presence_gate(ctx, g, _READ) is None
+
+
+def test_add_delete_gate_scope():
+    src = "Add the entries from list.jpg in the viewer to the budget app."
+    ctx = SimpleNamespace(p2_add_delete_gate_used=False, p2_delete_seen=True)
+    assert add_delete_gate(ctx, src)
+    assert add_delete_gate(ctx, src) is None
+    assert add_delete_gate(SimpleNamespace(p2_add_delete_gate_used=False, p2_delete_seen=False), src) is None
+    assert add_delete_gate(SimpleNamespace(p2_add_delete_gate_used=False, p2_delete_seen=True), "Add a song to the playlist.") is None

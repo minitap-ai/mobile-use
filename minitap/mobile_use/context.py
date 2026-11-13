@@ -122,6 +122,9 @@ class MobileUseContext(BaseModel):
     # verifier's one-time gate for named-delete goals has fired
     p2_delete_seen: bool = False
     p2_delete_gate_used: bool = False
+    # D4 candidates: one-time presence gate for listed deletes; add-goal delete gate
+    p2_delete_presence_used: bool = False
+    p2_add_delete_gate_used: bool = False
 
     def get_adb_client(self) -> AdbClient:
         if self.adb_client is None:
