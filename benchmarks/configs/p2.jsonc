@@ -14,5 +14,10 @@
     "p2_tool_fixes": true,
     "p2_executor_completion": true,
     "p2_step_screenshots": true
+  },
+  // Amendment 14 (2026-11-13): our own infrastructure limit raised for version B only; no
+  // device-action cap. Version A keeps 400 (the matrix timeout_s goes 1800 -> 3600 in the specs).
+  "agent": {
+    "max_steps": 1500
   }
 }

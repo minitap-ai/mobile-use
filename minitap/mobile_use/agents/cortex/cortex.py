@@ -49,6 +49,7 @@ class CortexNode:
         on_failure=lambda _: logger.error("Cortex Agent"),
     )
     async def __call__(self, state: State):
+        self.ctx.p2_cortex_turns += 1  # P2: replan guard bookkeeping (no effect in version A)
         # Get ablation configuration
         ablation_config = self.ctx.get_ablation_config()
         use_vision = ablation_config.use_vision

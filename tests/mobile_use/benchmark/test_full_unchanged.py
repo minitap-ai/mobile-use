@@ -74,6 +74,8 @@ P2_CHANGED = {
     "minitap/mobile_use/config.py",
     "minitap/mobile_use/context.py",
     "minitap/mobile_use/graph/graph.py",
+    "minitap/mobile_use/agents/orchestrator/orchestrator.py",
+    "minitap/mobile_use/tools/utils.py",
     "minitap/mobile_use/agents/contextor/contextor.py",
     "minitap/mobile_use/agents/cortex/cortex.md",
     "minitap/mobile_use/agents/cortex/cortex.py",

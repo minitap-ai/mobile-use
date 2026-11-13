@@ -96,6 +96,23 @@ async def move_cursor_to_end_if_bounds(
     bottom-right area of the focused element (if bounds are available).
     """
     if target.resource_id:
+        if ctx.get_ablation_config().p2_tool_fixes:
+            # P2 F7: the field moves when the keyboard opens; bounds from the stale hierarchy put
+            # this tap on a keyboard key (stray characters in the typed text). Use the live tree.
+            try:
+                from minitap.mobile_use.controllers.unified_controller import UnifiedMobileController
+
+                live = await UnifiedMobileController(ctx).get_ui_elements()
+                elt = find_element_by_resource_id(
+                    ui_hierarchy=live or [],
+                    resource_id=target.resource_id,
+                    index=target.resource_id_index,
+                    legacy_v1=legacy_v1(ctx),
+                ) or None
+                if elt is None:
+                    return None  # field not on screen any more: no blind tap
+            except Exception:
+                elt = None
         if not elt:
             elt = find_element_by_resource_id(
                 ui_hierarchy=state.latest_ui_hierarchy or [],

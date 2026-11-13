@@ -104,6 +104,7 @@ class PlannerNode:
                     completion_reason=None,
                 ),
             )
+        self.ctx.p2_plan_turn = self.ctx.p2_cortex_turns  # P2 replan guard
         if needs_replan and self.ctx.get_ablation_config().p2_no_redo:
             subgoals_plan = keep_completed_subgoals(state.subgoal_plan, subgoals_plan)  # P2 F6
         logger.info("📜 Generated plan:")

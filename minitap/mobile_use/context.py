@@ -111,6 +111,9 @@ class MobileUseContext(BaseModel):
     p2_sort_fact: str | None = None
     # P2 F6: the step-budget checkpoint fires once per task
     p2_budget_checkpoint_done: bool = False
+    # P2: Cortex turns so far, and the turn at which the Planner last produced a plan
+    p2_cortex_turns: int = 0
+    p2_plan_turn: int = -1
     # P2 F3: executed tool calls (tool, target, outcome) for the goal verifier
     p2_action_log: list[str] | None = None
     p2_action_ids: set[str] | None = None

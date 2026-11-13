@@ -146,7 +146,9 @@ def test_p2_config_enables_every_flag_on_top_of_full():
     full = load_benchmark_config(CONFIGS / "full.jsonc").resolved
     p2 = load_benchmark_config(CONFIGS / "p2.jsonc").resolved
     assert all(v for k, v in p2["ablation"].items() if k.startswith("p2_"))
+    assert full["agent"]["max_steps"] == 400 and p2["agent"]["max_steps"] == 1500  # Amendment 14
     for d in (full, p2):
         d["ablation"] = {k: v for k, v in d["ablation"].items() if not k.startswith("p2_")}
         d.pop("name"), d.pop("description")
-    assert full == p2  # same models, routing, agent settings: only the p2 flags differ
+        d["agent"].pop("max_steps")
+    assert full == p2  # same models, routing, agent settings: only the p2 flags + step limit differ

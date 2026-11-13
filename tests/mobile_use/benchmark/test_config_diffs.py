@@ -82,6 +82,7 @@ EXPECTED: dict[str, set[str] | str] = {
         "ablation.p2_tool_fixes",
         "ablation.p2_executor_completion",
         "ablation.p2_step_screenshots",
+        "agent.max_steps",  # Amendment 14: version B recursion limit 1500 (A keeps 400)
     },
     # routing / model rows
     "full-all-frontier": "llm-only",

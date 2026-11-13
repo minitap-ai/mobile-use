@@ -84,6 +84,19 @@ class OrchestratorNode:
             main_call=lambda: invoke_llm_with_timeout_message(llm.ainvoke(messages)),
             fallback_call=lambda: invoke_llm_with_timeout_message(llm_fallback.ainvoke(messages)),
         )  # type: ignore
+        if (
+            response.needs_replaning
+            and self.ctx.get_ablation_config().p2_no_redo
+            and self.ctx.p2_cortex_turns - self.ctx.p2_plan_turn < 2
+        ):
+            # P2 F6: a fresh plan gets at least one full Cortex turn before another replan (after a
+            # verifier rejection the old "REPLANNING" thoughts made the plan restart every turn).
+            from minitap.mobile_use.benchmark.runtime import get_runtime
+
+            rt = get_runtime()
+            if rt is not None:
+                rt.event("p2_replan_suppressed", reason=(response.reason or "")[:200])
+            response.needs_replaning = False
         if response.needs_replaning:
             thoughts = [response.reason]
             state.subgoal_plan = fail_current_subgoal(state.subgoal_plan)
