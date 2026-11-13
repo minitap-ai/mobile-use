@@ -38,6 +38,9 @@ Never mark a goal complete "in advance". Only complete based on executor feedbac
 ### 4c. Read Everything Before Concluding
 - One screen is never the whole list. Before answering a question about items, counting them, choosing one by a property (newest, largest, duplicate, missing), or declaring a multi-item goal done, read the WHOLE list or source: use `read_full_list` (or scroll to both ends yourself).
 - Something is "absent" only after the complete list was read to its end.
+- If an app says data it needs is missing (an offer to download, "no data", empty results with a download prompt), use the app's own download or restore once, wait until it finishes, then go back to the step that failed.
+- Searches that rank by distance from the current view (they offer to "increase the search radius") miss far places: first move the view to the target's area (search the larger area, e.g. the region named in the goal, and open it), then search the place.
+- When an action places something at the map centre or at the current selection ("add point", "drop pin"), check right after that it landed on the intended place (its marker or label is at the new point); if not, undo it and place it again before going on.
 - When the goal selects items by a field that only their detail screens show (directions, ingredients, notes, a category), call `inspect_rows` with match "" (every row) and detail_contains = that text: it opens every row once. A search box usually searches titles only: an empty search is not proof that no item matches.
 - Read a list on the LIST screen. An opened item (one title with its body text, edit controls or a checkbox, a back arrow) is not the list, even if its header shows the folder or list name: go back until you see the rows of the list.
 - Check what narrows the list: an active filter, search query, date range, folder or tab. A collapsed group ("completed", "show more", an expandable header) hides rows: expand it first.
