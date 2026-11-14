@@ -65,6 +65,18 @@ def is_bounded_goal(goal: str) -> bool:
     return bool(_BOUND_RE.search(goal or ""))
 
 
+# D6: question goals about completed / incomplete items (the verifier must judge the screen the agents left,
+# not the top of the list). Trigger (goal wording only): a question whose wording asks for completed or
+# incomplete items.
+_COMPLETION_Q_RE = re.compile(
+    r"^\s*(?:which|what|how many|list)\b[^?]*\b(?:completed|incomplete|uncompleted|not completed)\b", re.IGNORECASE
+)
+
+
+def is_completion_question(goal: str) -> bool:
+    return bool(_COMPLETION_Q_RE.search(goal or ""))
+
+
 def is_source_copy_goal(goal: str) -> bool:
     return bool(_SOURCE_COPY_RE.search(goal or ""))
 

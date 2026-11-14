@@ -1202,3 +1202,45 @@ def test_duplicate_delete_gate():
     assert duplicate_delete_refusal(ctx, "Delete the following entries: A.", "tap(text='Delete')") is None
     ctx.p2_inspect_rows_runs = 1
     assert duplicate_delete_refusal(ctx, goal, "tap(text='Delete')") is None
+
+
+# --- D6: inspect_rows name-only matches ---
+from minitap.mobile_use.robustness.row_inspector import Inspection  # noqa: E402
+
+
+def test_inspection_name_only_render():
+    ins = Inspection(detail_contains="mountain biking", reached_end=True, checked=3, total_seen=3)
+    ins.name_only.append({"pos": 2, "row": "Mountain Biking Fun | Friday", "details": ["Mountain Biking Fun", "12 km"]})
+    out = ins.render()
+    assert "NAME-ONLY matches, NOT counted" in out and "row 2" in out
+    assert "0 field matches over the whole list" in out
+    ins.rows.append({"pos": 1, "row": "Trail | Today", "details": ["Category: mountain biking"]})
+    assert "0 field matches" not in ins.render()
+
+
+# --- D6: completion-question trigger and the single-photo shutter gate ---
+from minitap.mobile_use.robustness.capture_gate import shutter_refusal  # noqa: E402
+from minitap.mobile_use.robustness.checklist import is_completion_question  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "goal, hit",
+    [
+        ("Which tasks have I completed for October 14 2023 in the planner?", True),
+        ("What incomplete tasks do I have on October 15 2023?", True),
+        ("Mark the task as completed.", False),  # not a question
+        ("How many tasks do I have due next week?", False),
+    ],
+)
+def test_completion_question_trigger(goal, hit):
+    assert is_completion_question(goal) is hit
+
+
+def test_shutter_gate_refuses_once():
+    ctx = SimpleNamespace(p2_shutter_taps=0, p2_shutter_refused=False)
+    g, shutter = "Take one photo.", "tap(content_desc='Shutter')"
+    assert shutter_refusal(ctx, g, shutter) is None  # first capture
+    assert shutter_refusal(ctx, g, shutter)  # second: refused once
+    assert shutter_refusal(ctx, g, shutter) is None  # asked again: allowed
+    assert shutter_refusal(SimpleNamespace(p2_shutter_taps=5, p2_shutter_refused=False), "Take a video.", shutter) is None
+    assert shutter_refusal(SimpleNamespace(p2_shutter_taps=5, p2_shutter_refused=False), g, "tap(text='Gallery')") is None

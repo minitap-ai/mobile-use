@@ -68,6 +68,15 @@ def get_tap_tool(ctx: MobileUseContext) -> BaseTool:
                     runtime = get_runtime()
                     if runtime is not None:
                         runtime.event("p2_duplicate_delete_refused")
+            if not refusal:  # D6: one shutter tap for a single-photo goal (one refusal, then allowed)
+                from minitap.mobile_use.robustness.action_log import describe
+                from minitap.mobile_use.robustness.capture_gate import shutter_refusal
+
+                refusal = shutter_refusal(ctx, state.initial_goal, describe("tap", {"target": target.model_dump()}))
+                if refusal:
+                    runtime = get_runtime()
+                    if runtime is not None:
+                        runtime.event("p2_shutter_refused")
         if refusal:
             tool_message = ToolMessage(
                 tool_call_id=tool_call_id,

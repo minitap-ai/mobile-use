@@ -45,6 +45,7 @@ class Inspection:
     detail_contains: str | None = None
     reached_end: bool = False
     discarded: list[int] = field(default_factory=list)  # rows whose detail asked to discard on BACK
+    name_only: list[dict] = field(default_factory=list)  # D6: needle only in the row's own name, not a field
 
     def groups(self) -> list[list[int]]:
         by: dict[tuple, list[int]] = {}
@@ -74,6 +75,17 @@ class Inspection:
                 "(Text match only: an attribute shown as an icon is not seen, and a match inside a "
                 "title or name is not a field value. 0 reported does not prove there is none.)"
             )
+        if self.name_only:
+            out.append(
+                "NAME-ONLY matches, NOT counted (the text appears only as the row's own title/name repeated "
+                "on its detail screen, not as a field value): "
+                + "; ".join(f"row {r['pos']} [{r['row'][:60]}]" for r in self.name_only)
+            )
+            if not self.rows and self.reached_end:
+                out.append(
+                    f"0 field matches over the whole list: {self.detail_contains!r} is not exposed as detail text "
+                    "(it may be shown only as an icon). Use the app's own search or filter for it instead."
+                )
         groups = self.groups()
         if groups:
             out.append(
@@ -164,8 +176,18 @@ def inspect_rows(
         result.checked += 1
         rec = {"pos": visit.index, "row": row.text, "details": details}
         result.opened.append(rec)
-        if want is None or any(want in d.lower() for d in details):
+        if want is None:
             result.rows.append(rec)
+        elif any(want in d.lower() for d in details):
+            # D6: a match that occurs only in detail lines equal to a segment of the row's own card is the
+            # record's name repeated on its detail screen, not a field value (observed: an icon-only category
+            # "matched" one record because its title contained the category word; the true matches were missed).
+            card = {seg.strip().lower() for seg in row.text.split(" | ") if seg.strip()}
+            hits = [d for d in details if want in d.lower()]
+            if all(h.strip().lower() in card for h in hits):
+                result.name_only.append(rec)
+            else:
+                result.rows.append(rec)
         back = page_rows(ET.fromstring(dev.dump_xml()), rect, cid)
         if not back:
             result.stopped = "BACK did not return to the list"

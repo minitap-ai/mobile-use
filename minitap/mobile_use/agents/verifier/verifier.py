@@ -226,6 +226,19 @@ async def _p2_call(self, state: State):
             runtime.event("goal_verification", verdict="skipped_limit")
         return {}
 
+    # D6: for questions about completed / incomplete items, capture the screen BEFORE the full list read.
+    # The full read returns the list to its top, so the verifier's screenshot showed only the top of the list
+    # while completed rows (moved to the bottom by the app) sat below the fold; it then judged rows it could
+    # not see as "empty checkboxes" (held-out seeds). Trigger (goal wording only): see completion_question.
+    from minitap.mobile_use.robustness.checklist import is_completion_question
+
+    pre_screen = None
+    if ablation.p2_coverage and android and is_completion_question(state.initial_goal):
+        try:
+            pre_screen = await create_device_controller(ctx).get_screen_data()
+        except Exception:
+            pre_screen = None
+
     full_read = None
     if ablation.p2_coverage and android:
         try:
@@ -253,7 +266,7 @@ async def _p2_call(self, state: State):
         action_log = render_action_log(ctx)
     use_vision = ablation.use_vision
     controller = create_device_controller(ctx)
-    screen = await controller.get_screen_data()
+    screen = pre_screen if pre_screen is not None else await controller.get_screen_data()
     system = Template(
         Path(__file__).parent.joinpath("verifier_p2.md").read_text(encoding="utf-8")
     ).render(
