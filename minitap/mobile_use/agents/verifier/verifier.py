@@ -3,6 +3,7 @@ without evidence). Task-agnostic: the goal text is the only task input."""
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
@@ -342,6 +343,53 @@ async def _p2_call(self, state: State):
         out.satisfied = False
         if not out.missing:
             out.missing = "; ".join(c.requirement for c in out.checks if not c.met)
+    if (
+        not out.satisfied
+        and ablation.p2_coverage
+        and android
+        and pre_screen is not None
+        and not ctx.p2_completion_recheck_done
+    ):
+        # D7a: a completion-question rejection that names titles NOT on the verifier's screen is not judged
+        # blind (D6 held-out: completed rows rejected as "uncompleted" from their list position). Scroll the
+        # first such row fully into view, capture that screen and verify ONCE more from it.
+        from minitap.mobile_use.robustness.completion_recheck import (
+            RECHECK_INSTRUCTION,
+            missing_titles,
+            scroll_title_into_view,
+        )
+
+        visible = " ".join(
+            str(e.get("text") or "") + " " + str(e.get("content-desc") or e.get("content_desc") or "")
+            for e in (screen.elements or [])
+        )
+        titles = missing_titles(f"{out.evidence or ''} {out.missing or ''}", visible)
+        if titles:
+            ctx.p2_completion_recheck_done = True
+            shown = await asyncio.to_thread(scroll_title_into_view, ctx, titles[0])
+            if runtime is not None:
+                runtime.event("p2_completion_recheck", titles=titles[:5], scrolled_to=shown)
+            if shown:
+                new_screen = await controller.get_screen_data()
+                messages2 = [
+                    HumanMessage(content="Current UI hierarchy:\n" + json.dumps(new_screen.elements, indent=1, ensure_ascii=False))
+                    if isinstance(m, HumanMessage) and str(m.content).startswith("Current UI hierarchy:")
+                    else m
+                    for m in messages
+                ]
+                if use_vision and new_screen.base64 and screen.base64:
+                    messages2[-1] = get_screenshot_message_for_llm(
+                        controller.get_compressed_b64_screenshot(new_screen.base64)
+                    )
+                messages2.append(HumanMessage(content=RECHECK_INSTRUCTION.format(title=titles[0])))
+                out = await with_fallback(
+                    main_call=lambda: invoke_llm_with_timeout_message(llm.ainvoke(messages2)),
+                    fallback_call=lambda: invoke_llm_with_timeout_message(llm_fallback.ainvoke(messages2)),
+                )  # type: ignore
+                if out.checks and any(not c.met for c in out.checks):
+                    out.satisfied = False
+                    if not out.missing:
+                        out.missing = "; ".join(c.requirement for c in out.checks if not c.met)
     if out.satisfied and ablation.p2_checklist:
         from minitap.mobile_use.robustness.delete_gate import delete_gate
 

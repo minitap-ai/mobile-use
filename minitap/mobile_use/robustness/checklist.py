@@ -73,6 +73,13 @@ _COMPLETION_Q_RE = re.compile(
 )
 
 
+COMPLETION_REQUIREMENT = (
+    "Completion: read the WHOLE list to its confirmed end (read_full_list) and list EVERY row whose date matches "
+    "the goal, including rows only partly visible at a screen edge. A row's completion is judged only from its own "
+    "visible checkbox or struck-through title, never from where it sits in the list."
+)
+
+
 def is_completion_question(goal: str) -> bool:
     return bool(_COMPLETION_Q_RE.search(goal or ""))
 
@@ -113,6 +120,8 @@ async def ensure_goal_checklist(ctx, goal: str) -> list[str] | None:
         items = items + SOURCE_COPY_REQUIREMENTS
     if is_bounded_goal(goal):
         items = items + [BOUND_REQUIREMENT]
+    if is_completion_question(goal):
+        items = items + [COMPLETION_REQUIREMENT]
     ctx.p2_goal_checklist = items
     runtime = get_runtime()
     if runtime is not None:

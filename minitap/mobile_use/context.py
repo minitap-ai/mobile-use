@@ -130,6 +130,8 @@ class MobileUseContext(BaseModel):
     # D6: shutter taps in a single-photo goal, and whether the one-time refusal was given
     p2_shutter_taps: int = 0
     p2_shutter_refused: bool = False
+    # D7a: the completion-question verifier re-check ran (once per run)
+    p2_completion_recheck_done: bool = False
 
     def get_adb_client(self) -> AdbClient:
         if self.adb_client is None:

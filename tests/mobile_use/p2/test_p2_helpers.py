@@ -1244,3 +1244,64 @@ def test_shutter_gate_refuses_once():
     assert shutter_refusal(ctx, g, shutter) is None  # asked again: allowed
     assert shutter_refusal(SimpleNamespace(p2_shutter_taps=5, p2_shutter_refused=False), "Take a video.", shutter) is None
     assert shutter_refusal(SimpleNamespace(p2_shutter_taps=5, p2_shutter_refused=False), g, "tap(text='Gallery')") is None
+
+
+# --- D7a: completion-question verifier re-check ---
+from minitap.mobile_use.robustness import completion_recheck as cr  # noqa: E402
+from minitap.mobile_use.robustness.checklist import COMPLETION_REQUIREMENT  # noqa: E402
+
+
+def test_missing_titles():
+    verdict = ("The agent provided 'Complete project proposal' and 'Plan team outing'; these are uncompleted. "
+               "None is dated 'October 17 2023'. 'Call Grandma' is checked.")
+    visible = "Call Grandma Oct 16, 2023 Take Dog to the Vet"
+    assert cr.missing_titles(verdict, visible) == ["Complete project proposal", "Plan team outing"]
+    assert cr.missing_titles("'None'", "") == []
+
+
+def test_completion_line_appended(monkeypatch):
+    import minitap.mobile_use.robustness.checklist as cl
+
+    class _Llm:
+        def with_structured_output(self, _schema):
+            return self
+
+    async def boom(**_):
+        raise RuntimeError("no llm")
+
+    monkeypatch.setattr(cl, "get_llm", lambda **_: _Llm())
+    monkeypatch.setattr(cl, "with_fallback", boom)
+    monkeypatch.setattr(cl, "get_runtime", lambda: None)
+    got = asyncio.run(ensure_goal_checklist(_checklist_ctx(), "Which tasks have I completed for October 17 2023?"))
+    assert got == [COMPLETION_REQUIREMENT]
+
+
+def test_scroll_title_into_view(monkeypatch):
+    rows = [f"Row {i}" for i in range(30)] + ["Target task"] + [f"Tail {i}" for i in range(10)]
+    state = {"off": 5}  # first visible row index
+    H, ROW, TOP, BOT = 2000, 150, 200, 1800
+
+    def dump():
+        nodes = []
+        for k, i in enumerate(range(state["off"], min(len(rows), state["off"] + 11))):
+            y = TOP + k * ROW
+            nodes.append(f'<node text="{rows[i]}" bounds="[0,{y}][700,{y + ROW - 10}]"/>')
+        return "<hierarchy>" + "".join(nodes) + "</hierarchy>"
+
+    def swipe(x1, y1, x2, y2, ms):
+        state["off"] = max(0, state["off"] - 10) if y2 > y1 else state["off"]
+
+    def drag(x, a, b):
+        state["off"] = min(len(rows) - 11, state["off"] + max(1, (a - b) // ROW))
+
+    dev = SimpleNamespace(dump_xml=dump, swipe=swipe, drag=drag, screen_w=720, screen_h=H, settle_s=0)
+    monkeypatch.setattr("minitap.mobile_use.robustness.list_reader.android_device", lambda ctx: dev)
+    rect = SimpleNamespace(x1=0, y1=TOP, x2=720, y2=BOT, height=BOT - TOP)
+    monkeypatch.setattr(
+        "minitap.mobile_use.robustness.list_reader.find_main_container",
+        lambda *a, **k: SimpleNamespace(rect=rect),
+    )
+    assert cr.scroll_title_into_view(SimpleNamespace(), "Target task") is True
+    b = cr._node_rect(cr.ET.fromstring(dump()), "Target task")
+    assert b[1] >= TOP and b[3] <= BOT - int((BOT - TOP) * 0.18)
+    assert cr.scroll_title_into_view(SimpleNamespace(), "Absent task") is False
