@@ -27,6 +27,7 @@ from minitap.mobile_use.tools.index import (
     format_tools_list,
 )
 from minitap.mobile_use.robustness import p2_flags
+from minitap.mobile_use.robustness.map_route import map_route_flag
 from minitap.mobile_use.robustness.budget import checkpoint_due, checkpoint_plan, node_runs_used
 from minitap.mobile_use.robustness.calendar_context import calendar_context
 from minitap.mobile_use.robustness.checklist import render_checklist
@@ -102,6 +103,7 @@ class CortexNode:
             use_data_fidelity=use_data_fidelity,
             **p2_flags(ablation_config),
             p2_checklist_text=render_checklist(self.ctx.p2_goal_checklist),
+            p2_map_route=map_route_flag(ablation_config, state.initial_goal),
         )
         # KNOWN ISSUE (04 - Audit A9), deliberately NOT fixed on paper/androidworld-rework so
         # that every run of the study sees the same Cortex input as the January 2026 system:

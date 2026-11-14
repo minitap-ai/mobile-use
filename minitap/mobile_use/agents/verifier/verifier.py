@@ -206,6 +206,7 @@ async def _p2_call(self, state: State):
     )
     from minitap.mobile_use.robustness.calendar_context import calendar_context
     from minitap.mobile_use.robustness.checklist import render_checklist
+    from minitap.mobile_use.robustness.map_route import map_route_flag
 
     ctx = self.ctx
     ablation = ctx.get_ablation_config()
@@ -279,6 +280,7 @@ async def _p2_call(self, state: State):
         has_full_read=bool(full_read),
         has_screen_log=bool(screen_log),
         has_action_log=bool(action_log),
+        p2_map_route=map_route_flag(ablation, state.initial_goal),
     )
     thoughts = "\n".join(state.agents_thoughts[-RECENT_THOUGHTS:])
     notes = "\n".join(f"- {k}: {v}" for k, v in (state.scratchpad or {}).items())

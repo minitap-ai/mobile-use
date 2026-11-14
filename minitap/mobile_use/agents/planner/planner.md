@@ -37,6 +37,7 @@ All actions must stay within this app (except OAuth flows).
 {% endif %}{% if p2_no_redo %}- **Replanning keeps progress**: when replanning, list ONLY the subgoals still to do; completed subgoals are kept automatically. Fix what is wrong; never restart from the beginning.
 {% endif %}{% if p2_final_state %}- **Capture goals**: to take a photo, record a video or audio with an app, plan only the capture in that app. Never plan a screen recording for it: screen recording is only for reading what a video already playing on screen shows or says.
 {% endif %}{% if p2_no_redo %}- **Create, don't browse**: to create a new item (a route, a track, a note, an entry), plan the menu entry that creates or plans it, not the list of saved items.
+{% endif %}{% if p2_map_route %}- **Route or track through given places** (this goal): plan "open the app's route planner and start a new route", then ONE subgoal per place in the goal's order, each "add <place> as the next point: search its own name with the planner's search, show the place itself on the map, press Back (through the search screens, without tapping them again) until the planner is visible, tap its add-point button once, check the point count went up by one", then "save the route with the planner's own save". Never plan the place card's own buttons (favourite, marker, actions, plan a route, navigation).
 {% endif %}**Shortcuts**: Always prefer `launch_app` to open apps (not manual app drawer navigation), `open_link` for URLs.
 {% if video_recording_enabled %}
 ### 🎥 Video Recording Pattern

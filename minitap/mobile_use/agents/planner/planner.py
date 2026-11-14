@@ -17,6 +17,7 @@ from minitap.mobile_use.tools.index import (
     format_tools_list,
 )
 from minitap.mobile_use.robustness import p2_flags
+from minitap.mobile_use.robustness.map_route import map_route_flag
 from minitap.mobile_use.robustness.checklist import ensure_goal_checklist
 from minitap.mobile_use.robustness.order import insert_order_subgoal
 from minitap.mobile_use.robustness.planning import keep_completed_subgoals, p2_human_vars
@@ -59,6 +60,7 @@ class PlannerNode:
             current_foreground_app=current_foreground_app,
             video_recording_enabled=self.ctx.video_recording_enabled,
             **p2_flags(self.ctx.get_ablation_config()),
+            p2_map_route=map_route_flag(self.ctx.get_ablation_config(), state.initial_goal),
         )
         human_message = Template(
             Path(__file__).parent.joinpath("human.md").read_text(encoding="utf-8")
