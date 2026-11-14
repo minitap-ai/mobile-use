@@ -48,6 +48,26 @@ SOURCE_COPY_REQUIREMENTS = [
 ]
 
 
+# D6: fixed requirement for goals with a time or date bound (the checklist LLM and the verifier read "after X"
+# strictly once, against the boundary convention already in the prompts). Trigger (goal wording only): a bound
+# word followed, in the same sentence, by a clock time or a calendar date.
+_MONTHS = "january|february|march|april|may|june|july|august|september|october|november|december"
+_BOUND_RE = re.compile(
+    r"\b(?:after|before|since|until|from|between)\b[^.?!]*?"
+    rf"(?:\b\d{{1,2}}(?::\d{{2}})?\s*(?:am|pm)\b|\b\d{{1,2}}:\d{{2}}\b|\b(?:{_MONTHS})\s+\d{{1,2}}\b|\b\d{{4}}-\d{{2}}-\d{{2}}\b)",
+    re.IGNORECASE,
+)
+BOUND_REQUIREMENT = (
+    "Bounds: a time or date bound written in the goal (after / before / since / until / from / between X) "
+    "INCLUDES an item exactly at X, unless the goal says \"strictly\" or \"exclusive\" (e.g. \"after 9:00am\" "
+    "includes an item at 9:00am; an answer of none is wrong if such an item exists)."
+)
+
+
+def is_bounded_goal(goal: str) -> bool:
+    return bool(_BOUND_RE.search(goal or ""))
+
+
 def is_source_copy_goal(goal: str) -> bool:
     return bool(_SOURCE_COPY_RE.search(goal or ""))
 
@@ -82,6 +102,8 @@ async def ensure_goal_checklist(ctx, goal: str) -> list[str] | None:
         items = []
     if is_source_copy_goal(goal):
         items = items + SOURCE_COPY_REQUIREMENTS
+    if is_bounded_goal(goal):
+        items = items + [BOUND_REQUIREMENT]
     ctx.p2_goal_checklist = items
     runtime = get_runtime()
     if runtime is not None:

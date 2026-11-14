@@ -1154,3 +1154,50 @@ from minitap.mobile_use.robustness.text_copy import split_trailing_enters  # noq
 )
 def test_split_trailing_enters(text, sent, enters):
     assert split_trailing_enters(text) == (sent, enters)
+
+
+# --- D6 candidates: bound checklist line, duplicate-delete gate ---
+from minitap.mobile_use.robustness.checklist import BOUND_REQUIREMENT, is_bounded_goal  # noqa: E402
+from minitap.mobile_use.robustness.delete_gate import duplicate_delete_refusal  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "goal, hit",
+    [
+        ("What is my first meeting after 10:00am October 15 2023 in the planner?", True),
+        ("Do I have anything between 10:00am and 8pm October 19 2023?", True),
+        ("Total distance from October 05 2023 to October 13 2023?", True),
+        ("Delete all the events on 2023-10-15.", False),  # no bound word
+        ("How many entries do I have due next week?", False),
+        ("Send the message after you open the app.", False),  # bound word, no time or date
+    ],
+)
+def test_bounded_goal_trigger(goal, hit):
+    assert is_bounded_goal(goal) is hit
+
+
+def test_bound_line_appended(monkeypatch):
+    import minitap.mobile_use.robustness.checklist as cl
+
+    class _Llm:
+        def with_structured_output(self, _schema):
+            return self
+
+    async def boom(**_):
+        raise RuntimeError("no llm")
+
+    monkeypatch.setattr(cl, "get_llm", lambda **_: _Llm())
+    monkeypatch.setattr(cl, "with_fallback", boom)
+    monkeypatch.setattr(cl, "get_runtime", lambda: None)
+    ctx = _checklist_ctx()
+    assert asyncio.run(ensure_goal_checklist(ctx, "First item after 9:00am October 3 2023?")) == [BOUND_REQUIREMENT]
+
+
+def test_duplicate_delete_gate():
+    ctx = SimpleNamespace(p2_inspect_rows_runs=0)
+    goal = "Delete all but one of any entries that are exact duplicates."
+    assert duplicate_delete_refusal(ctx, goal, "tap(text='Delete')")
+    assert duplicate_delete_refusal(ctx, goal, "tap(text='More options')") is None  # not a delete control
+    assert duplicate_delete_refusal(ctx, "Delete the following entries: A.", "tap(text='Delete')") is None
+    ctx.p2_inspect_rows_runs = 1
+    assert duplicate_delete_refusal(ctx, goal, "tap(text='Delete')") is None

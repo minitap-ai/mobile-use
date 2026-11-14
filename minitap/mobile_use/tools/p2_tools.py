@@ -247,6 +247,7 @@ def get_inspect_rows_tool(ctx: MobileUseContext) -> BaseTool:
             res = await asyncio.to_thread(_inspect, dev, match or "", detail_contains)
             outcome, ok = res.render(), res.error is None
             if ok:
+                ctx.p2_inspect_rows_runs += 1
                 ctx.p2_tool_evidence = ((ctx.p2_tool_evidence or []) + [f"[inspect_rows match={match!r} detail_contains={detail_contains!r}] {outcome[:12000]}"])[-6:]
         except Exception as e:
             outcome, ok = f"inspect_rows failed: {e}", False

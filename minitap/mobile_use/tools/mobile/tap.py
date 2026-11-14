@@ -10,6 +10,7 @@ from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.unified_controller import UnifiedMobileController
 from minitap.mobile_use.graph.state import State
+from minitap.mobile_use.benchmark.runtime import get_runtime
 from minitap.mobile_use.robustness.target_resolution import p2_covered_check, p2_resolve_target
 from minitap.mobile_use.tools.tool_wrapper import ToolWrapper
 from minitap.mobile_use.tools.types import Target
@@ -56,6 +57,17 @@ def get_tap_tool(ctx: MobileUseContext) -> BaseTool:
                 refusal, cover_warning = p2_covered_check(ctx, target, await controller.get_ui_elements())
             except Exception:
                 refusal, cover_warning = None, None
+            if not refusal:  # D6: no delete-control tap in a duplicate-delete goal before inspect_rows
+                from minitap.mobile_use.robustness.action_log import describe
+                from minitap.mobile_use.robustness.delete_gate import duplicate_delete_refusal
+
+                refusal = duplicate_delete_refusal(
+                    ctx, state.initial_goal, describe("tap", {"target": target.model_dump()})
+                )
+                if refusal:
+                    runtime = get_runtime()
+                    if runtime is not None:
+                        runtime.event("p2_duplicate_delete_refused")
         if refusal:
             tool_message = ToolMessage(
                 tool_call_id=tool_call_id,

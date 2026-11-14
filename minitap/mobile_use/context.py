@@ -125,6 +125,8 @@ class MobileUseContext(BaseModel):
     # D4 candidates: one-time presence gate for listed deletes; add-goal delete gate
     p2_delete_presence_used: bool = False
     p2_add_delete_gate_used: bool = False
+    # D6: completed inspect_rows runs (the duplicate-delete gate requires one before any delete tap)
+    p2_inspect_rows_runs: int = 0
 
     def get_adb_client(self) -> AdbClient:
         if self.adb_client is None:

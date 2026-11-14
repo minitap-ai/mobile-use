@@ -110,3 +110,30 @@ def add_delete_gate(ctx, goal: str) -> str | None:
         return None
     ctx.p2_add_delete_gate_used = True
     return ADD_DELETE_MESSAGE
+
+
+# --- D6: duplicate-delete gate (deterministic, tool level) ---
+# Observed on D5 (dev seed): a duplicate-delete goal; the agents judged rows "duplicates" from title and
+# description on the list, deleted 3, and one was not identical on every field. Backtest over all p2 runs of
+# duplicate-delete goals: runs that ran inspect_rows before the first delete passed 41 / failed 8; runs that
+# deleted without it passed 11 / failed 22 (one task family 0/13). The existing prompt rule ("delete only rows
+# inspect_rows grouped as identical") was ignored, so the tap tool refuses a delete-control tap until
+# inspect_rows has run once in this run. Trigger (goal wording only): the goal mentions duplicates.
+DUPLICATE_GOAL_RE = re.compile(r"\bduplicat", re.IGNORECASE)
+
+DUPLICATE_DELETE_REFUSAL = (
+    "Refused: this goal deletes duplicates, and no inspect_rows has been run yet. Duplicates must be identical "
+    "on EVERY field, not only on what the list shows. Run inspect_rows on the candidate rows first (match= a "
+    "title), then delete only rows it groups as identical; keep one of each group."
+)
+
+
+def duplicate_delete_refusal(ctx, goal: str, target_desc: str) -> str | None:
+    """Refusal text for a delete-control tap in a duplicate-delete goal before any inspect_rows, else None."""
+    from minitap.mobile_use.robustness.action_log import DELETE_ACTION_RE
+
+    if not DUPLICATE_GOAL_RE.search(goal or "") or ctx.p2_inspect_rows_runs > 0:
+        return None
+    if not DELETE_ACTION_RE.search(target_desc or ""):
+        return None
+    return DUPLICATE_DELETE_REFUSAL
