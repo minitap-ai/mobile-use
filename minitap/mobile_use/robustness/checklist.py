@@ -49,14 +49,11 @@ SOURCE_COPY_REQUIREMENTS = [
 
 
 # D6: fixed requirement for goals with a time or date bound (the checklist LLM and the verifier read "after X"
-# strictly once, against the boundary convention already in the prompts). Trigger (goal wording only): a bound
-# word followed, in the same sentence, by a clock time or a calendar date.
-_MONTHS = "january|february|march|april|may|june|july|august|september|october|november|december"
+# strictly once, against the boundary convention already in the prompts). Trigger (goal wording only):
+# "after" or "before" immediately followed by a clock time (e.g. "after 10:00am").
 _BOUND_RE = re.compile(
-    r"\b(?:after|before|since|until|from|between)\b[^.?!]*?"
-    rf"(?:\b\d{{1,2}}(?::\d{{2}})?\s*(?:am|pm)\b|\b\d{{1,2}}:\d{{2}}\b|\b(?:{_MONTHS})\s+\d{{1,2}}\b|\b\d{{4}}-\d{{2}}-\d{{2}}\b)",
-    re.IGNORECASE,
-)
+    r"\b(?:after|before)\s+(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)\b|\d{1,2}:\d{2}\b)", re.IGNORECASE
+)  # narrowed (coordinator: smallest touched set): "after/before <clock time>" only
 BOUND_REQUIREMENT = (
     "Bounds: a time or date bound written in the goal (after / before / since / until / from / between X) "
     "INCLUDES an item exactly at X, unless the goal says \"strictly\" or \"exclusive\" (e.g. \"after 9:00am\" "

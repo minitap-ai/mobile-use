@@ -1165,8 +1165,9 @@ from minitap.mobile_use.robustness.delete_gate import duplicate_delete_refusal  
     "goal, hit",
     [
         ("What is my first meeting after 10:00am October 15 2023 in the planner?", True),
-        ("Do I have anything between 10:00am and 8pm October 19 2023?", True),
-        ("Total distance from October 05 2023 to October 13 2023?", True),
+        ("What is my first meeting before 20:00 October 15 2023?", True),
+        ("Do I have anything between 10:00am and 8pm October 19 2023?", False),  # narrowed: after/before only
+        ("Total distance from October 05 2023 to October 13 2023?", False),
         ("Delete all the events on 2023-10-15.", False),  # no bound word
         ("How many entries do I have due next week?", False),
         ("Send the message after you open the app.", False),  # bound word, no time or date
