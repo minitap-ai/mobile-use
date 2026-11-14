@@ -1134,3 +1134,23 @@ def test_add_delete_gate_scope():
     assert add_delete_gate(ctx, src) is None
     assert add_delete_gate(SimpleNamespace(p2_add_delete_gate_used=False, p2_delete_seen=False), src) is None
     assert add_delete_gate(SimpleNamespace(p2_add_delete_gate_used=False, p2_delete_seen=True), "Add a song to the playlist.") is None
+
+
+# --- D5: multi-line text is typed whole; only single-line text gets Enter key presses ---
+from minitap.mobile_use.robustness.text_copy import split_trailing_enters  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "text, sent, enters",
+    [
+        ("query\n", "query", 1),  # single-line: Enter submits the field
+        ("query\n\n", "query", 2),
+        ("query", "query", 0),
+        ("Head\n\nBody.\n", "Head\n\nBody.\n", 0),  # multi-line: typed whole, newline committed
+        ("Head\nBody.", "Head\nBody.", 0),
+        ("\n", "\n", 0),
+        ("", "", 0),
+    ],
+)
+def test_split_trailing_enters(text, sent, enters):
+    assert split_trailing_enters(text) == (sent, enters)

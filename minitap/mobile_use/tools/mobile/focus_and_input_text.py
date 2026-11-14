@@ -17,7 +17,11 @@ from minitap.mobile_use.benchmark.text_check import (
     find_focused_text_element,
 )
 from minitap.mobile_use.constants import EXECUTOR_MESSAGES_KEY
-from minitap.mobile_use.robustness.text_copy import restore_from_decision, trailing_newlines_missing
+from minitap.mobile_use.robustness.text_copy import (
+    restore_from_decision,
+    split_trailing_enters,
+    trailing_newlines_missing,
+)
 from minitap.mobile_use.tools.text_fidelity import restore_text
 from minitap.mobile_use.context import MobileUseContext
 from minitap.mobile_use.controllers.controller_factory import create_device_controller
@@ -179,12 +183,16 @@ def get_focus_and_input_text_tool(ctx: MobileUseContext) -> BaseTool:
 
         # Step 3: Type the text
         trailing_enters = 0
-        if ablation_config.p2_tool_fixes and text.endswith("\n") and text.strip("\n"):
+        multi_line = "\n" in text.rstrip("\n")
+        if ablation_config.p2_tool_fixes and split_trailing_enters(text)[1]:
             # P2 F7: a trailing newline typed into a single-line field (a search box) becomes a
             # space instead of submitting. Type the text, then press Enter once per newline: it
-            # submits single-line fields and adds the line break in multi-line ones.
-            body = text.rstrip("\n")
-            trailing_enters = len(text) - len(body)
+            # submits the field.
+            # D5: ONLY for single-line text (split_trailing_enters). Multi-line text is typed whole,
+            # trailing newlines included, through the input method: a separate Enter key event
+            # right after the text was lost in multi-line editors on held-out seeds, while the
+            # newline committed with the text was kept in every observed readback.
+            body, trailing_enters = split_trailing_enters(text)
             result = await _controller_input_text(ctx=ctx, text=body)
             if result.ok:
                 controller = create_device_controller(ctx)
@@ -217,16 +225,20 @@ def get_focus_and_input_text_tool(ctx: MobileUseContext) -> BaseTool:
             logger.warning("Skipping post-input validation (ablation baseline)")
             text_input_content = f"(validation skipped) {text}"
 
-        if trailing_enters and readback_element is not None:
-            # D3: an Enter press can be lost (observed on a held-out seed: the field read back
-            # without the final line break, and the whitespace-normalized check still said MATCH).
-            # When the raw readback has fewer trailing newlines than the text, press the missing
-            # Enters once and read the field again. Behaviour is unchanged when nothing was lost.
+        if (
+            ablation_config.p2_tool_fixes
+            and multi_line
+            and text.endswith("\n")
+            and readback_element is not None
+        ):
+            # D3/D5: a final line break can still be lost (the whitespace-normalized check then
+            # says MATCH). When the raw readback of this multi-line field has fewer trailing
+            # newlines than the text, commit the missing newlines ONCE through the input method
+            # (not as Enter key events, which were the ones lost) and read the field again.
             missing = trailing_newlines_missing(text, text_input_content)
             if missing:
+                await _controller_input_text(ctx=ctx, text="\n" * missing)
                 controller = create_device_controller(ctx)
-                for _ in range(missing):
-                    await controller.press_enter()
                 screen_data = await controller.get_screen_data()
                 state.latest_ui_hierarchy = screen_data.elements
                 readback_hierarchy = screen_data.elements

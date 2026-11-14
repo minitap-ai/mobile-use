@@ -51,3 +51,16 @@ def trailing_newlines_missing(intended: str, read_back: str | None) -> int:
     want = len(intended) - len(intended.rstrip("\n"))
     have = len(read_back) - len(read_back.rstrip("\n"))
     return max(0, want - have)
+
+
+def split_trailing_enters(text: str) -> tuple[str, int]:
+    """P2 F7 + D5: how to type `text`: (text to send through the input method, Enter key presses after it).
+
+    Single-line text ending in newlines (e.g. a search query): send the body, then one Enter per
+    newline (submits the field; a newline typed into a single-line field became a space).
+    Multi-line text (it has an inner line break) or text without trailing newlines: send it whole,
+    no Enter key events (a separate Enter after the text was lost in multi-line editors)."""
+    body = text.rstrip("\n")
+    if not body or body == text or "\n" in body:
+        return text, 0
+    return body, len(text) - len(body)
